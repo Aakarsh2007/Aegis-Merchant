@@ -14,7 +14,6 @@ pydantic-settings>=2.5.0
 # --- persistence ---
 sqlalchemy>=2.0.35
 aiosqlite>=0.20.0
-alembic>=1.13.0
 
 # --- scheduling (in-process; no Celery, no broker) ---
 apscheduler>=3.10.4

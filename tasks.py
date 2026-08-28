@@ -156,9 +156,19 @@ def _pending(phase: str) -> int:
     return 0
 
 
-@task("seed", "Seed the 420-transaction GlowKart corpus (Phase 1)")
+@task("seed", "Seed the 420-transaction GlowKart corpus (runtime + committed demo DB)")
 def seed() -> int:
-    return _pending("Phase 1")
+    """Writes two databases.
+
+    The runtime one is gitignored and disposable. The demo one is committed, so
+    a judge running `demo` sees a populated dashboard on first load without
+    waiting on a seed step (workflow.md §22).
+    """
+    rc = run([PY, "-m", "app.db.seed"], cwd=API)
+    if rc != 0:
+        return rc
+    demo_db = ROOT / "data" / "revpilot.seed.db"
+    return run([PY, "-m", "app.db.seed", "--out", str(demo_db)], cwd=API)
 
 
 @task("warm-cache", "Populate the committed LLM response cache (Phase 6)")

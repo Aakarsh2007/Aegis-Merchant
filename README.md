@@ -9,10 +9,31 @@ Razorpay AI Buildathon 2026 · Track: **AI Revenue Recovery**
 
 [![CI](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml/badge.svg)](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml)
 
-> **Build status: Phase 0 of 15 complete.** This README grows with the build. The
-> full architecture, and the reasoning behind every choice in it, is in
-> [`workflow.md`](workflow.md) — 2,400 lines of build contract written before the
-> first line of code.
+> **Build status: Phase 1 of 15 complete** — injected clock, config, health endpoints,
+> CI, the 18-table schema, and the seeded 420-transaction corpus. The full
+> architecture, and the reasoning behind every choice in it, is in
+> [`workflow.md`](workflow.md) — a build contract written before the first line of code.
+>
+> **No recovery figures are quoted yet, because nothing has run yet.** The agent lands in
+> Phases 4–9 and measurement in Phase 13. What exists today is the corpus below. Any rupee
+> figure in `workflow.md` is an illustrative placeholder until then, and is labelled as such.
+
+## The corpus, measured
+
+Run `python tasks.py seed` and it prints this — so the numbers in this README cannot drift
+away from the data without someone noticing.
+
+| | |
+|---|---|
+| Transactions | **420** — 210 captured · 96 failed checkout · 62 abandoned · 28 overdue invoices · 24 subscription failures |
+| Customers | 140 (6 opted out · 4 DND-registered · ≥22 without marketing consent) |
+| Captured GMV | ₹7,93,199 over a 14-day window (implied ~₹17.0L/month) |
+| Revenue at risk | ₹11,84,629 |
+| Recovered so far | **₹0** |
+| Reproducible | Byte-for-byte from `SEED=20260905` against a fixed anchor instant |
+
+Failures are **deliberately over-sampled** — a corpus with three failures would exercise
+nothing — so rates computed over it are rates of the sample, not of GlowKart's true funnel.
 
 ---
 
@@ -103,13 +124,19 @@ money.**
 ## Repository layout
 
 ```
-apps/api/app/         FastAPI backend
+apps/api/app/
   core/clock.py       injected Clock — the only sanctioned wall-clock read
   config.py           every policy bound, as config rather than a literal
   main.py             app factory, health endpoints
+  db/types.py         UtcDateTime — rejects naive datetimes at the DB boundary
+  db/enums.py         24 enum columns, each with a real CHECK constraint
+  db/models.py        the 18 tables
+  db/session.py       async engine + WAL/foreign-key/busy-timeout pragmas
+  db/seed.py          the 420-transaction GlowKart corpus
 apps/web/             Next.js Command Center            (Phase 12)
+data/revpilot.seed.db committed demo database — inspectable without our code
 tests/                unit, integration, eval, property suites
-docs/INCIDENTS.md     engineering journal
+docs/INCIDENTS.md     engineering journal — real breakages, wrong theories included
 docs/DECISIONS.md     decisions, including what we rejected
 workflow.md           the build contract
 tasks.py              every project command

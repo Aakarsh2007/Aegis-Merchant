@@ -104,3 +104,42 @@ in-process). Durability comes from the outbox pattern, not from a broker.
 **Cost of being wrong:** The honest limitation is single-process, no horizontal
 scaling — stated in the README. The outbox is precisely what makes swapping in a
 real queue consumer mechanical if that ever matters.
+
+## DEC-006 · 2026-08-29 · No Alembic; the seed script is the schema fixture
+
+**Phase:** 1
+
+**Decision:** Create the schema with `Base.metadata.create_all` and regenerate data with
+`tasks.py seed`. No migration tool.
+
+**Rejected:** Alembic, which the v3.1 roadmap listed. Asked what it would actually do
+here and found nothing: there is no deployed instance whose data must survive a schema
+change, and during the build the correct response to a schema change is to delete the dev
+database and re-seed — which takes under a second. Alembic would have contributed an
+`env.py`, a `versions/` directory and a migration chain that nothing ever runs. The
+rubric rewards "the right tool in the right place", and that cuts against ceremony as
+much as it cuts against reaching for an LLM.
+
+**Cost of being wrong:** Low and clearly signposted. Alembic goes in the moment there is
+a persistent instance with data worth preserving; `create_all` on an existing database is
+a no-op, so adding it later is additive rather than a rewrite. Recorded in workflow.md as
+ADL-012.
+
+## DEC-007 · 2026-08-29 · Timestamps as ISO-8601 UTC text, not SQLite DATETIME
+
+**Phase:** 1
+
+**Decision:** A `UtcDateTime` type decorator storing a fixed-width
+`YYYY-MM-DDTHH:MM:SS.sssZ` string, rejecting naive datetimes on both write and read.
+
+**Rejected:** `DateTime(timezone=True)`. SQLite has no native timestamp type and no
+concept of a time zone: SQLAlchemy writes whatever it is handed and reads back a **naive**
+datetime, silently discarding the offset. In a system where a timezone error means
+messaging a customer at 2 AM in breach of quiet hours, a silent tz loss is not an
+acceptable failure mode. Also rejected: Unix epoch integers, which are unambiguous but
+unreadable to a judge inspecting the database file — and §12.1 makes independent
+inspection part of the credibility argument.
+
+**Cost of being wrong:** Fixed-width text sorts correctly, so `ORDER BY`, `BETWEEN` and
+the rolling-window queries behave exactly as they would with a native type. The cost is
+~8 bytes per column versus an integer, which is irrelevant at this scale.

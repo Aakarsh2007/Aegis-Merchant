@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| **Document Version** | 3.1 — FINAL. Judging-criteria-aligned, free-tier-only, technically audited. |
+| **Document Version** | 3.2 — v3.1 plus corrections found while implementing (§30 ADL-012). |
 | **Supersedes** | v2.1 (see §30 ADL-006 for the full delta and reasoning) |
 | **Cost to build and run** | **₹0.** Every dependency is a free tier or self-hosted (§22.1). |
 | **Target Event** | Razorpay AI Buildathon 2026 |
@@ -31,7 +31,7 @@
 | 9 | **Indian regulatory & consent compliance** | TRAI/DLT, DND, quiet hours, NPCI, RBI |
 | 10 | Ingestion, transactional outbox, DLQ | Exactly-once execution against a real payment API |
 | 11 | Razorpay integration specification | Every endpoint and webhook we touch |
-| 12 | Data model (SQLite WAL) | 16 tables, and why each is load-bearing |
+| 12 | Data model (SQLite WAL) | 18 tables, and why each is load-bearing |
 | 13 | Security architecture | HMAC, auth, PII, injection containment, audit chain |
 | 14 | **Measurement & attribution methodology** | The control arm. The headline defence. |
 | 15 | AI evaluation harness | Golden set, injection suite, property-based safety proof |
@@ -50,6 +50,29 @@
 | 28 | Application form answer pack | The 12 fields |
 | 29 | Principal-engineer review | 11 adversarial questions |
 | 30 | Architecture decision log | 11 decisions, with the reasoning |
+
+---
+
+> ### ⚠ On the rupee figures in this document
+>
+> Every specific amount below — ₹3.84L at risk, ₹1.24L recovered, ₹93.1K net incremental, 31 cases,
+> 32.3% — is an **illustrative placeholder**, written before the system existed, and none of it has been
+> measured. They are kept only to show the *shape* of the reporting. **Phase 13 replaces them with figures
+> the code actually produces.** Until then, treat any rupee number here as a mock-up, not a result.
+>
+> What *is* measured, as of Phase 1, from the committed corpus in `data/revpilot.seed.db`:
+>
+> | Fact | Value |
+> |---|---|
+> | Transactions | 420 (210 captured · 96 failed checkout · 62 abandoned · 28 invoices · 24 subscriptions) |
+> | Captured GMV | ₹7,93,199 over a 14-day window |
+> | Implied run-rate | ~₹17.0L/month — consistent with GlowKart at ~₹20L/month |
+> | Revenue at risk | ₹11,84,629 |
+> | Recovered | **₹0 — nothing has run yet** |
+>
+> Printed by `python tasks.py seed` on every run, so a drift between the document and the data cannot go
+> unnoticed. This distinction is the whole point of §14.5: a figure with no provenance is a liability, and
+> that applies to our own planning document first.
 
 ---
 
@@ -965,6 +988,9 @@ with any SQLite browser — which means a judge can independently verify our num
 
 ```mermaid
 erDiagram
+    MERCHANT ||--o{ PAYMENT_ATTEMPT : records
+    CUSTOMER ||--o{ PAYMENT_ATTEMPT : makes
+    PAYMENT_ATTEMPT ||--o| RECOVERY_CASE : may_open
     MERCHANT ||--o{ CUSTOMER : owns
     MERCHANT ||--|| POLICY_CONFIG : configures
     MERCHANT ||--o{ RECOVERY_CASE : owns
@@ -1013,6 +1039,26 @@ erDiagram
         int max_representations
         int approval_ttl_minutes
         float control_arm_fraction
+    }
+
+    PAYMENT_ATTEMPT {
+        string id PK
+        string merchant_id FK
+        string customer_id FK
+        string order_id
+        string payment_id
+        string invoice_id
+        string subscription_id
+        string kind
+        string status
+        int amount_paise
+        string method
+        string issuer
+        string error_code
+        string error_source
+        string error_step
+        string error_reason
+        timestamp attempted_at
     }
 
     CUSTOMER {
@@ -1231,6 +1277,7 @@ erDiagram
 | `EXPERIMENT_ASSIGNMENT` | Immutable arm assignment | No counterfactual → the headline number is unfalsifiable |
 | `LLM_CALL` | Per-call token/latency/validity **and `source ∈ {LIVE, CACHED, DETERMINISTIC}`** | Cost and latency claims are unmeasured assertions, and a cached response could be silently passed off as live |
 | `LLM_CACHE` | Content-addressed committed response cache (§4.5) | A 420-case batch takes hours on a free tier, and the result is not reproducible |
+| `PAYMENT_ATTEMPT` | The transaction ledger: every attempt, successful or failed | **Found while implementing Phase 1.** Two things had nowhere to live: the 210 *successful* payments in the corpus (a success is not a recovery case), and the source data for the rail-health index — §4.2 item 7 claims rail health is "a rolling success rate per (method, issuer) from our own event log", which requires a table of attempts with a denominator. Without it, rail health could only be computed from failures, i.e. from a numerator with no denominator. It is also the honest denominator for "revenue at risk". |
 | `MESSAGE_TEMPLATE` | DLT-registered templates with slots | SMS content is legally non-compliant by construction |
 | `POLICY_CONFIG` (expanded) | Every bound is data, not a literal | Cannot demo a policy change live; cannot show per-merchant config |
 
@@ -1261,8 +1308,37 @@ prevent spam.
 | **Hero cases** | 3 | Ananya (₹4,299 UPI timeout, high LTV, no consent for marketing → recovered at 0% discount), Rahul Enterprises (₹18,500 invoice → HITL + promise-to-pay), Vikram (mandate revoked → re-auth, not retry) |
 
 **Generation rule:** seeded RNG (`SEED=20260905`), committed generator script, committed output. Reproducible
-byte-for-byte. A judge can regenerate and diff. The three hero cases are *planted in a realistic distribution*,
-not hand-placed at the top — the agent finds them the same way it finds everything else.
+byte-for-byte — `test_same_seed_produces_identical_corpus` asserts it, and a companion test with a *different*
+seed asserts the digest changes, because a reproducibility test that cannot fail proves nothing. Timestamps
+derive from a **fixed anchor instant** (2026-09-01 09:00 IST), never the wall clock: deriving them from `now`
+would make the committed database differ on every run and silently destroy the reproducibility claim. The three
+hero cases are *planted in a realistic distribution*, not hand-placed at the top — the agent finds them the same
+way it finds everything else, and a test asserts they are not in the first ten rows.
+
+**Measured properties of the corpus (as built, not as hoped):**
+
+| Property | Value |
+|---|---|
+| Window | 14 days |
+| Captured GMV | ₹7,93,199 (210 orders) |
+| Implied run-rate | ~₹17.0L/month, against GlowKart's stated ~₹20L/month |
+| Revenue at risk | ₹11,84,629 |
+| Failure `error_source` spread | bank 55 · customer 50 · gateway 9 · business 4 · internal 2 |
+| Consent profile | 6 opted out · 4 DND-registered · ≥22 without marketing consent |
+| Subscription split | 13 insufficient-balance · 11 mandate-invalid |
+
+**Two disclosures that belong here rather than in a footnote.**
+
+*Failures are deliberately over-sampled.* 96 payment failures across 368 checkout attempts is ~26% — the top of
+the 15–30% band in §0.1, and higher than a healthy merchant's true rate. That is intentional: a corpus with three
+failures would exercise nothing. **The consequence is that every rate computed over this corpus is a rate of the
+sample, not of GlowKart's funnel**, and the dashboard says so. Quoting a sample recovery rate as though it were a
+population figure is the same error as quoting gross recovery as though it were incremental.
+
+*The window was corrected during Phase 1.* The corpus originally spanned 60 days, which implied a ₹4.06L/month
+run-rate for a brand described as doing ₹20L/month — a 5× mismatch any judge dividing GMV by days would have
+found. Compressing to 14 days fixed it. The seed script now prints the implied run-rate on every run, so this
+class of error is visible rather than latent.
 
 ---
 
@@ -2219,7 +2295,7 @@ Sixteen phases (0–15). **Every phase carries DoD-J (§17.1): journal what brok
 | Phase | Deliverable | Key files | Definition of Done |
 |---|---|---|---|
 | **0** | Monorepo, env, CI skeleton, Makefile, **injected `Clock`** | `Makefile`, `.env.example`, `.github/workflows/ci.yml`, `core/clock.py`, `docs/INCIDENTS.md`, `docs/DECISIONS.md` | `make demo` starts both apps (**no `--reload`**); `/healthz` 200; CI green with **zero secrets**; `SystemClock`/`FakeClock` in place with a lint rule banning bare `datetime.now()`; **both docs files exist and are committed empty-but-headed** |
-| **1** | Data model + migrations + 420-txn seed | `db/models.py`, `db/session.py`, `db/seed.py`, `alembic/` | WAL + FKs on; all §12.2 tables; seed reproducible from `SEED=20260905`; `revpilot.db` committed; `test_db_constraints` proves every UNIQUE fires |
+| **1** | Data model + 420-txn seed | `db/base.py`, `db/types.py`, `db/enums.py`, `db/ids.py`, `db/models.py`, `db/session.py`, `db/seed.py` | WAL + FKs + `busy_timeout` verified **by querying the pragmas**, not assumed; all 18 §12.2 tables; timestamps stored as ISO-8601 UTC text through a type that rejects naive datetimes at both ends; seed reproducible byte-for-byte from `SEED=20260905` against a **fixed anchor instant** (never wall-clock, or the committed DB would differ every run); `data/revpilot.seed.db` committed; `test_db_constraints` proves every UNIQUE and FK actually fires |
 | **2** | Razorpay client + HMAC webhook ingestion | `tools/razorpay_client.py`, `routers/webhooks.py`, `tests/fixtures/razorpay/` | Valid HMAC 200 <15 ms; forged 401; replay 401; duplicate dropped; **real Test Mode field shapes captured as fixtures**; every doc divergence journalled |
 | **3** | Deterministic classifier + rail-health index | `agent/classifier.py`, `agent/rail_health.py` | `(error_source, error_step)` → category for all seeded failures; rail-health computed from our own log; **classifier accuracy on the golden set recorded as the LLM's baseline to beat** |
 | **4** | Stopping Rules Engine | `guardrails/stopping_rules.py` | All 12 rules implemented as pure predicates; `test_no_case_outlives_its_window` passes; firing counts exposed. All window and quiet-hours tests use `FakeClock`, never a global time patch |
@@ -2408,6 +2484,24 @@ marginal gain, and it doubles the prompt surface to maintain and evaluate. Low-c
 route to the deterministic fallback and, where the amount justifies it, to a human at rung A2. That path is
 cheaper, has bounded latency, and is easier to defend — *"below a confidence threshold we stop guessing and
 ask a person"* is a better answer than *"we ask a bigger model."*
+
+**ADL-012 — Corrections found while implementing (v3.1 → v3.2).** Two gaps only visible once the schema
+was written, recorded here rather than silently patched in code:
+
+*Added `PAYMENT_ATTEMPT` (16 → 18 tables).* §4.2 item 7 claims the retry rail is chosen from "a rolling
+success rate per (method, issuer) from our own event log" — a statistics query rather than an LLM call. That
+claim needs a table of *attempts*, because a success rate needs a denominator, and the ERD had nowhere to put
+the corpus's 210 successful payments. Without this table, rail health could only have been computed from
+failures: a numerator with no denominator. It is also the honest basis for "revenue at risk".
+
+*Dropped Alembic.* The v3.1 roadmap listed an `alembic/` directory. Removed after asking what it would
+actually do here: there is no deployed instance to migrate, the database is created by `create_all` and
+populated by a committed seed script, and during the build itself the correct move for a schema change is to
+delete the dev database and re-seed — which takes under a second. Alembic would have added an `env.py`, a
+migration chain, and a versions directory that nothing ever runs. The rubric rewards *"the right tool in the
+right place"*, and that cuts against ceremony as much as it cuts against reaching for an LLM. **The seed
+script is the schema fixture.** Alembic goes in the moment there is a persistent instance whose data must
+survive a schema change; until then it would be theatre. Recorded in `docs/DECISIONS.md` as DEC-006.
 
 **ADL-007 — Report policy interceptions as a positive metric.** v2.1 framed intercepted proposals as a defect
 count. A non-zero interception count is evidence the firewall is live; zero interceptions with an untested
