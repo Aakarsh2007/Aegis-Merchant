@@ -1,0 +1,34 @@
+# Normalise line endings so the repo is byte-identical regardless of the OS it
+# was committed from. This is not cosmetic: a CRLF in the Makefile or in a CI
+# shell script breaks on Linux, and CRLF in a file whose SHA-256 we chain into
+# the audit ledger would change the hash.
+
+* text=auto eol=lf
+
+# Files that MUST be LF — recipe lines and shell scripts break otherwise.
+Makefile        text eol=lf
+*.sh            text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.py            text eol=lf
+*.ts            text eol=lf
+*.tsx           text eol=lf
+*.json          text eol=lf
+*.toml          text eol=lf
+*.md            text eol=lf
+.env.example    text eol=lf
+
+# Binary — never touch, never diff.
+*.db            binary
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.pdf           binary
+*.ico           binary
+*.woff          binary
+*.woff2         binary
+
+# Keep generated/vendored files out of diffs and language stats.
+data/llm_cache.jsonl  -diff linguist-generated
+workflow.md           linguist-documentation

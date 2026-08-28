@@ -1,0 +1,118 @@
+name: CI
+
+# Runs with ZERO secrets configured. That is deliberate: the LLM eval suites
+# score against a committed response cache, and injection containment is
+# tested with a hostile-LLM stub (workflow.md §15.2). Gating the build on a
+# provider's model behaviour would make our build status depend on someone
+# else's weights — and would need a key in CI, which would make this badge
+# unreproducible by anyone who forks the repo.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  api:
+    name: API — lint, types, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r apps/api/requirements.txt
+
+      - name: Lint (ruff)
+        run: python tasks.py lint
+
+      - name: Type check (mypy --strict)
+        run: python tasks.py types
+
+      - name: Tests
+        run: python -m pytest
+
+      # Blocking gates from workflow.md §15.5. They pass trivially until the
+      # suites exist, then become real gates — declared here from Phase 0 so
+      # they are never "added later" and forgotten.
+      - name: Eval suites (cached golden set + injection containment)
+        run: python -m pytest -m eval
+
+      - name: Property-based policy-firewall proof
+        run: python -m pytest -m property
+
+  web:
+    name: Web — typecheck & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check whether the web app is scaffolded yet
+        id: probe
+        run: |
+          if [ -f apps/web/package.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::apps/web not scaffolded yet (Phase 12) — skipping"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.probe.outputs.exists == 'true'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        if: steps.probe.outputs.exists == 'true'
+        run: npm ci
+        working-directory: apps/web
+
+      - name: Typecheck
+        if: steps.probe.outputs.exists == 'true'
+        run: npx tsc --noEmit
+        working-directory: apps/web
+
+      - name: Build
+        if: steps.probe.outputs.exists == 'true'
+        run: npm run build
+        working-directory: apps/web
+
+  hygiene:
+    name: Hygiene — no committed secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert .env is not tracked
+        run: |
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "::error::.env is tracked. Secrets must never be committed."
+            exit 1
+          fi
+          echo "OK: .env is not tracked"
+
+      - name: Assert no Razorpay live keys anywhere in the tree
+        run: |
+          # rzp_live_ is the live-mode prefix. Test mode (rzp_test_) is fine.
+          if grep -rIn --exclude-dir=.git --exclude-dir=node_modules "rzp_live_" .; then
+            echo "::error::A Razorpay LIVE key appears in the repository."
+            exit 1
+          fi
+          echo "OK: no live keys found"

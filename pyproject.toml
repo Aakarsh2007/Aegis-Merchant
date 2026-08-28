@@ -1,0 +1,82 @@
+[project]
+name = "revpilot"
+version = "0.1.0"
+description = "RevPilot AI — autonomous revenue recovery agent for Razorpay merchants"
+requires-python = ">=3.11"
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["apps/api"]
+asyncio_mode = "auto"
+addopts = "-q --strict-markers --strict-config"
+markers = [
+    "eval: golden-set and containment suites (cached, no API key needed)",
+    "live: hits a real external API; run manually, never in CI",
+    "property: hypothesis property-based tests",
+]
+filterwarnings = ["error::DeprecationWarning"]
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["apps/api", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",    # pycodestyle
+    "F",         # pyflakes
+    "I",         # isort
+    "B",         # bugbear
+    "C4",        # comprehensions
+    "UP",        # pyupgrade
+    "SIM",       # simplify
+    "RUF",       # ruff-specific
+    "ASYNC",     # async correctness
+    "DTZ",       # naive-datetime bans — see also tests/test_no_wall_clock_reads.py
+]
+ignore = [
+    "E501",      # line length is enforced by the formatter
+    "B008",      # FastAPI Depends() in defaults is the documented idiom
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The single sanctioned wall-clock reader (workflow.md §21).
+"apps/api/app/core/clock.py" = ["DTZ005"]
+# Tests construct explicit datetimes on purpose.
+"tests/*" = ["DTZ001", "DTZ005", "S101"]
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "apps/api"
+strict = true
+warn_unreachable = true
+show_error_codes = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["razorpay.*", "apscheduler.*", "google.genai.*", "sse_starlette.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+strict = false
+disallow_untyped_defs = false
+
+# ---------------------------------------------------------------------------
+# coverage — measured where it matters, not everywhere
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["apps/api/app"]
+omit = ["*/__pycache__/*", "*/migrations/*"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]

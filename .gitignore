@@ -1,0 +1,83 @@
+# ---------------------------------------------------------------------------
+# Secrets — never commit
+# ---------------------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+venv/
+.venv/
+env/
+ENV/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# ---------------------------------------------------------------------------
+# Node / Next.js
+# ---------------------------------------------------------------------------
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-error.log*
+
+# ---------------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------------
+# NOTE: apps/api/revpilot.db is the RUNTIME database and is ignored.
+# The seeded, reproducible demo database is committed at data/revpilot.seed.db
+# (see workflow.md §12.1) so a judge sees a populated dashboard on first load.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+!data/revpilot.seed.db
+
+# ---------------------------------------------------------------------------
+# Logs & local artefacts
+# ---------------------------------------------------------------------------
+logs/
+*.log
+.DS_Store
+Thumbs.db
+
+# ---------------------------------------------------------------------------
+# Archived pre-v3.1 implementation (kept on disk, never committed).
+# The v3.1 build in apps/ is authoritative — see workflow.md §30 ADL-006.
+# ---------------------------------------------------------------------------
+legacy/
+
+# ---------------------------------------------------------------------------
+# Editor / OS
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*~
+
+# local backups
+.env.backup*

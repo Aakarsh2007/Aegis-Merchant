@@ -1,0 +1,23 @@
+{
+  "name": "aegis-merchant-revpilot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RevPilot AI - Autonomous revenue recovery agent for Razorpay merchants (Razorpay AI Buildathon 2026)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Aakarsh2007/Aegis-Merchant.git"
+  },
+  "scripts": {
+    "comment": "tasks.py is the source of truth for project commands; these are conveniences for node-first workflows.",
+    "demo": "python tasks.py demo",
+    "api": "python tasks.py api",
+    "web": "python tasks.py web",
+    "test": "python tasks.py test",
+    "check": "python tasks.py check",
+    "lint": "python tasks.py lint"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
