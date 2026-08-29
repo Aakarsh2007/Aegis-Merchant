@@ -399,3 +399,42 @@ problem in LLM-in-the-loop systems, and pinning outputs is the standard answer.
 
 **Cost of being wrong:** a stale cache would silently score an old prompt. The version key
 and `test_every_cached_entry_matches_the_current_prompt_version` close that.
+
+## DEC-019 · 2026-08-29 · No LangGraph; the case row is the checkpoint
+
+**Phase:** 7 · **Supersedes ADL-008**
+
+**Decision:** The agent is an explicit async state machine over the `recovery_cases` row.
+Seven nodes, one pure `next_node()` function holding the entire control flow.
+
+**Rejected:** LangGraph, which ADL-008 had chosen. That decision was made in the planning
+phase for one stated reason — checkpointed pause/resume, so a case escalated to a human
+could suspend for hours and resume mid-graph. The justification does not survive contact
+with what actually got built:
+
+*The checkpoint already exists.* A case awaiting approval is a row with
+`status = AWAITING_APPROVAL`. That row is the authoritative state — the dashboard reads it,
+the audit chain hashes it, the attribution matcher queries it. A graph checkpointer would
+store the same case state a second time, and the two would have to agree. **Duplicated
+state that must agree is exactly the defect INC-007 produced one phase earlier**, where the
+proposed message class lived in two places and diverged.
+
+*And resuming is the wrong semantics anyway.* When a human approves, the correct behaviour
+is not to continue a frozen graph. It is to reload the case and re-run the policy firewall,
+because §6.1 requires the stopping rules to be evaluated again immediately before acting —
+the customer may have paid in the intervening four hours. Resuming a checkpoint would skip
+precisely the check that exists to catch that.
+
+Also weighed: `langgraph` pulls `langchain-core`, `langsmith`, `langgraph-checkpoint` and
+`langgraph-sdk` into a project whose Definition of Done is that a judge clones it and it
+runs. That alone would not have decided it — the duplicated state did.
+
+**The honest trade:** "we use LangGraph" is a more recognisable sentence to a judge
+skimming a repo, and this costs us that. What it buys is a control flow readable in twenty
+lines, no dependency whose main feature duplicates our own state, and an answer to "where
+did you choose *not* to use the obvious tool" that is about engineering rather than taste.
+
+**Cost of being wrong:** if the graph ever needs genuine mid-node suspension — a node that
+blocks on an external callback rather than ending a run — this would need revisiting.
+Nothing in the four playbooks does. `tests/test_agent_graph.py::TestNoLangGraph` asserts the
+dependency stays out, so re-adding it has to be deliberate.

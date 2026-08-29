@@ -109,9 +109,10 @@ generated contexts per run rather than by example
 ## Architecture in one paragraph
 
 Razorpay webhooks arrive, are HMAC-verified over raw bytes, deduplicated, and
-normalised. A bounded seven-node LangGraph state machine enriches the case, runs
-twelve stopping rules **before spending a token**, diagnoses the failure, and
-proposes a recovery. Every proposal then passes a deterministic policy firewall the
+normalised. A bounded seven-node state machine — plain async Python, no agent
+framework ([DEC-019](docs/DECISIONS.md)) — enriches the case, runs twelve
+stopping rules **before spending a token**, diagnoses the failure, and proposes
+a recovery. Every proposal then passes a deterministic policy firewall the
 LLM cannot reach — amount ceilings, discount caps, contact-frequency limits, quiet
 hours, consent class, spend budgets. Only the firewall can mint the token that
 unlocks a write tool. Execution goes through a transactional outbox whose

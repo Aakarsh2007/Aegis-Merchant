@@ -1969,7 +1969,7 @@ All schemas Pydantic v2; OpenAPI at `/docs`; frontend types generated from it.
 |---|---|---|
 | Frontend | Next.js 15 + TypeScript strict + Tailwind + shadcn/ui + Recharts | Server components for fast first paint; SSE for live updates; generated types prevent contract drift |
 | Backend | Python 3.11 + FastAPI + Pydantic v2 | Async; strict validation at the boundary where LLM output enters the system |
-| Agent runtime | LangGraph (current 1.x) | Explicit typed state, no LLM-controlled edges, checkpointing. Version corrected from v2.1's "0.1+". |
+| Agent runtime | **A plain async state machine.** No LangGraph, no LangChain. | The control flow is one pure `next_node()` function — the set of things that can happen to a case is enumerable by reading twenty lines, and nothing a model returns appears in it. LangGraph was chosen in planning and rejected in Phase 7 (DEC-019): its checkpointer would duplicate the case state we already persist, and resuming a frozen graph would skip the policy re-check §6.1 requires before acting. |
 | LLM | `LLMAdapter` → `gemini-2.5-flash` (free tier) primary, `CachedAdapter` for batch/CI, `DeterministicAdapter` fallback | §4.4. Provider is config, not a dependency. Runs with **zero keys**. |
 | Batch inference | Committed content-addressed response cache | §4.5. 420 cases in <20 s, zero API calls, byte-for-byte reproducible. |
 | Database | SQLite 3 WAL + SQLAlchemy 2.0 (async) + Alembic | ACID, zero infra, judge-inspectable file |
@@ -2343,7 +2343,7 @@ Sixteen phases (0–15). **Every phase carries DoD-J (§17.1): journal what brok
 | **4** | Stopping Rules Engine | `guardrails/stopping_rules.py` | All 12 rules are pure predicates over a frozen context — no I/O, no clock read — so termination is testable by fast-forwarding rather than waiting. Four outcomes, not two (DEC-012): deferring is not stopping (a quiet-hours hold is sent at 09:05, never dropped) and degrading is not stopping (no marketing consent means send the transactional link at 0%, not send nothing). All twelve evaluate every time, never short-circuited, because per-rule firing counts are the dashboard's evidence the brakes work (DEC-013). Termination proven by property test over 2,000 generated contexts, not by sampling. Quiet hours wrap midnight and are evaluated in IST — a naive `start <= h < end` reports 23:00 as allowed and messages someone at 11 PM |
 | **5** | Policy firewall + `PolicyToken` | `guardrails/policy_engine.py`, `guardrails/token.py` | Every §26.2 branch covered; **hypothesis fuzzer green at 2,000 examples per property, with vacuity guards** (INC-006 — the first version passed while proving nothing); `PolicyToken` HMAC-signed under a process-private key so a hand-built token raises at the call site (DEC-014), plus an import-graph test that no module outside `guardrails` may mint one; clamps distinguish **violations** (model breached a hard bound → escalate) from **routine reductions** (consent downgrade → proceed, safer), because conflating them would send every no-marketing-consent recovery to a human queue (DEC-015) |
 | **6** | `LLMAdapter`, Gemini free tier, rate limiter, **response cache**, deterministic fallback | `llm/adapter.py`, `llm/gemini_adapter.py`, `llm/cache.py`, `llm/deterministic.py`, `llm/rate_limit.py`, `llm/prompts.py`, `llm/routing.py` | Four adapters satisfy one protocol; Gemini `response_schema` output **re-validated through Pydantic** (the provider's constraint is a convenience, ours is the contract); schema bounds propagated to the provider after INC-011 showed a dropped `maxLength` discarding good diagnoses; one re-prompt then the deterministic floor; **full pipeline passes with zero API keys**; token-bucket RPM + persisted RPD counter rolling on the **IST** day; every `LLM_CALL` records `source ∈ {LIVE, CACHED, DETERMINISTIC}`; `warm-cache` scores the model against the baseline **and** records responses; **the gate returned "ship the rule table"** (DEC-017) and a CI test asserts that verdict from the committed cache with no key |
-| **7** | LangGraph 7-node graph | `agent/graph.py`, `agent/state.py`, `agent/nodes/*.py` | End-to-end traversal; `MAX_NODE_VISITS` trips on a synthetic loop; `llm_calls ≤ 3` asserted; **test proves `execute_node` never reads `state["proposal"]`** |
+| **7** | The 7-node agent graph — **without LangGraph** (DEC-019) | `agent/graph.py`, `agent/state.py`, `agent/nodes.py` | End-to-end traversal over the real 420-transaction corpus: 210 cases, 139 authorised, 25 escalated, 39 held as control (18.6% against an 18% target), **max 7 node visits against a budget of 9**. `MAX_NODE_VISITS` trips on a synthetic loop; the model-call budget is enforced at every node; **an AST test proves `execute_node` never reads `proposal`** — if it could, every clamp in the firewall would be advisory. A node that raises finalises the case as `FAILED_PERMANENT` rather than leaving it stuck, because a stuck case is the one failure the stopping rules cannot rescue. Re-entry on a terminal case is a no-op, since duplicate webhook deliveries make that normal. |
 | **8** | Two-phase outbox + retry + DLQ + reconciler | `tools/outbox.py`, `tools/action_tools.py`, `workers/drainer.py` | `reference_id` committed before any call; `test_crash_between_call_and_commit` passes; DLQ populated and replayable; duplicate-reference path recovers |
 | **9** | Attribution matcher + experiment arms | `services/attribution.py`, `services/experiments.py` | Arm assignment deterministic and stable across restart; recovery counted only on signed webhook + `reference_id` match; lift + Wilson CI computed; **no test asserts a target rupee figure** |
 | **10** | Audit chain + verifier + auth | `tools/audit.py`, `routers/audit.py`, `security/auth.py` | Canonical JSON chaining; `/audit/verify` catches a deliberately tampered block; bearer auth on every money endpoint; approval `policy_applied_hash` mismatch → 409 |
@@ -2490,7 +2490,8 @@ judging criteria. Changes, and why:
 | Moved `TRIAGE` before `DIAGNOSE` (§6.1) | v2.1 spent LLM tokens before checking whether action was permitted. |
 | Named the weakest point out loud (§29.10) | Volunteering the limitation is cheaper than having it found. |
 
-**ADL-008 — Keep LangGraph, for checkpointed pause/resume specifically.** A seven-node graph with no
+**ADL-008 — Keep LangGraph, for checkpointed pause/resume specifically.** *(SUPERSEDED in
+Phase 7 by DEC-019 — see the note at the end of this entry.)* A seven-node graph with no
 LLM-controlled edges could be a plain async state machine in ~150 lines with one fewer dependency, and that
 alternative was seriously considered. **The deciding factor is HITL.** A case that escalates to
 `AWAITING_APPROVAL` must suspend for up to four hours, survive a process restart, and then resume *mid-graph*
@@ -2499,6 +2500,19 @@ hand-rolling durable graph suspension is the kind of code that looks simple and 
 benefits: typed state at node boundaries, and a graph a judge recognises. **We are explicitly not using
 LangGraph for what it is usually used for** — autonomous tool-selection loops — which ADL-002 rules out. The
 framework provides durable state transport; the safety comes from our own code.
+
+> **Superseded during Phase 7.** The justification above did not survive contact with what
+> got built. A case awaiting approval is *already* a row in `recovery_cases` with
+> `status = AWAITING_APPROVAL`, and that row is authoritative — the dashboard reads it, the
+> audit chain hashes it, the attribution matcher queries it. A graph checkpointer would hold
+> the same case state a second time, and the two would have to agree: **duplicated state that
+> must agree is the defect INC-007 produced one phase earlier.** Worse, resuming a frozen
+> graph is the wrong semantics — on approval the case must be *reloaded* and the policy
+> firewall re-run, because §6.1 requires the stopping rules to be re-evaluated immediately
+> before acting, and the customer may have paid during the four-hour approval window.
+> Resuming would skip exactly that check. The graph is now an explicit async state machine
+> whose entire control flow is one pure function. Recorded as DEC-019, and
+> `TestNoLangGraph` asserts the dependency stays out.
 
 **ADL-009 — Free-tier-only, treated as a design constraint rather than a compromise.** Every dependency is a
 free tier or self-hosted (§22.1): Razorpay Test Mode, Gemini free tier, SQLite, Cloudflare Tunnel, GitHub
