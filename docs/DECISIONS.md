@@ -267,3 +267,66 @@ under-reporting would be invisible.
 **Cost of being wrong:** Nothing measurable — twelve pure comparisons over in-memory data,
 with no I/O. The context is assembled once by the caller, so the cost was already paid
 before the first rule ran.
+
+## DEC-014 · 2026-08-29 · An HMAC-signed capability token, not a naming convention
+
+**Phase:** 5
+
+**Decision:** `PolicyToken` carries an HMAC over the applied action, signed with a key
+generated at import and held module-private. Write tools call `verify()` before touching a
+provider.
+
+**Rejected:** A plain marker object, or a `_minted_by` string field, or a code-review
+convention. Each of those fails silently: a developer who constructs one by hand gets a
+working token and no signal. With a signature, skipping the firewall raises at the call
+site.
+
+**What is NOT claimed:** Python has no private state, so code that deliberately reaches for
+`_SIGNING_KEY` can forge a token. The honest claim is narrower — no *accidental* path
+exists, and every deliberate one is visible in a diff. The static half is enforced by
+`tests/test_no_unauthorised_writes.py`, which walks the import graph and fails if any module
+outside `guardrails` imports the mint function.
+
+**Why the key is per-process and ephemeral:** a token is a capability for one immediate
+execution, not a durable grant. It must not survive a restart or be replayed tomorrow. Human
+approvals genuinely do need to persist, and they use a different mechanism — a content hash
+of the exact approved action, re-checked at execution time.
+
+## DEC-015 · 2026-08-29 · Violations and routine reductions are different things
+
+**Phase:** 5
+
+**Decision:** `Clamp` carries `is_violation`. The escalation ladder keys on violations only.
+
+**Rejected:** Treating every clamp as evidence the model misbehaved. That was the first
+implementation, and the fuzzer's coverage guard exposed what it would do in production:
+Ananya's recovery has its discount stripped because she has no marketing consent, which is
+the compliance design working exactly as intended (§9.2) — and it would have escalated her
+case to a human approval queue. Every no-marketing-consent recovery would have needed a
+person, which is the product not working.
+
+The distinction is between a proposal that breached a hard bound (90%, NaN, negative — the
+model tried something it is not permitted to do) and a reduction that made a reasonable
+proposal *safer* (consent downgrade, absolute rupee cap on a large cart).
+
+**Consequence:** the dashboard's "unsafe proposals intercepted" figure (§14.6) counts
+violations, not all clamps. Counting routine downgrades would inflate the metric with the
+system's own good behaviour and make it meaningless as evidence.
+
+## DEC-016 · 2026-08-29 · Sabotage every safety test before trusting it
+
+**Phase:** 5
+
+**Decision:** Standing practice: any test asserting a safety property is verified by
+deliberately breaking the thing it protects and confirming it goes red.
+
+**Rejected:** Trusting a green suite. INC-006 is the argument — twenty-five property tests
+passed while proving nothing, and only sabotage revealed it. A guarded assertion
+(`if precondition: assert ...`) fails *open*: when the precondition is never met it is
+indistinguishable from passing.
+
+**How it is applied:** sabotage runs are manual and recorded in the phase notes rather than
+committed, since a permanently-broken copy of the firewall in the repo would be worse than
+the problem. What *is* committed is the coverage guard — `TestTheProofIsNotVacuous` —
+which asserts the proof's preconditions are actually met, so the decay is caught
+automatically next time.

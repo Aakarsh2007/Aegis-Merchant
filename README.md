@@ -92,7 +92,7 @@ provenance are never summed into one number.
 | Judging criterion | Where the evidence is |
 |---|---|
 | **Problem taste** — *did you pick something that actually matters* | [`workflow.md` §0](workflow.md), §5 — four distinct revenue leaks, with the scope we cut and why |
-| **Build quality** — *does it run, is it structured, would you trust it* | This section, §13 (auth, PII, injection containment), §22 (Judge Mode), CI badge above |
+| **Build quality** — *does it run, is it structured, would you trust it* | This section, §13 (auth, PII, injection containment), §22 (Judge Mode), CI badge above. The policy firewall is proven closed by property test — and the proof itself is checked for vacuity, after the first version passed while proving nothing ([INC-006](docs/INCIDENTS.md)) |
 | **AI judgment** — *the right tool in the right place, and where you chose not to use one* | §4.2 — nine places we **rejected** an LLM in favour of deterministic code. Now measured: the rule table scores **96.5%** on an 85-case golden set at zero cost, and **Phase 6's model must beat that or we ship the rule table** ([baseline](tests/eval/test_classifier_baseline.py)) |
 | **Failure recovery** — *what broke, and what you did about it* | [`docs/INCIDENTS.md`](docs/INCIDENTS.md) — written while things were broken, wrong theories included |
 

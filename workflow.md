@@ -1613,7 +1613,18 @@ amounts exceeding the order, expiry of −5 minutes, marketing class without con
 **The claim this licenses:** *"We did not test that the agent behaves safely. We proved that no input
 — including a fully compromised LLM — can produce an unsafe executed action."*
 
-Run at 2,000 examples in CI, 50,000 nightly.
+Run at 2,000 examples per property in CI.
+
+> **The proof must be checked for vacuity, not just for green.** Every invariant above is
+> guarded on `verdict == PASSED`. On this file's first run, **100% of 1,500 generated
+> contexts were BLOCKED at the first gate**, so no assertion executed and all twenty-five
+> properties passed while proving nothing — a deliberately sabotaged NaN guard went
+> undetected (INC-006). Three things now keep it honest: a `viable_contexts` strategy that
+> reaches the clamping code by construction; one isolating strategy per refusal, so each
+> "must be blocked" property fails if and only if its own guard is removed; and
+> `TestTheProofIsNotVacuous`, which asserts a meaningful share of examples reach PASSED and
+> that the clamps are actually exercised. **Sabotage is standing practice** (DEC-016):
+> removing the NaN guard now fails 6 properties, removing the discount ceiling fails 15.
 
 ### 15.4 Message quality gate
 
@@ -2321,7 +2332,7 @@ Sixteen phases (0–15). **Every phase carries DoD-J (§17.1): journal what brok
 | **2** | Razorpay client + HMAC webhook ingestion | `tools/razorpay_client.py`, `routers/webhooks.py`, `tests/fixtures/razorpay/` | Valid HMAC 200 <15 ms; forged 401; replay 401; duplicate dropped; **real Test Mode field shapes captured as fixtures**; every doc divergence journalled |
 | **3** | Deterministic classifier + rail-health index | `agent/classifier.py`, `agent/rail_health.py` | `(error_source, error_step)` → category for all seeded failures; rail-health computed from our own log; **classifier accuracy on the golden set recorded as the LLM's baseline to beat** |
 | **4** | Stopping Rules Engine | `guardrails/stopping_rules.py` | All 12 rules are pure predicates over a frozen context — no I/O, no clock read — so termination is testable by fast-forwarding rather than waiting. Four outcomes, not two (DEC-012): deferring is not stopping (a quiet-hours hold is sent at 09:05, never dropped) and degrading is not stopping (no marketing consent means send the transactional link at 0%, not send nothing). All twelve evaluate every time, never short-circuited, because per-rule firing counts are the dashboard's evidence the brakes work (DEC-013). Termination proven by property test over 2,000 generated contexts, not by sampling. Quiet hours wrap midnight and are evaluated in IST — a naive `start <= h < end` reports 23:00 as allowed and messages someone at 11 PM |
-| **5** | Policy firewall + `PolicyToken` | `guardrails/policy_engine.py`, `guardrails/token.py` | Every §26.2 branch covered; **hypothesis fuzzer green at 2,000 examples**; no code path to a write tool without a token (asserted by a test that greps the import graph) |
+| **5** | Policy firewall + `PolicyToken` | `guardrails/policy_engine.py`, `guardrails/token.py` | Every §26.2 branch covered; **hypothesis fuzzer green at 2,000 examples per property, with vacuity guards** (INC-006 — the first version passed while proving nothing); `PolicyToken` HMAC-signed under a process-private key so a hand-built token raises at the call site (DEC-014), plus an import-graph test that no module outside `guardrails` may mint one; clamps distinguish **violations** (model breached a hard bound → escalate) from **routine reductions** (consent downgrade → proceed, safer), because conflating them would send every no-marketing-consent recovery to a human queue (DEC-015) |
 | **6** | `LLMAdapter`, Gemini free tier, rate limiter, **response cache**, deterministic fallback | `llm/adapter.py`, `llm/gemini_adapter.py`, `llm/cached_adapter.py`, `llm/deterministic.py`, `llm/rate_limit.py`, `llm/prompts/` | All four adapters satisfy the protocol; Gemini `response_schema` output **re-validated through Pydantic**; one re-prompt then fallback; **full pipeline passes with zero API keys**; token-bucket RPM limiter + SQLite-persisted RPD counter; `LLM_CALL` rows record `source`; `make warm-cache` populates and commits `data/llm_cache.jsonl` |
 | **7** | LangGraph 7-node graph | `agent/graph.py`, `agent/state.py`, `agent/nodes/*.py` | End-to-end traversal; `MAX_NODE_VISITS` trips on a synthetic loop; `llm_calls ≤ 3` asserted; **test proves `execute_node` never reads `state["proposal"]`** |
 | **8** | Two-phase outbox + retry + DLQ + reconciler | `tools/outbox.py`, `tools/action_tools.py`, `workers/drainer.py` | `reference_id` committed before any call; `test_crash_between_call_and_commit` passes; DLQ populated and replayable; duplicate-reference path recovers |

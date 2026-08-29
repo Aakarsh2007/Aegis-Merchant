@@ -235,3 +235,90 @@ out how production produces it before deciding it cannot; distributed reads of r
 values disagree routinely. And a safety invariant should be enforced *structurally* rather
 than in each rule: the engine-level guard means a future thirteenth rule cannot reintroduce
 this bug, which per-rule diligence alone could not promise.
+
+## INC-006 · 2026-08-29 · The safety proof proved nothing
+
+**Phase:** 5 (policy firewall)
+
+**Symptom:** None. That is what makes this the most important entry in the file.
+Twenty-five property tests asserting that the policy firewall is closed all passed on the
+first run, and the suite was green.
+
+**How it was caught:** not by a failing test. By deliberately sabotaging the firewall —
+deleting the NaN/infinity guard from the discount clamp — and re-running the proof. **It
+still passed.** A NaN discount could reach the applied action and the "proof" did not
+notice.
+
+**Root cause:** every invariant is written as `if verdict is PASSED: assert ...`. Measuring
+the actual verdicts showed **100% of 1,500 generated contexts were BLOCKED at the first
+gate**, so no assertion ever executed. With around eight independent block conditions
+(kill switch, opt-out, consent, window, attempt budget, contact caps, control arm,
+non-positive amount) each firing roughly half the time, the chance of a random context
+surviving to the clamping code is under 0.1%. Randomness alone was never going to find that
+path — it had to be constructed.
+
+A second instance of the same flaw hid behind the first. The properties of the form *"if X
+then it must be refused"* were also vacuous: they ran against the hostile strategy, where
+everything is refused for a dozen other reasons. Deleting the CONTROL-arm block entirely did
+not fail `test_the_control_arm_never_executes`, because something else was blocking every
+example. The test never observed the code it was named after.
+
+**Fix:** three changes.
+1. A `viable_contexts` strategy that reaches the clamping code by construction, keeping
+   random exactly what the invariants are about — the discount (still NaN, infinite,
+   negative, 10,000%), the expiry, consent, the amount.
+2. One isolating strategy per refusal, viable in every respect except the single condition
+   under test, so each property fails if and only if its own guard is removed.
+3. `TestTheProofIsNotVacuous` — coverage guards asserting that a meaningful share of
+   examples reach PASSED, that the clamps are exercised, and that tokens are actually
+   minted. Built from a seeded RNG, because a measurement should give the same answer every
+   run.
+
+**Why it stayed fixed:** re-ran the sabotages. Removing the NaN guard now fails 6
+properties; removing the discount ceiling fails 15; allowing the CONTROL arm to act fails
+its own property. Before the fix, all three passed.
+
+**What I actually learned:** a green property test is not evidence until you have watched it
+go red. Guarded assertions (`if precondition: assert ...`) fail open — when the
+precondition is never met they are indistinguishable from passing, and the stronger the
+guard, the more likely the test is silently dead. Two habits came out of this and are now
+standing practice in this repo: **sabotage every safety test at least once**, and **assert
+the coverage the proof depends on**, so it cannot decay quietly.
+
+The uncomfortable part: I had already written this exact lesson twice — the meta-test in
+`test_no_wall_clock_reads.py` and `test_accuracy_is_not_suspiciously_perfect` in the
+classifier baseline — and still shipped a vacuous proof in the module where it mattered
+most. Knowing the failure mode is not the same as checking for it.
+
+## INC-007 · 2026-08-29 · The same field in two places, disagreeing
+
+**Phase:** 5 (policy firewall)
+
+**Symptom:** Three unit tests failed at once. A proposal explicitly marked
+`message_class=MARKETING` for a consenting customer had its discount silently stripped to
+zero, and the recorded reason was "transactional message cannot carry an offer" — for a
+message that was not transactional.
+
+**Wrong theory (~5 min lost):** assumed the consent-downgrade logic was firing when it
+should not, and started tracing S-08. S-08 was correct. It was reading a different value
+than the one the test set.
+
+**Root cause:** the proposed message class and discount existed in **two places** —
+`RecoveryProposal` (what the model suggested) and `StoppingContext` (what the stopping
+rules evaluate) — and the caller was responsible for keeping them in sync. The policy
+engine then read the stopping context's copy, which still held its default. Two sources of
+truth for one fact, with nothing enforcing agreement.
+
+**Fix:** the proposal is now copied into the stopping context inside `evaluate_policy`
+before the rules run (`apps/api/app/guardrails/policy_engine.py`, step 0). The caller can
+no longer supply a disagreeing pair, because the caller no longer supplies it at all.
+
+**Why it stayed fixed:** `test_ananya_recovers_without_a_discount` and
+`test_an_excessive_discount_resets_to_the_safe_default` both depend on the proposal's class
+reaching the rules.
+
+**What I actually learned:** duplicated state does not announce itself; it waits for the
+two copies to diverge and then produces a correct-looking answer to the wrong question. The
+telling detail was the *reason string* — it said "transactional" about a message the test
+had marked marketing, and that mismatch was the whole bug visible in one line. Error
+messages that quote the value they acted on pay for themselves.
