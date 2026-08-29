@@ -322,3 +322,120 @@ two copies to diverge and then produces a correct-looking answer to the wrong qu
 telling detail was the *reason string* — it said "transactional" about a message the test
 had marked marketing, and that mismatch was the whole bug visible in one line. Error
 messages that quote the value they acted on pay for themselves.
+
+## INC-008 · 2026-08-29 · The model in the plan could not be called, again
+
+**Phase:** 6 (LLM adapter)
+
+**Symptom:** First live call with the newly-supplied key: `404 NOT_FOUND. This model
+models/gemini-2.5-flash is no longer available to new users.`
+
+**Wrong theory (~2 min):** assumed a bad key, since a 404 on a well-known model looked
+like an auth problem wearing a disguise. The key was fine — it authenticated, and a 404 is
+a model error, not an auth error. Reading the message rather than pattern-matching the
+status code settled it in one step.
+
+**Root cause:** `gemini-2.5-flash` is retired for new API keys. This is the *second* time
+this project has had a hard-coded model retired underneath it: the original plan specified
+Gemini 1.5 Flash (retired), v3.1 "corrected" that to 2.5 Flash, and 2.5 Flash is now gone
+too. Correcting a stale model name to another stale model name is not a fix.
+
+**A second finding, worse than the first:** the models-list endpoint is **not
+authoritative**. It cheerfully lists `gemini-2.5-flash` among 53 models — including ones
+that return 404 or 503 on use. Of the flash candidates, only three actually worked.
+Listing a model is not the same as being able to call it, and only a real call tells the
+truth.
+
+**Fix:** the model is config (`GEMINI_MODEL`), `CANDIDATE_MODELS` records the probed
+alternatives, and `GeminiAdapter.usable_models()` probes by *calling* rather than by
+listing. The next retirement is a config change instead of an investigation.
+
+**What I actually learned:** a model name is not a stable identifier and should never be
+treated as one. More generally: when an API offers both a directory and a real call, the
+directory is a hint and the call is the fact. I had written "verify against live docs" into
+the workflow for Razorpay endpoints and then trusted a listing for models.
+
+## INC-009 · 2026-08-29 · The latency budget was fiction
+
+**Phase:** 6
+
+**Symptom:** Every working model measured 2.7-8.4 s median on the free tier, against a
+plan that budgeted **1,400 ms p95 with a 2,500 ms timeout**. At those settings essentially
+every live call would have timed out and fallen back, and the system would have looked
+like it had an LLM while never actually using one.
+
+**Root cause:** the budget was written before there was anything to measure, against a
+model that no longer exists. It was an assumption formatted as a specification.
+
+**Fix:** measured properly (warm, n=5 per model), then set `llm_timeout_s = 12.0` and
+recorded the real figures in §4.6. Reasoned about whether ~4 s is acceptable rather than
+just relaxing the number until it passed: the webhook is acknowledged in ~7 ms and
+diagnosis runs in a background task, so nobody is waiting on it. A customer whose payment
+just failed does not perceive a difference between a link in 4 s and one in 400 ms.
+
+**What I actually learned:** a performance target written before the first measurement is a
+guess with a decimal point. The tell is that it was suspiciously round — 1,400 ms and
+2,500 ms are numbers someone chose, not numbers anyone observed.
+
+## INC-010 · 2026-08-29 · A model comparison that measured the fallback
+
+**Phase:** 6
+
+**Symptom:** The first model comparison reported **100.0% for all three candidates**. A
+result that good should have been the first clue.
+
+**Caught by:** reading the columns next to the headline. `fell_back: 16, 24, 23` out of 25 —
+most "model" answers had come from the deterministic fallback. The 100% was the rule table
+being measured while wearing the model's name.
+
+**Root cause:** two independent bugs producing one flattering number.
+1. The rate limiter's `try_acquire` returns False rather than waiting, and the adapter
+   degrades on refusal. Correct on the webhook path — waiting a minute for a token would
+   be worse than answering deterministically — and completely wrong for an offline
+   benchmark, where waiting is free.
+2. The subset was `cases[:25]`, and the golden set is ordered with the `clean` band first.
+   So the comparison ran entirely on the easy cases, which is exactly where the rule table
+   already scores 100% and where no two systems can be distinguished.
+
+**Fix:** `wait_for_slot_s` on the adapter (non-zero only for the offline warm-up),
+stratified sampling across difficulty bands, and a contamination guard that prints
+`UNUSABLE` and refuses to report any accuracy computed with a non-zero fallback count.
+
+**What I actually learned:** the sanity check on a benchmark is not "is the number good"
+but "could this number have come from something other than what I think I measured". Both
+bugs pushed the result in the flattering direction, which is the direction one is least
+inclined to interrogate. The guard now makes that interrogation automatic, because I will
+not reliably do it by hand at 2 a.m. before a submission.
+
+## INC-011 · 2026-08-29 · A constraint the model was never told about
+
+**Phase:** 6
+
+**Symptom:** Live calls to `gemini-3.1-flash-lite` fell back with `schema validation failed
+twice`, while the raw response was obviously fine.
+
+**Root cause:** the response was valid JSON with a sensible diagnosis, and `reasoning` was
+279 characters against a `max_length=240`. My Pydantic-to-Gemini schema translator
+propagated types and enums but **silently dropped `maxLength`** — so the provider was never
+told the bound, the model had no way to honour it, and a good diagnosis was discarded in
+favour of the rule table.
+
+**Fix:** two parts.
+1. Propagate `maxLength`, `minLength`, `minimum`, `maximum`, `maxItems` into the provider
+   schema. A constraint the provider is never told is a constraint the model cannot honour.
+2. A narrow, recorded repair: string fields with a declared `maxLength` are trimmed and
+   re-validated before falling back. Deliberately narrow — numbers and enums are never
+   coerced, because a wrong category must fail rather than be massaged into shape. Losing a
+   correct diagnosis over a few characters of prose is the wrong trade; losing one over a
+   wrong category is the right one.
+
+**Bonus finding in the same investigation:** the translator was also forwarding Pydantic
+`description` fields, which are our docstrings. That took the DIAGNOSE prompt from 41 to
+465 input tokens — an 11x increase on a free tier, to restate what the system prompt
+already says at length. Dropped.
+
+**What I actually learned:** a translation layer between two schema languages fails
+*silently and asymmetrically*. It dropped a constraint (invisible until a model exceeded
+it) and added 400 tokens of noise (invisible until someone looked at a usage counter).
+Neither showed up as an error. Round-tripping the translated schema and asserting the
+bounds survived would have caught both, and there is now a test that does exactly that.

@@ -171,9 +171,14 @@ def seed() -> int:
     return run([PY, "-m", "app.db.seed", "--out", str(demo_db)], cwd=API)
 
 
-@task("warm-cache", "Populate the committed LLM response cache (Phase 6)")
+@task("warm-cache", "Score the model against the baseline and record responses")
 def warm_cache() -> int:
-    return _pending("Phase 6")
+    """Needs GEMINI_API_KEY. Run offline, days before a demo -- never on the day.
+
+    Also answers the Phase 6 gate: does the model beat the deterministic rule
+    table? Pass `--compare N` to score several candidates first.
+    """
+    return run([PY, "-m", "app.llm.warm_cache", *sys.argv[2:]], cwd=API)
 
 
 @task("batch", "Run the 420-transaction batch (Phase 13)")

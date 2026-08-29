@@ -330,3 +330,72 @@ committed, since a permanently-broken copy of the firewall in the repo would be 
 the problem. What *is* committed is the coverage guard — `TestTheProofIsNotVacuous` —
 which asserts the proof's preconditions are actually met, so the decay is caught
 automatically next time.
+
+## DEC-017 · 2026-08-29 · The rule table ships for diagnosis; the model advises
+
+**Phase:** 6
+
+**Decision:** The deterministic classifier decides diagnosis. The model is consulted only
+where the classifier declares itself unsure (`needs_llm_review` — conflicting signals, or
+confidence below 0.6).
+
+**Measured, both prompt revisions reported:**
+
+| system | overall | conflicting_signals |
+|---|---|---|
+| deterministic rule table | **96.5%** (82/85) | 10/10 |
+| gemini-3.1-flash-lite, prompt v1 | 82.4% (70/85) | 10/10 |
+| gemini-3.1-flash-lite, prompt v2 | 90.6% (77/85) | 10/10 |
+
+§15.1 committed to this *before the model existed*: if it does not beat the rule table, we
+ship the rule table and say so. It did not, so we do.
+
+**Why v1 lost:** 13 of its 15 misses were `X -> UNKNOWN`. The prompt told it that an honest
+UNKNOWN beats a confident guess, and it took that seriously on degraded telemetry — but
+nothing told it that `error_source` is an attribution Razorpay has *already made*, not a
+hint to weigh. Given only `error_source=bank`, it answered "not enough evidence", which is
+cautious and wrong: that IS the evidence.
+
+**Why I stopped at v2:** the fix worked (degraded_telemetry 9/15 -> 14/15, hard_ambiguous
+3/5 -> 5/5) but traded errors elsewhere (clean 45/45 -> 42/45) and still lost by 6 points.
+A third revision tuned against the same 85 cases would be fitting the test set, not
+improving the system. Two shots, both reported, verdict stands.
+
+**The sub-result that justifies the architecture:** on `conflicting_signals` — the band the
+model exists to handle, where Razorpay's own fields disagree — it scored **10/10 in both
+runs**, matching the rule table exactly. It loses overall on cases the rule table already
+answers well, not on the ones it was designed to be asked about. So this is not a
+compromise between two systems; it is the split §4.2 specified before either was built,
+now supported by measurement instead of assertion.
+
+**Cost of being wrong:** `test_the_baseline_still_beats_the_model` asserts the ordering in
+the direction the measurement went. If a future model or prompt genuinely overtakes the
+rule table, that test fails — and the failure is the signal to change the routing, not to
+loosen the assertion. A gate that only fires in the flattering direction is not a gate.
+
+## DEC-018 · 2026-08-29 · A committed response cache, and what it is allowed to claim
+
+**Phase:** 6
+
+**Decision:** Real model responses are recorded into `data/llm_cache.jsonl` and committed.
+The batch demo and CI score from it.
+
+**Rejected:** calling the model live in CI. It needs a secret (so nobody who forks the repo
+can reproduce the badge), burns free-tier quota on every push, and returns a slightly
+different answer each run — which is precisely what a regression gate must not do.
+
+**What this buys beyond speed:** the batch result becomes **byte-for-byte reproducible**. A
+judge who clones the repo gets exactly the numbers in the README, because the model's
+contribution is pinned rather than re-rolled. Non-reproducible benchmarks are a real
+problem in LLM-in-the-loop systems, and pinning outputs is the standard answer.
+
+**The honesty constraints, which are not optional:**
+- Every served response is marked `source=CACHED` and is never displayed as live.
+- `prompt_version` is part of the key, so a prompt edit invalidates everything derived
+  from it. Demonstrated in practice: revising the DIAGNOSE prompt to v2 invalidated all 83
+  v1 entries, and a test asserts no stale versions remain.
+- Cached rows are **re-validated on read**. The cache is a file in a repo; a hand-edited
+  entry that no longer matches the schema must fail like any other malformed response.
+
+**Cost of being wrong:** a stale cache would silently score an old prompt. The version key
+and `test_every_cached_entry_matches_the_current_prompt_version` close that.

@@ -396,7 +396,8 @@ class LLMAdapter(Protocol):
 
 | Role | Model | Rationale |
 |---|---|---|
-| Workhorse — diagnosis, composition, promise extraction | `gemini-2.5-flash` | Free tier; fast; native JSON-schema-constrained output. These are short structured-output tasks — the binding constraint is latency and quota, not intelligence. |
+| Workhorse — composition, promise extraction, briefing | `gemini-3.1-flash-lite` | Free tier; native JSON-schema-constrained output. **Chosen by probing, not by reading:** the plan's Gemini 1.5 Flash is retired, and v3.1's `gemini-2.5-flash` returns 404 for new keys. The models-list endpoint advertises both anyway — only a real call tells the truth (INC-008). |
+| Diagnosis | **the deterministic rule table** | The model was measured against it and **lost, 90.6% to 96.5%** (DEC-017). §15.1 committed to shipping the rule table in that case, so we do. The model is consulted only where the classifier declares itself unsure — the band where it scored 10/10, matching the baseline exactly. |
 | Escalation | *none* | **We deliberately do not implement a second-model escalation tier.** On a free tier a second model means a second quota to exhaust for marginal gain. Low-confidence diagnoses route to the deterministic fallback and, if the amount warrants it, to a human (rung A2). Cheaper, more predictable, and more defensible than a model cascade. |
 
 **Implementation notes (Gemini-specific):**
@@ -470,8 +471,16 @@ code rather than hoped for.
 | Output tokens per case | ≤600 | `max_output_tokens` |
 | **Actual spend** | **₹0 — free tier** | `/api/v1/metrics/cost` reports quota consumed, not currency |
 | **Projected spend at scale** | logged token counts × published paid rates | Same endpoint. **This is the number that answers "would this work in production."** |
-| p95 diagnose latency (live) | ≤1,400 ms | Timeout at 2,500 ms |
-| p95 end-to-end (event → dispatch) | ≤4,000 ms | Traced |
+| p95 diagnose latency (live) | **~1,700 ms median measured** | Timeout at 12,000 ms |
+| p95 end-to-end (event → dispatch) | ≤15,000 ms live, <1 s cached | Traced |
+
+> **These numbers replace a guess.** The originals — 1,400 ms p95, 2,500 ms timeout, 4,000 ms
+> end-to-end — were written before anything existed to measure, against a model that no longer
+> exists. Measured warm on the free tier, every working model sits between 2.7 s and 8.4 s, so
+> the old timeout would have made *every* live call fall back and the system would have appeared
+> to use an LLM while never actually reaching one (INC-009). ~4 s is acceptable here for a
+> specific reason rather than by relaxation: the webhook is acknowledged in ~7 ms and diagnosis
+> runs in a background task, so no one is waiting on it.
 
 > **The unit-economics slide:** *"This ran on ₹0. But we log every token, so we can tell you what it would cost
 > at scale: roughly ₹0.30 of inference per case at published paid rates. Recovering a ₹4,299 cart for ₹0.30 is
@@ -2333,7 +2342,7 @@ Sixteen phases (0–15). **Every phase carries DoD-J (§17.1): journal what brok
 | **3** | Deterministic classifier + rail-health index | `agent/classifier.py`, `agent/rail_health.py` | `(error_source, error_step)` → category for all seeded failures; rail-health computed from our own log; **classifier accuracy on the golden set recorded as the LLM's baseline to beat** |
 | **4** | Stopping Rules Engine | `guardrails/stopping_rules.py` | All 12 rules are pure predicates over a frozen context — no I/O, no clock read — so termination is testable by fast-forwarding rather than waiting. Four outcomes, not two (DEC-012): deferring is not stopping (a quiet-hours hold is sent at 09:05, never dropped) and degrading is not stopping (no marketing consent means send the transactional link at 0%, not send nothing). All twelve evaluate every time, never short-circuited, because per-rule firing counts are the dashboard's evidence the brakes work (DEC-013). Termination proven by property test over 2,000 generated contexts, not by sampling. Quiet hours wrap midnight and are evaluated in IST — a naive `start <= h < end` reports 23:00 as allowed and messages someone at 11 PM |
 | **5** | Policy firewall + `PolicyToken` | `guardrails/policy_engine.py`, `guardrails/token.py` | Every §26.2 branch covered; **hypothesis fuzzer green at 2,000 examples per property, with vacuity guards** (INC-006 — the first version passed while proving nothing); `PolicyToken` HMAC-signed under a process-private key so a hand-built token raises at the call site (DEC-014), plus an import-graph test that no module outside `guardrails` may mint one; clamps distinguish **violations** (model breached a hard bound → escalate) from **routine reductions** (consent downgrade → proceed, safer), because conflating them would send every no-marketing-consent recovery to a human queue (DEC-015) |
-| **6** | `LLMAdapter`, Gemini free tier, rate limiter, **response cache**, deterministic fallback | `llm/adapter.py`, `llm/gemini_adapter.py`, `llm/cached_adapter.py`, `llm/deterministic.py`, `llm/rate_limit.py`, `llm/prompts/` | All four adapters satisfy the protocol; Gemini `response_schema` output **re-validated through Pydantic**; one re-prompt then fallback; **full pipeline passes with zero API keys**; token-bucket RPM limiter + SQLite-persisted RPD counter; `LLM_CALL` rows record `source`; `make warm-cache` populates and commits `data/llm_cache.jsonl` |
+| **6** | `LLMAdapter`, Gemini free tier, rate limiter, **response cache**, deterministic fallback | `llm/adapter.py`, `llm/gemini_adapter.py`, `llm/cache.py`, `llm/deterministic.py`, `llm/rate_limit.py`, `llm/prompts.py`, `llm/routing.py` | Four adapters satisfy one protocol; Gemini `response_schema` output **re-validated through Pydantic** (the provider's constraint is a convenience, ours is the contract); schema bounds propagated to the provider after INC-011 showed a dropped `maxLength` discarding good diagnoses; one re-prompt then the deterministic floor; **full pipeline passes with zero API keys**; token-bucket RPM + persisted RPD counter rolling on the **IST** day; every `LLM_CALL` records `source ∈ {LIVE, CACHED, DETERMINISTIC}`; `warm-cache` scores the model against the baseline **and** records responses; **the gate returned "ship the rule table"** (DEC-017) and a CI test asserts that verdict from the committed cache with no key |
 | **7** | LangGraph 7-node graph | `agent/graph.py`, `agent/state.py`, `agent/nodes/*.py` | End-to-end traversal; `MAX_NODE_VISITS` trips on a synthetic loop; `llm_calls ≤ 3` asserted; **test proves `execute_node` never reads `state["proposal"]`** |
 | **8** | Two-phase outbox + retry + DLQ + reconciler | `tools/outbox.py`, `tools/action_tools.py`, `workers/drainer.py` | `reference_id` committed before any call; `test_crash_between_call_and_commit` passes; DLQ populated and replayable; duplicate-reference path recovers |
 | **9** | Attribution matcher + experiment arms | `services/attribution.py`, `services/experiments.py` | Arm assignment deterministic and stable across restart; recovery counted only on signed webhook + `reference_id` match; lift + Wilson CI computed; **no test asserts a target rupee figure** |

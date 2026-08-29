@@ -81,3 +81,6 @@ legacy/
 
 # local backups
 .env.backup*
+
+# Hypothesis example database (machine-local)
+.hypothesis/

@@ -51,14 +51,19 @@ class Settings(BaseSettings):
 
     # ------------------------------------------------------------------ llm
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.1-flash-lite"
 
     #: Free-tier quotas. Flagged VERIFY_CURRENT_QUOTA in workflow.md §4.6 —
     #: free-tier limits change, so read them from config and re-check them
     #: rather than trusting a number hardcoded months ago.
     llm_rpm_limit: int = 10
     llm_rpd_limit: int = 200
-    llm_timeout_s: float = 2.5
+    #: Measured, not assumed. Free-tier Gemini 3.x answers these short
+    #: structured tasks in ~3.9 s median; the original 2.5 s budget was written
+    #: before there was anything to measure and would have made every live call
+    #: fall back (INC-009). The customer is not waiting on this -- the webhook
+    #: was acknowledged in ~7 ms and diagnosis runs in a background task.
+    llm_timeout_s: float = 12.0
     llm_max_output_tokens: int = 1024
     llm_max_calls_per_case: int = 3
 
