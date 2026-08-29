@@ -1,0 +1,23 @@
+{
+  "_fixture_meta": {
+    "provenance": "documented_shape",
+    "source": "Razorpay Webhooks / Payments API documentation",
+    "note": "An event type we do not handle. Must be accepted and ignored, never 500: Razorpay retries non-2xx responses, so an exception on an unrecognised event becomes an infinite retry loop.",
+    "replace_with": "python tasks.py capture-fixtures  (needs RAZORPAY_* keys)"
+  },
+  "entity": "event",
+  "account_id": "acc_TestModeGlowKart",
+  "event": "payment.dispute.created",
+  "contains": [
+    "dispute"
+  ],
+  "payload": {
+    "dispute": {
+      "entity": {
+        "id": "disp_XYZ",
+        "amount": 100000
+      }
+    }
+  },
+  "created_at": 1788241600
+}

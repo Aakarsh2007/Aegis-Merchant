@@ -1,0 +1,44 @@
+{
+  "_fixture_meta": {
+    "provenance": "documented_shape",
+    "source": "Razorpay Webhooks / Payments API documentation",
+    "note": "Organic resolution. Must NOT open a case: counting the payment that closes exposure as a new opportunity is the classic double-count bug. Also how a CONTROL-arm case is observed.",
+    "replace_with": "python tasks.py capture-fixtures  (needs RAZORPAY_* keys)"
+  },
+  "entity": "event",
+  "account_id": "acc_TestModeGlowKart",
+  "event": "order.paid",
+  "contains": [
+    "order",
+    "payment"
+  ],
+  "payload": {
+    "order": {
+      "entity": {
+        "id": "order_organic_0007",
+        "entity": "order",
+        "amount": 189900,
+        "amount_paid": 189900,
+        "amount_due": 0,
+        "currency": "INR",
+        "receipt": "GK-88301",
+        "status": "paid",
+        "attempts": 2,
+        "notes": {},
+        "created_at": 1788230000
+      }
+    },
+    "payment": {
+      "entity": {
+        "id": "pay_organic_0007",
+        "entity": "payment",
+        "amount": 189900,
+        "status": "captured",
+        "method": "upi",
+        "bank": "SBI",
+        "created_at": 1788240500
+      }
+    }
+  },
+  "created_at": 1788240501
+}

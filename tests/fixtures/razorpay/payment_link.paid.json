@@ -1,0 +1,57 @@
+{
+  "_fixture_meta": {
+    "provenance": "documented_shape",
+    "source": "Razorpay Webhooks / Payments API documentation",
+    "note": "Verified recovery. reference_id is our idempotency key coming back; the attribution matcher requires an exact match on it before counting a single rupee (section 14.1).",
+    "replace_with": "python tasks.py capture-fixtures  (needs RAZORPAY_* keys)"
+  },
+  "entity": "event",
+  "account_id": "acc_TestModeGlowKart",
+  "event": "payment_link.paid",
+  "contains": [
+    "payment_link",
+    "payment",
+    "order"
+  ],
+  "payload": {
+    "payment_link": {
+      "entity": {
+        "id": "plink_RecoveryAnanya01",
+        "entity": "payment_link",
+        "amount": 429900,
+        "currency": "INR",
+        "status": "paid",
+        "reference_id": "rvp_RC-0142_1",
+        "description": "GlowKart - complete your order",
+        "short_url": "https://rzp.io/i/mockAnanya1",
+        "amount_paid": 429900,
+        "customer": {
+          "name": "Ananya",
+          "contact": "+919000001234",
+          "email": null
+        },
+        "notes": {
+          "case_id": "RC-0142",
+          "playbook": "PAYMENT_FAILURE",
+          "arm": "TREATMENT"
+        },
+        "created_at": 1788240900,
+        "expire_by": 1788242700
+      }
+    },
+    "payment": {
+      "entity": {
+        "id": "pay_RecoveredAnanya01",
+        "entity": "payment",
+        "amount": 429900,
+        "currency": "INR",
+        "status": "captured",
+        "method": "card",
+        "bank": "ICICI",
+        "captured": true,
+        "created_at": 1788241092
+      }
+    }
+  },
+  "created_at": 1788241093
+}

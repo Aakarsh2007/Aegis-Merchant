@@ -1,0 +1,54 @@
+{
+  "_fixture_meta": {
+    "provenance": "documented_shape",
+    "source": "Razorpay Webhooks / Payments API documentation",
+    "note": "Bank-side UPI authorisation timeout. error_source='bank' is the field the deterministic classifier reads, instead of asking a model whose fault it was.",
+    "replace_with": "python tasks.py capture-fixtures  (needs RAZORPAY_* keys)"
+  },
+  "entity": "event",
+  "account_id": "acc_TestModeGlowKart",
+  "event": "payment.failed",
+  "contains": [
+    "payment"
+  ],
+  "payload": {
+    "payment": {
+      "entity": {
+        "id": "pay_glowkart_ananya01",
+        "entity": "payment",
+        "amount": 429900,
+        "currency": "INR",
+        "status": "failed",
+        "order_id": "order_glowkart_ananya01",
+        "invoice_id": null,
+        "international": false,
+        "method": "upi",
+        "amount_refunded": 0,
+        "captured": false,
+        "description": "GlowKart order",
+        "card_id": null,
+        "bank": "HDFC",
+        "wallet": null,
+        "vpa": "ananya@okhdfcbank",
+        "email": "an****01@example.com",
+        "contact": "+919000001234",
+        "notes": {
+          "merchant_order_ref": "GK-88291"
+        },
+        "fee": null,
+        "tax": null,
+        "error_code": "GATEWAY_ERROR",
+        "error_description": "Payment was not completed on time.",
+        "error_source": "bank",
+        "error_step": "payment_authorization",
+        "error_reason": "payment_failed_due_to_bank_timeout",
+        "acquirer_data": {
+          "rrn": null,
+          "upi_transaction_id": null
+        },
+        "created_at": 1788240840
+      }
+    }
+  },
+  "created_at": 1788240841
+}

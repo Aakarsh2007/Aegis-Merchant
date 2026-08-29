@@ -15,6 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Settings, get_settings
 from app.core.clock import Clock, SystemClock, iso_ist
+from app.deps import get_clock as _deps_get_clock
+from app.deps import get_provider
+from app.routers import webhooks
 
 __version__ = "0.1.0"
 
@@ -24,7 +27,8 @@ _clock: Clock = SystemClock()
 
 
 def get_clock() -> Clock:
-    return _clock
+    """Re-exported from app.deps so existing imports keep working."""
+    return _deps_get_clock()
 
 
 @asynccontextmanager
@@ -60,6 +64,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    app.include_router(webhooks.router)
+
     @app.get("/healthz", tags=["health"], summary="Liveness probe")
     async def healthz() -> dict[str, Any]:
         return {"status": "ok", "service": "revpilot-api", "version": __version__}
@@ -81,6 +87,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "now_ist": iso_ist(clock.now_ist()),
             "environment": settings.environment,
             "razorpay": "test_mode" if settings.razorpay_live else "mock_provider",
+            "provider_impl": get_provider(settings).name,
+            "webhook_secret_configured": bool(settings.razorpay_webhook_secret),
             "llm_adapter": settings.llm_provider,
             "llm_model": settings.gemini_model if settings.llm_provider == "gemini" else None,
             "simulation_allowed": settings.simulation_allowed,

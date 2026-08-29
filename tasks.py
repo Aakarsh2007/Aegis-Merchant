@@ -191,6 +191,17 @@ def verify_audit() -> int:
     return _pending("Phase 10")
 
 
+@task("capture-fixtures", "Record real Razorpay Test Mode responses as fixtures")
+def capture_fixtures() -> int:
+    """Replace documented-shape fixtures with captured Test Mode responses.
+
+    The deterministic classifier keys on error_source / error_step, so a
+    classifier built against assumed field shapes is built on sand. Needs
+    RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env.
+    """
+    return run([PY, "-m", "app.tools.capture_fixtures"], cwd=API)
+
+
 @task("tunnel", "Expose the local API over HTTPS for real webhooks (Phase 14)")
 def tunnel() -> int:
     return _pending("Phase 14")

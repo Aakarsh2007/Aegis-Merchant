@@ -1,0 +1,49 @@
+{
+  "_fixture_meta": {
+    "provenance": "documented_shape",
+    "source": "Razorpay Webhooks / Payments API documentation",
+    "note": "Receivables recovery verification for Playbook 3.",
+    "replace_with": "python tasks.py capture-fixtures  (needs RAZORPAY_* keys)"
+  },
+  "entity": "event",
+  "account_id": "acc_TestModeGlowKart",
+  "event": "invoice.paid",
+  "contains": [
+    "invoice",
+    "payment"
+  ],
+  "payload": {
+    "invoice": {
+      "entity": {
+        "id": "inv_glowkart_rahul01",
+        "entity": "invoice",
+        "amount": 1850000,
+        "amount_paid": 1850000,
+        "amount_due": 0,
+        "currency": "INR",
+        "status": "paid",
+        "receipt": "GK-INV-4471",
+        "customer_details": {
+          "name": "Rahul Enterprises",
+          "email": null
+        },
+        "notes": {
+          "case_id": "RC-0155"
+        },
+        "created_at": 1784700000
+      }
+    },
+    "payment": {
+      "entity": {
+        "id": "pay_rahul_settle01",
+        "entity": "payment",
+        "amount": 1850000,
+        "status": "captured",
+        "method": "netbanking",
+        "bank": "ICICI",
+        "created_at": 1788241500
+      }
+    }
+  },
+  "created_at": 1788241501
+}

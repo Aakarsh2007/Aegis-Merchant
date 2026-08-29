@@ -1,0 +1,48 @@
+{
+  "_fixture_meta": {
+    "provenance": "documented_shape",
+    "source": "Razorpay Webhooks / Payments API documentation",
+    "note": "Playbook 4 trigger. error_reason distinguishes a revoked mandate (retry cannot succeed and burns a re-presentation -> send a re-auth link) from insufficient balance (reschedule and retry). Getting this backwards is the most common subscription-recovery bug in production systems.",
+    "replace_with": "python tasks.py capture-fixtures  (needs RAZORPAY_* keys)"
+  },
+  "entity": "event",
+  "account_id": "acc_TestModeGlowKart",
+  "event": "subscription.pending",
+  "contains": [
+    "subscription",
+    "payment"
+  ],
+  "payload": {
+    "subscription": {
+      "entity": {
+        "id": "sub_glowkart_vikram01",
+        "entity": "subscription",
+        "plan_id": "plan_glowkart_monthly",
+        "status": "pending",
+        "current_start": 1785648000,
+        "current_end": 1788240000,
+        "paid_count": 6,
+        "remaining_count": 6,
+        "notes": {},
+        "created_at": 1770000000
+      }
+    },
+    "payment": {
+      "entity": {
+        "id": "pay_sub_vikram_fail01",
+        "entity": "payment",
+        "amount": 99900,
+        "status": "failed",
+        "method": "emandate",
+        "bank": "HDFC",
+        "error_code": "BAD_REQUEST_ERROR",
+        "error_description": "The mandate is no longer active.",
+        "error_source": "customer",
+        "error_step": "payment_initiation",
+        "error_reason": "payment_failed_mandate_revoked_by_customer",
+        "created_at": 1788239000
+      }
+    }
+  },
+  "created_at": 1788239001
+}

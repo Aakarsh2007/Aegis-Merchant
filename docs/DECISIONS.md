@@ -143,3 +143,41 @@ inspection part of the credibility argument.
 **Cost of being wrong:** Fixed-width text sorts correctly, so `ORDER BY`, `BETWEEN` and
 the rolling-window queries behave exactly as they would with a native type. The cost is
 ~8 bytes per column versus an integer, which is irrelevant at this scale.
+
+## DEC-008 · 2026-08-29 · Razorpay REST API over httpx, not the official Python SDK
+
+**Phase:** 2
+
+**Decision:** Call Razorpay's documented REST API directly with `httpx.AsyncClient`.
+
+**Rejected:** The official `razorpay` package. Verified rather than assumed — it wraps
+`requests` and is fully synchronous, with no async client. Every call from this
+application would block the event loop, and that is not theoretical here: the outbox
+drainer runs in-process alongside the API, so one slow provider call would stall webhook
+acknowledgement for every other merchant event. It also exposes no per-request timeout
+control, which the retry policy in workflow.md §10.4 depends on. Also rejected: wrapping
+the SDK in `run_in_executor`, which keeps the "official SDK" label but adds a thread pool
+to work around a problem that disappears if we just make the HTTP call ourselves. Auth is
+HTTP Basic with `key_id:key_secret` — exactly what the SDK does.
+
+**Cost of being wrong:** We now own the request/response mapping, so a Razorpay API change
+lands on us instead of on a dependency. Mitigated by keeping the surface tiny (five
+operations) and by capturing real Test Mode responses as fixtures. The dependency was
+removed from requirements.txt rather than left unused.
+
+## DEC-009 · 2026-08-29 · The mock provider enforces reference_id uniqueness
+
+**Phase:** 2
+
+**Decision:** `MockRazorpayProvider` rejects a duplicate `reference_id` exactly as
+Razorpay does, and simulates non-zero latency.
+
+**Rejected:** A permissive mock that always succeeds. The entire two-phase outbox design
+rests on the provider rejecting a duplicate reference — that rejection is what makes a
+post-crash retry idempotent. A mock without it would let the Phase 8 crash-recovery tests
+pass against a false model of the world, and the bug would surface only against real
+Razorpay, in the worst possible way: two live payment links for one cart. A mock is
+allowed to be simpler than reality, but never *more permissive* on the property the
+design depends on.
+
+**Cost of being wrong:** None; it makes the mock strictly closer to reality.
