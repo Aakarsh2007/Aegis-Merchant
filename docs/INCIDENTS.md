@@ -105,3 +105,88 @@ unnoticed future timestamp would have silently corrupted the rail-health index (
 "1-hour success rate" computed over rows dated in the future) and the recovery-window
 checks. Reproducibility tests earn their keep by catching data faults, not just
 non-determinism.
+
+## INC-003 · 2026-08-29 · A free-text field could unblock a fraud control
+
+**Phase:** 3 (deterministic classifier)
+
+**Symptom:** `test_never_acts_autonomously_on_a_risk_block` failed on two golden-set
+cases. The classifier marked payments with `error_source=business` -- meaning the
+merchant's own risk rules rejected them -- as **recoverable**. The agent would have
+issued a fresh payment link for a payment its own fraud controls had blocked.
+
+**Wrong theory (~15 min lost):** assumed the golden-set labels were too strict, and that
+"blocked after a risk check timed out" was arguably a rail fault worth retrying. Sat with
+the consequence instead: if the retry succeeded, we would have collected money on a
+transaction the business deliberately refused. That is not a labelling disagreement, it is
+the system defeating its own control.
+
+**Root cause:** substring matching on `error_reason` was allowed to override
+`error_source`. `payment_blocked_after_risk_check_timeout` contains "timeout", so it
+matched RAIL_FAULT; `mandate_presented_but_blocked_by_risk` contains "mandate", so it
+matched MANDATE_INVALID. The design treated the reason string as "more specific evidence",
+which is right for ordinary disagreements and catastrophically wrong when one of the
+signals is an authorisation decision rather than a description.
+
+**Fix:** `error_source=business` is now an authoritative gate checked before any reason
+matching can run (`apps/api/app/agent/classifier.py`, the SAFETY GATE block). No reason
+string can reverse it. Separately, `_REASON_MARKERS` was reordered by specificity, since
+the same flaw made `otp_entry_timed_out_by_user` -- a person giving up -- read as a rail
+outage.
+
+**Why it stayed fixed:** `test_no_reason_string_can_unblock_a_business_block` feeds a
+reason containing every rail, funds and mandate marker at once and asserts the verdict is
+still RISK_BLOCKED. `test_never_acts_autonomously_on_a_risk_block` runs over the whole
+golden set.
+
+**What I actually learned:** "the more specific signal wins" is a good default and a bad
+absolute. Some fields are *descriptions* and some are *decisions*, and a decision must not
+be outranked by a description. This is the same shape as the LLM/policy boundary the whole
+architecture rests on -- a model's proposal is a description, the policy firewall's verdict
+is a decision -- and I had just reproduced, one layer down, the bug the architecture exists
+to prevent. Both failing cases were ones I had *predicted* in the golden set as expected
+misses; I had written them off as accuracy noise rather than noticing one was a safety
+property.
+
+## INC-004 · 2026-08-29 · The corpus contained no degraded rail to find
+
+**Phase:** 3 (rail health)
+
+**Symptom:** Running the classifier and rail-health index over the real committed corpus,
+the Ananya hero case produced `alternative: none confidently better -> reissue same rail`.
+The demo script in workflow.md narrates "HDFC UPI success fell to 42%, so switch rails". In
+the actual data HDFC UPI was at **72.7%, above the 65.4% baseline** -- not degraded at all.
+
+**Wrong theory (~10 min lost):** suspected the Wilson lower bound was too conservative and
+that `best_alternative` was refusing a switch it should have made. It was not: with HDFC
+above baseline there was genuinely nothing better to switch to, and the refusal was
+correct. The code was right and the *data* did not contain the scenario.
+
+**Root cause:** the seed generator sprinkled failures uniformly at random across every
+rail. Real rail failures are **bursty** -- a bank has a bad three hours -- and uniform
+sprinkling produces a corpus in which no rail is ever meaningfully worse than any other.
+The product's central claim is that it detects a degraded rail and routes around it, and
+the corpus could not exercise that claim.
+
+**Fix:** a declared HDFC UPI outage window in `db/seed.py` -- 18 bank-side authorisation
+timeouts concentrated into 3 hours, taken **out of** the existing 96-failure budget rather
+than added on top. HDFC UPI is now 41.0% over 39 attempts and the index recommends
+upi/ICICI at 87.1%. The seed prints the scenario on every run so it can never become a
+hidden assumption.
+
+**Why it stayed fixed:** the seed output states the scenario explicitly, and section 12.5
+records it as scenario design.
+
+**What I actually learned:** two things. Synthetic data has to contain the phenomenon the
+product exists to handle, or the tests pass while proving nothing -- the data-side version
+of a mock that is more permissive than reality (DEC-009). And the line between legitimate
+scenario design and rigging is not fuzzy: designing the corpus to *contain a realistic
+degraded rail* is legitimate and is declared; tuning it until the recovery rate hits a
+target would be rigging, and is exactly what section 16.2 forbids.
+
+Related finding, recorded because it will matter in Phase 12: "degraded" is measured
+*relative to the baseline*, so during a broad outage nothing looks degraded -- everything
+is equally bad and the baseline collapses with it. Measured across windows at the outage
+peak: 14 days -> degraded, 24 hours -> degraded, 3 hours -> **not** degraded (rail 10.0%
+against a baseline that had itself fallen to 16.7%). The 24-hour default is what keeps
+enough healthy history in frame for the comparison to mean anything.

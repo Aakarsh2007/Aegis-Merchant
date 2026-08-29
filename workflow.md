@@ -1324,6 +1324,7 @@ way it finds everything else, and a test asserts they are not in the first ten r
 | Implied run-rate | ~₹17.0L/month, against GlowKart's stated ~₹20L/month |
 | Revenue at risk | ₹11,84,629 |
 | Failure `error_source` spread | bank 55 · customer 50 · gateway 9 · business 4 · internal 2 |
+| **Declared scenario** | A 3-hour `upi/HDFC` outage: 18 bank-side authorisation timeouts, taken *out of* the 96-failure budget. HDFC UPI runs at **41.0% over 39 attempts** against a 65% baseline, so the rail-health index has a genuinely degraded rail to find and the alternative (`upi/ICICI`, 87.1%) is real rather than narrated. Scenario design, **not** metric tuning — no rate or rupee target is aimed at. Added after INC-004, where the first run against real data showed the corpus contained no degraded rail at all. |
 | Consent profile | 6 opted out · 4 DND-registered · ≥22 without marketing consent |
 | Subscription split | 13 insufficient-balance · 11 mandate-invalid |
 
@@ -1544,7 +1545,15 @@ hackathon project has this. It is roughly four hours of work and it is dispropor
   cache (§4.5). CI then re-scores against the cache. This gives a real accuracy number, a green CI badge, and
   **no API key in CI** — the alternative (calling a free-tier model from CI) is flaky, quota-burning, and
   would make the badge meaningless.
-- CI gate: cached accuracy ≥ 0.85 and `is_recoverable` recall ≥ 0.95. Prompt changes invalidate cache keys, so
+- CI gate: cached accuracy ≥ 0.85 and `is_recoverable` recall ≥ 0.95.
+
+> **Measured baseline, Phase 3 (recorded before the model exists):** the deterministic rule
+> table scores **82/85 = 96.5%** on the golden set, with **100% recoverability recall** and
+> zero risk-blocked leakage. All three misses fall in one band — `method_context`, where
+> payment method changes the correct answer and the rule table deliberately ignores it
+> (DEC-011). Cost: zero. **Phase 6 must beat 96.5% on this set, or we ship the rule table
+> and say so.** The set also carries `test_accuracy_is_not_suspiciously_perfect`: a 100%
+> score fails the build, because it would mean the set had stopped being evidence. Prompt changes invalidate cache keys, so
   a prompt edit *forces* a fresh `make eval-live` before CI can pass — the gate cannot be silently bypassed.
 
 ### 15.2 Prompt-injection suite
@@ -2036,8 +2045,9 @@ firewall the model cannot reach."*
 
 **0:50–1:50 — Ananya.** Inject her ₹4,299 HDFC UPI failure. Narrate the trace as it streams:
 *"Razorpay's own `error_source` field says `bank` — we didn't ask a model to guess whose fault it was, we read
-it. The model's job was harder: this is a four-time customer with ₹14,800 lifetime value hitting a rail that's
-at 42% success this hour. It proposed a 5% discount to be safe. Policy declined the discount — she has no
+it. Rail health is a SQL query over our own ledger, not a model either: HDFC UPI is at 41% over 39 attempts
+against a 65% baseline, and ICICI is at 87%. The model's job was harder: this is a four-time customer with
+₹14,800 lifetime value hitting a rail we can prove is degraded. It proposed a 5% discount to be safe. Policy declined the discount — she has no
 marketing consent, and a bank-side timeout isn't a pricing problem. So: fresh link, healthy rail, zero
 discount."* Link is created against real Razorpay Test Mode. Pay it. Webhook lands.
 *"₹4,299 recovered, verified against a signed webhook, and the merchant gave away no margin."*

@@ -31,6 +31,7 @@ away from the data without someone noticing.
 | Revenue at risk | ₹11,84,629 |
 | Recovered so far | **₹0** |
 | Reproducible | Byte-for-byte from `SEED=20260905` against a fixed anchor instant |
+| Declared scenario | A 3-hour `upi/HDFC` outage (41.0% over 39 attempts vs a 65% baseline), so there is a genuinely degraded rail to detect. Scenario design, not metric tuning — see [INC-004](docs/INCIDENTS.md) |
 
 Failures are **deliberately over-sampled** — a corpus with three failures would exercise
 nothing — so rates computed over it are rates of the sample, not of GlowKart's true funnel.
@@ -92,7 +93,7 @@ provenance are never summed into one number.
 |---|---|
 | **Problem taste** — *did you pick something that actually matters* | [`workflow.md` §0](workflow.md), §5 — four distinct revenue leaks, with the scope we cut and why |
 | **Build quality** — *does it run, is it structured, would you trust it* | This section, §13 (auth, PII, injection containment), §22 (Judge Mode), CI badge above |
-| **AI judgment** — *the right tool in the right place, and where you chose not to use one* | §4.2 — nine places we **rejected** an LLM in favour of deterministic code, and why |
+| **AI judgment** — *the right tool in the right place, and where you chose not to use one* | §4.2 — nine places we **rejected** an LLM in favour of deterministic code. Now measured: the rule table scores **96.5%** on an 85-case golden set at zero cost, and **Phase 6's model must beat that or we ship the rule table** ([baseline](tests/eval/test_classifier_baseline.py)) |
 | **Failure recovery** — *what broke, and what you did about it* | [`docs/INCIDENTS.md`](docs/INCIDENTS.md) — written while things were broken, wrong theories included |
 
 The track bar asks for *"measured money recovered across a batch, with compliant

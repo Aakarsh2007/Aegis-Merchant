@@ -181,3 +181,46 @@ allowed to be simpler than reality, but never *more permissive* on the property 
 design depends on.
 
 **Cost of being wrong:** None; it makes the mock strictly closer to reality.
+
+## DEC-010 · 2026-08-29 · Wilson lower bound for rail ranking, not raw success rate
+
+**Phase:** 3
+
+**Decision:** Rank rails by the Wilson score interval's lower bound at 95%.
+
+**Rejected:** The raw success rate. It is actively wrong at the sample sizes this system
+lives at: a rail with 1 success in 1 attempt scores 100% and outranks a rail with 36 in 40,
+so every recovery would be routed to whichever rail got lucky most recently. The mirror
+failure is worse -- 0 successes in 3 attempts scores 0%, permanently blacklisting a healthy
+rail that had an unlucky afternoon. Also rejected: a minimum-sample cutoff, which throws
+away real information and just relocates the arbitrary threshold; and Laplace smoothing
+toward a prior, which works but needs a tuning constant nobody can justify. Wilson needs no
+tuning parameter and degrades smoothly.
+
+**Consequence worth stating:** `best_alternative` returns `None` when nothing is
+*confidently* better, and `None` is a real answer meaning "reissue on the same rail". With
+only two attempts per case, spending one on a hunch is expensive, and churning rails on
+noise makes the recovery message harder to explain to a customer.
+
+**Cost of being wrong:** Slightly conservative -- a genuinely better rail with a thin
+sample will not be recommended until it has evidence. That is the correct direction to be
+wrong in.
+
+## DEC-011 · 2026-08-29 · The classifier accepts `method` and deliberately ignores it
+
+**Phase:** 3
+
+**Decision:** `classify()` takes a `method` parameter and does not use it. Three golden-set
+cases (G-M001..003) fail because of this, and they are declared in the data as expected
+misses.
+
+**Rejected:** Adding method-aware rules. Payment method genuinely changes the right answer
+-- a bank-side failure at initiation means a rail outage on UPI but an unregistered mandate
+on e-mandate -- but encoding that is a combinatorial table of (source x step x method x
+reason) that would be guesswork dressed as logic. It is exactly the multi-signal judgement
+section 4.3 task 1 describes, and it is where the LLM should earn its cost.
+
+**Cost of being wrong:** A measured 96.5% baseline instead of a higher one. That is the
+point: the parameter stays in the signature so the handoff is visible in the code rather
+than hidden, and Phase 6 has a concrete, pre-registered target to beat rather than a vague
+aspiration.

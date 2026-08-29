@@ -76,6 +76,26 @@ N_CUSTOMERS = 140
 #: implied Rs 4L/month, which any judge dividing GMV by days would have caught.
 CHECKOUT_WINDOW_DAYS = 14
 
+#: A declared scenario, not a tuned metric.
+#:
+#: The product's core claim is that it diagnoses a degraded rail and routes
+#: around it. A corpus in which no rail is ever degraded cannot exercise that,
+#: and the first run against real data proved the point: HDFC UPI sat at 72.7%
+#: -- above baseline -- so the rail-health index correctly refused to switch,
+#: contradicting the demo narrative.
+#:
+#: So the corpus contains an explicit HDFC UPI outage window: a 3-hour burst of
+#: bank-side authorisation timeouts. This is scenario design, and it is stated
+#: in the seed output and in workflow.md section 12.5. It is NOT metric tuning:
+#: no recovery rate or rupee target is being aimed at, and the failures come out
+#: of the existing 96-failure budget rather than being added on top.
+OUTAGE_ISSUER = "HDFC"
+OUTAGE_METHOD = PaymentMethod.UPI
+OUTAGE_FAILURES = 18
+OUTAGE_START_DAYS_AGO = 2
+OUTAGE_START_HOUR_IST = 14
+OUTAGE_DURATION_HOURS = 3
+
 # Consent profile: 22 without marketing consent, 6 opted out, 4 DND.
 N_NO_MARKETING = 22
 N_OPTED_OUT = 6
@@ -486,7 +506,37 @@ def _build_attempts(rng: random.Random, customers: list[Customer]) -> list[Payme
             attempted_at=ANCHOR_IST - timedelta(hours=2, minutes=14),
         )
     )
-    for _ in range(N_FAILED - 1):
+    # The declared HDFC UPI outage window: a concentrated burst of bank-side
+    # authorisation timeouts, which is what a real rail incident looks like.
+    # Bursty, not uniformly sprinkled -- the reason the health window is hours
+    # rather than days.
+    outage_start = (ANCHOR_IST - timedelta(days=OUTAGE_START_DAYS_AGO)).replace(
+        hour=OUTAGE_START_HOUR_IST, minute=0, second=0, microsecond=0
+    )
+    for _ in range(OUTAGE_FAILURES):
+        cust = pick_customer()
+        attempts.append(
+            PaymentAttempt(
+                id=next_id(),
+                merchant_id=MERCHANT_ID,
+                customer_id=cust.id,
+                order_id=f"order_{rng.randrange(16**12):012x}",
+                payment_id=f"pay_{rng.randrange(16**12):012x}",
+                kind=AttemptKind.CHECKOUT,
+                status=PaymentStatus.FAILED,
+                amount_paise=int(rng.triangular(39_900, 1_499_900, 219_900)),
+                method=OUTAGE_METHOD,
+                issuer=OUTAGE_ISSUER,
+                error_code="GATEWAY_ERROR",
+                error_source=ErrorSource.BANK,
+                error_step=ErrorStep.PAYMENT_AUTHORIZATION,
+                error_reason="payment_failed_due_to_bank_timeout",
+                attempted_at=outage_start
+                + timedelta(minutes=rng.randint(0, OUTAGE_DURATION_HOURS * 60 - 1)),
+            )
+        )
+
+    for _ in range(N_FAILED - 1 - OUTAGE_FAILURES):
         cust = pick_customer()
         method = _method(rng)
         source, step, code, reason, _w = _weighted_choice(rng, FAILURE_PROFILES)
@@ -800,6 +850,12 @@ def _report(db_path: Path, stats: SeedStats) -> None:
     )
     print(f"  revenue at risk     Rs {stats.at_risk_paise / 100:,.0f}")
     print("  recovered           Rs 0   (nothing has run yet)")
+    print()
+    print(f"  DECLARED SCENARIO: a {OUTAGE_DURATION_HOURS}h {OUTAGE_METHOD.value}/"
+          f"{OUTAGE_ISSUER} outage ({OUTAGE_FAILURES} bank-timeout failures),")
+    print("        so the rail-health index has a genuinely degraded rail to find.")
+    print("        Scenario design, not metric tuning: no rate or rupee target is")
+    print("        aimed at, and these come out of the 96-failure budget.")
     print()
     print("  NOTE: failures are deliberately over-sampled -- a corpus with three")
     print("        failures would exercise nothing. Rates are of this sample, not")
