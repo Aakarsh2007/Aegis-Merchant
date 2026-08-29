@@ -45,6 +45,7 @@ __all__ = [
     "PolicyTokenInvalid",
     "canonical_json",
     "mint",
+    "reissue_from_committed_intent",
 ]
 
 #: Generated once per process. Never logged, never persisted, never exported.
@@ -101,6 +102,36 @@ class AppliedAction:
         payload["send_after"] = self.send_after.isoformat() if self.send_after else None
         return payload
 
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> AppliedAction:
+        """Rebuild from ``as_payload()`` output.
+
+        Lives next to its inverse on purpose. The reconciler deserialises an
+        outbox row committed before a crash, and an earlier version left the
+        enum fields as plain strings -- which then blew up computing the token
+        signature, in the one code path that only runs after a crash. A
+        serialise/deserialise pair belongs in one place with a round-trip test
+        (INC-013).
+        """
+        from datetime import datetime as _dt
+
+        send_after = payload.get("send_after")
+        return cls(
+            case_id=str(payload["case_id"]),
+            strategy=RecoveryStrategy(payload["strategy"]),
+            amount_paise=int(payload["amount_paise"]),
+            discount_pct=float(payload["discount_pct"]),
+            discount_amount_paise=int(payload["discount_amount_paise"]),
+            charge_amount_paise=int(payload["charge_amount_paise"]),
+            link_expiry_minutes=int(payload["link_expiry_minutes"]),
+            channel=Channel(payload["channel"]),
+            message_class=MessageClass(payload["message_class"]),
+            escalation_rung=EscalationRung(payload["escalation_rung"]),
+            reference_id=str(payload["reference_id"]),
+            attempt_no=int(payload["attempt_no"]),
+            send_after=_dt.fromisoformat(send_after) if send_after else None,
+        )
+
     def canonical(self) -> str:
         return canonical_json(self.as_payload())
 
@@ -152,6 +183,37 @@ class PolicyToken:
 def _sign(applied: AppliedAction, minted_at: datetime) -> str:
     message = f"{applied.canonical()}|{minted_at.isoformat()}".encode()
     return hmac.new(_SIGNING_KEY, message, hashlib.sha256).hexdigest()
+
+
+def reissue_from_committed_intent(
+    payload_json: str, *, minted_at: datetime
+) -> tuple[AppliedAction, PolicyToken]:
+    """Re-materialise a capability for an action that was **already authorised**.
+
+    This exists because the reconciler needs it, and because letting the
+    reconciler call :func:`mint` would quietly weaken the invariant the
+    import-graph test protects: *only the policy firewall authorises actions*.
+
+    Two authorities are being distinguished, and conflating them is the bug:
+
+    1. **Authorising a new action.** Only ``evaluate_policy`` may do this. It is
+       where the bounds are applied and where a proposal becomes a decision.
+    2. **Re-materialising a capability for an action already authorised and
+       already committed to the outbox.** The outbox row is durable evidence
+       that (1) happened; a crash destroyed the in-memory token, not the
+       authorisation.
+
+    The input constrains the authority: this takes a **committed outbox
+    payload**, not an arbitrary ``AppliedAction``. It cannot authorise anything
+    that was not already written to the outbox by the firewall, so it is not a
+    second way to say yes -- it is a way to pick up a yes that was already
+    given. The numbers are byte-identical to what was authorised, which is
+    checkable: ``content_hash()`` is unchanged.
+    """
+    applied = AppliedAction.from_payload(json.loads(payload_json))
+    return applied, PolicyToken(
+        applied=applied, minted_at=minted_at, signature=_sign(applied, minted_at)
+    )
 
 
 def mint(applied: AppliedAction, *, minted_at: datetime) -> PolicyToken:

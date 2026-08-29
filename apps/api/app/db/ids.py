@@ -67,8 +67,17 @@ def reference_id(case_id: str, attempt_no: int) -> str:
 
     It is also the exact string the attribution matcher looks for in the
     confirming webhook, so recovery can never be attributed by guesswork.
+
+    **Lowercased deliberately.** Verified against live Razorpay Test Mode
+    (INC-012): the provider *stores* the reference with its original case, but
+    treats uniqueness and lookup **case-insensitively** -- while our own
+    ``UNIQUE(reference_id)`` in SQLite is case-*sensitive*. Two references
+    differing only in case would therefore pass our constraint and be rejected
+    by the provider, a confusing failure with no local trace. Emitting
+    lowercase makes both uniqueness domains identical, which removes the
+    asymmetry at the source instead of handling it at every comparison site.
     """
-    return f"rvp_{case_id}_{attempt_no}"
+    return f"rvp_{case_id}_{attempt_no}".lower()
 
 
 def idempotency_hash(merchant_id: str, order_ref: str, playbook: str) -> str:

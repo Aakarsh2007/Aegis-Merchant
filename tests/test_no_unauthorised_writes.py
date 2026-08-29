@@ -27,6 +27,10 @@ APP = Path(__file__).resolve().parents[1] / "apps" / "api" / "app"
 
 #: The only package allowed to mint a capability.
 MINT_MODULE = "app.guardrails.token"
+#: Naming these individually rather than the module: `reissue_from_committed_intent`
+#: is deliberately NOT here. It takes a committed outbox payload rather than an
+#: arbitrary action, so it cannot authorise anything the firewall did not already
+#: authorise -- it picks up a yes that was already given (see token.py).
 MINT_NAMES = {"mint", "_sign", "_SIGNING_KEY"}
 ALLOWED_MINTERS = {"app.guardrails.policy_engine", "app.guardrails.token"}
 

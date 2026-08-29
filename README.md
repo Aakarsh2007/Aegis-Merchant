@@ -72,7 +72,7 @@ the boundary between what this system does and what it simulates.
 
 | Real | Mocked, and labelled as such in the UI |
 |---|---|
-| Razorpay Test Mode: Orders, Payments, Payment Links, Invoices, Subscriptions | WhatsApp/SMS **delivery** — we hold no DLT registration or WhatsApp Business Account. The consent, template and quiet-hours machinery in front of the adapter is real and fully enforced. |
+| Razorpay Test Mode: Payment Links created for real, `reference_id` idempotency **verified live** — a duplicate is refused and the existing link is retrievable | WhatsApp/SMS **delivery** — we hold no DLT registration or WhatsApp Business Account. The consent, template and quiet-hours machinery in front of the adapter is real and fully enforced. |
 | HMAC-SHA256 webhook verification over raw bytes, with a replay window | The control-arm self-recovery baseline **inside the simulated batch** is a declared parameter, not a measured population value |
 | The deterministic policy firewall, and every bound it enforces | |
 | SHA-256 hash-chained audit ledger, with a public verifier | |

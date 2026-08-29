@@ -1,0 +1,22 @@
+# Line endings and indentation, so a contributor's editor does not fight the
+# repo. Pairs with .gitattributes, which enforces LF at the git layer.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{js,jsx,ts,tsx,json,yml,yaml,css,scss,html}]
+indent_size = 2
+
+[*.md]
+# Trailing whitespace is significant in Markdown line breaks.
+trim_trailing_whitespace = false
+
+[Makefile]
+# Recipe lines require literal tabs.
+indent_style = tab

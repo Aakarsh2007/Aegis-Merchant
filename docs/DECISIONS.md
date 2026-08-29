@@ -438,3 +438,31 @@ did you choose *not* to use the obvious tool" that is about engineering rather t
 blocks on an external callback rather than ending a run — this would need revisiting.
 Nothing in the four playbooks does. `tests/test_agent_graph.py::TestNoLangGraph` asserts the
 dependency stays out, so re-adding it has to be deliberate.
+
+## DEC-020 · 2026-08-29 · Verify the provider's behaviour before depending on it
+
+**Phase:** 8
+
+**Decision:** Before writing the outbox, probe live Razorpay Test Mode to confirm the
+property the whole design rests on: that a duplicate `reference_id` is refused and the
+existing link is retrievable.
+
+**Rejected:** building on the documented behaviour and the mock. Both said the right thing,
+and both were things *I* had written down. The outbox's entire correctness argument reduces
+to "the provider will refuse our second attempt" — depending on that without testing it
+would have been the same class of mistake as INC-010, where a benchmark measured the
+fallback and reported it as the model.
+
+**What the probe established:**
+- A duplicate `reference_id` is refused. DEC-009 is validated; the mock models something
+  true, so the crash-recovery tests are proving something.
+- The existing link is retrievable, so the recovery path works.
+- Case semantics differ from ours (INC-012), which the mock would never have revealed.
+
+**Then verified end-to-end against live Test Mode:** phase one commits the intent, the
+provider creates a real link, the process "dies" before phase two — and on restart the
+reconciler resumes and finishes with **one link at Razorpay, one action locally, consistent
+state.** That is the §16 scenario-9 claim, demonstrated rather than asserted.
+
+**Cost of being wrong:** the probe costs one Test Mode payment link and about a minute. The
+alternative was discovering during the demo that two live links exist for one cart.

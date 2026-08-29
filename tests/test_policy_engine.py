@@ -241,7 +241,7 @@ class TestTheAppliedAction:
         exact string the attribution matcher later looks for."""
         decision = run(RecoveryProposal(), context())
         assert decision.applied is not None
-        assert decision.applied.reference_id == "rvp_RC-0142_1"
+        assert decision.applied.reference_id == "rvp_rc-0142_1"
 
     def test_strategy_and_channel_pass_through(self) -> None:
         """The firewall bounds magnitudes; it does not make a second choice."""
@@ -290,3 +290,48 @@ class TestTokens:
         b = run(RecoveryProposal(), context())
         assert a.applied is not None and b.applied is not None
         assert a.applied.content_hash() == b.applied.content_hash()
+
+
+class TestSerialisationRoundTrip:
+    """The outbox commits an action as JSON and the reconciler reads it back
+    after a crash -- the one code path that only runs when something has
+    already gone wrong, and therefore the one least likely to be exercised by
+    accident. INC-013 was exactly this: enums came back as strings and the
+    token signature blew up."""
+
+    def test_an_action_survives_a_round_trip(self) -> None:
+        import json
+
+        from app.guardrails.token import AppliedAction
+
+        original = run(RecoveryProposal(), context()).applied
+        assert original is not None
+
+        restored = AppliedAction.from_payload(json.loads(json.dumps(original.as_payload())))
+        assert restored == original
+
+    def test_the_hash_survives_a_round_trip(self) -> None:
+        """A human approves a hash. If deserialisation changed it, an approved
+        action could never be matched back at execution time."""
+        import json
+
+        from app.guardrails.token import AppliedAction
+
+        original = run(RecoveryProposal(discount_pct=5.0), context()).applied
+        assert original is not None
+        restored = AppliedAction.from_payload(json.loads(json.dumps(original.as_payload())))
+        assert restored.content_hash() == original.content_hash()
+
+    def test_enums_come_back_as_enums_not_strings(self) -> None:
+        import json
+
+        from app.db.enums import Channel, EscalationRung, MessageClass, RecoveryStrategy
+        from app.guardrails.token import AppliedAction
+
+        original = run(RecoveryProposal(), context()).applied
+        assert original is not None
+        restored = AppliedAction.from_payload(json.loads(json.dumps(original.as_payload())))
+        assert isinstance(restored.strategy, RecoveryStrategy)
+        assert isinstance(restored.channel, Channel)
+        assert isinstance(restored.message_class, MessageClass)
+        assert isinstance(restored.escalation_rung, EscalationRung)

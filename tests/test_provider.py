@@ -36,7 +36,7 @@ def mock() -> MockRazorpayProvider:
     return MockRazorpayProvider(latency_s=0.0)
 
 
-def link_request(reference_id: str = "rvp_RC-0142_1", amount: int = 429_900) -> PaymentLinkRequest:
+def link_request(reference_id: str = "rvp_rc-0142_1", amount: int = 429_900) -> PaymentLinkRequest:
     return PaymentLinkRequest(
         amount_paise=amount,
         reference_id=reference_id,
@@ -75,7 +75,7 @@ class TestReferenceIdIdempotency:
     async def test_existing_link_is_retrievable(self, mock: MockRazorpayProvider) -> None:
         """The recovery path after a duplicate rejection."""
         created = await mock.create_payment_link(link_request())
-        found = await mock.get_payment_link_by_reference("rvp_RC-0142_1")
+        found = await mock.get_payment_link_by_reference("rvp_rc-0142_1")
         assert found is not None
         assert found.link_id == created.link_id
         assert found.was_existing is True
@@ -86,8 +86,8 @@ class TestReferenceIdIdempotency:
     async def test_different_attempts_are_different_links(self, mock: MockRazorpayProvider) -> None:
         """reference_id embeds the attempt number, so attempt 2 is legitimately
         a new link rather than a duplicate."""
-        await mock.create_payment_link(link_request("rvp_RC-0142_1"))
-        await mock.create_payment_link(link_request("rvp_RC-0142_2"))
+        await mock.create_payment_link(link_request("rvp_rc-0142_1"))
+        await mock.create_payment_link(link_request("rvp_rc-0142_2"))
         assert mock.link_count() == 2
 
 
@@ -168,7 +168,7 @@ class TestRazorpayProviderHTTP:
                 json={
                     "id": "plink_ABC",
                     "short_url": "https://rzp.io/i/ABC",
-                    "reference_id": "rvp_RC-0142_1",
+                    "reference_id": "rvp_rc-0142_1",
                     "amount": 429900,
                     "status": "created",
                 },
@@ -204,7 +204,7 @@ class TestRazorpayProviderHTTP:
         await self.provider().create_payment_link(
             PaymentLinkRequest(
                 amount_paise=1000,
-                reference_id="rvp_RC-1_1",
+                reference_id="rvp_rc-1_1",
                 description="d",
                 customer_name="n",
                 expire_by=expiry,

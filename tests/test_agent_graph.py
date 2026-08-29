@@ -192,7 +192,7 @@ class TestEndToEnd:
         assert final.policy_applied is not None
         assert final.policy_applied.discount_pct == 0.0
         assert final.policy_applied.escalation_rung.value == "A0_AUTONOMOUS"
-        assert final.reference_id == "rvp_RC-0142_1"
+        assert final.reference_id == "rvp_rc-0142_1"
         assert final.trace[-1].node == "AUDIT"
 
     async def test_the_trace_records_provenance_for_every_step(self) -> None:

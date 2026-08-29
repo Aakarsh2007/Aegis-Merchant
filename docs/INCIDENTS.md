@@ -439,3 +439,71 @@ already says at length. Dropped.
 it) and added 400 tokens of noise (invisible until someone looked at a usage counter).
 Neither showed up as an error. Round-tripping the translated schema and asserting the
 bounds survived would have caught both, and there is now a test that does exactly that.
+
+## INC-012 · 2026-08-29 · Two uniqueness domains that disagreed about case
+
+**Phase:** 8 (outbox)
+
+**Symptom:** None yet — found by probing live Razorpay Test Mode before writing the outbox,
+rather than by a failure.
+
+**What I was checking:** DEC-009 claims the mock provider rejects a duplicate
+`reference_id` "exactly as Razorpay does", and the entire two-phase outbox rests on that.
+I had never confirmed Razorpay actually does it. It does — sending the same reference twice
+returned `payment link with given reference_id ... already exists`, and the existing link
+was retrievable.
+
+**What the error message gave away:** it echoed my `rvp_RC-TEST01_1` back as
+`rvp_rc-test01_1`. Following that up established the exact semantics:
+
+| behaviour | result |
+|---|---|
+| storage | **case-preserving** — reads back as `rvp_RC-TEST01_1` |
+| lookup | **case-insensitive** — a lowercase query finds the uppercase link |
+| uniqueness | **case-insensitive** — two case-variants cannot both exist |
+
+**The latent bug:** our own `UNIQUE(reference_id)` in SQLite is case-*sensitive*, while
+Razorpay's is case-*insensitive*. Two references differing only in case would pass our
+constraint and then be rejected by the provider — a confusing failure with no local trace,
+and one that would only appear once case IDs happened to collide that way.
+
+**Fix:** `reference_id()` now emits lowercase. Both uniqueness domains become identical, so
+the asymmetry cannot arise. Fixed at the source rather than by normalising at each
+comparison site, because there is more than one comparison site (our UNIQUE, the attribution
+matcher, the outbox lookup) and missing one is exactly how this class of bug survives.
+
+**What I actually learned:** an error message is evidence about implementation. The
+lowercasing was incidental to the failure I was testing, and it was the most informative
+thing in the response. More generally: when two systems both enforce "the same" constraint,
+the interesting question is not whether they agree on the happy path but whether their
+*equivalence classes* match — case, whitespace, and unicode normalisation are where they
+usually do not.
+
+## INC-013 · 2026-08-29 · The crash-recovery path crashed
+
+**Phase:** 8 (outbox reconciler)
+
+**Symptom:** `test_the_reconciler_resumes_a_crash_between_phases` failed with
+`AttributeError: 'str' object has no attribute 'value'`, deep inside the token signature.
+
+**Wrong theory (~5 min):** assumed the token module had a bug, since that is where the
+traceback ended. It did not. The traceback ended there because that is the first place the
+bad data was *used*; it was produced two frames earlier.
+
+**Root cause:** the reconciler reads an outbox row committed before the crash and rebuilds
+the action from JSON. It reconstructed `AppliedAction` field by field, which left the enum
+fields as plain strings — and computing the signature then called `.value` on a `str`. The
+serialise and deserialise halves lived in different modules, and only one of them knew the
+types.
+
+**Fix:** `AppliedAction.from_payload()`, next to its inverse `as_payload()`, with three
+round-trip tests: the action survives, **the content hash survives**, and enums come back as
+enums. The hash one matters most — a human approves a hash, so if deserialisation changed
+it, an approved action could never be matched back at execution time.
+
+**What I actually learned:** this is the one code path that only executes *after something
+has already gone wrong*, which makes it the least likely to be exercised by accident and the
+most costly to have broken. It was found only because the crash-recovery test simulates a
+real crash rather than mocking around it. And the structural lesson: a serialise/deserialise
+pair belongs in one place with a round-trip test, because when they live apart they drift
+silently and the failure surfaces somewhere unrelated.
