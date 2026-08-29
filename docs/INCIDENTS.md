@@ -190,3 +190,48 @@ is equally bad and the baseline collapses with it. Measured across windows at th
 peak: 14 days -> degraded, 24 hours -> degraded, 3 hours -> **not** degraded (rail 10.0%
 against a baseline that had itself fallen to 16.7%). The 24-hour default is what keeps
 enough healthy history in frame for the comparison to mean anything.
+
+## INC-005 · 2026-08-29 · A deferral that never advanced the clock
+
+**Phase:** 4 (stopping rules)
+
+**Symptom:** The property-based termination proof failed on its first run.
+`test_advancing_the_clock_always_reaches_a_terminal_state` walks a case forward by
+repeatedly jumping to whatever instant the engine asked it to wait for; hypothesis found a
+context where the engine deferred to an instant **that had already passed**, so the walk
+never advanced and the assertion `defer_until > now` tripped.
+
+**Wrong theory (~10 min lost):** assumed hypothesis had generated an impossible context and
+that the right fix was to constrain the strategy — `contacts_24h = 1` with a
+`last_contact_at` more than 24 hours old is self-contradictory, so a real caller would
+never produce it. Then worked out how a real caller produces it anyway: the count and the
+timestamp are **two separate queries**. Under load, or with any clock skew between the
+application and the database, the count can be read before a contact ages out and the
+timestamp after. Constraining the test would have hidden a production bug behind an
+assumption about inputs.
+
+**Root cause:** S-04 computed `defer_until = last_contact_at + 24h` without checking that
+the result was in the future. When the counter and the timestamp disagreed, the rule
+deferred to a moment in the past. The scheduler would then re-evaluate immediately, the
+same rule would fire with the same already-passed instant, and the case would spin — a
+busy loop in the component whose entire purpose is guaranteeing termination.
+
+**Fix:** two layers, deliberately.
+1. `s04_contact_cap_24h` now returns PROCEED when the computed release has already passed,
+   trusting the timestamp over the counter: if the last contact was more than 24 hours ago,
+   a 24-hour cap cannot be binding.
+2. `evaluate()` drops any deferral that does not move the clock forward, whatever rule
+   produced it (`apps/api/app/guardrails/stopping_rules.py`, the engine-level guard).
+
+**Why it stayed fixed:** `test_defer_always_carries_a_future_instant` and
+`test_advancing_the_clock_always_reaches_a_terminal_state` both run over 2,000 generated
+contexts per CI run.
+
+**What I actually learned:** the fix I nearly made was to the *test*. Narrowing the
+strategy would have produced a green suite and left a livelock in the termination
+guarantee — the exact failure mode the track bar's "stopping rules" requirement is asking
+about. Two lessons worth keeping. When a property test finds an "impossible" input, work
+out how production produces it before deciding it cannot; distributed reads of related
+values disagree routinely. And a safety invariant should be enforced *structurally* rather
+than in each rule: the engine-level guard means a future thirteenth rule cannot reintroduce
+this bug, which per-rule diligence alone could not promise.

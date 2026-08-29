@@ -727,10 +727,22 @@ and re-evaluated at `POLICY` (before execution) — because state can change in 
 | **S-12** | Kill switch | `merchant.autopilot_enabled == false` (one dashboard toggle, effective immediately) | Halt everything; drain nothing new | `SUPPRESSED` |
 
 **Termination proof.** Each case carries a monotonically increasing `attempt_no` bounded by S-02 and a wall-clock
-deadline enforced by S-06. A background sweeper runs every 60s and force-transitions any case past its deadline.
-Therefore no case can remain non-terminal indefinitely — the bound is `min(MAX_ATTEMPTS, window)`, and both are
-finite. A test (`test_no_case_outlives_its_window`) fast-forwards a frozen clock and asserts every seeded case
-reaches a terminal state.
+deadline enforced by S-06, so the bound is `min(MAX_ATTEMPTS, window)` and both are finite. Three mechanisms make
+that a guarantee rather than an intention:
+
+1. **A deferral may never outlive the window.** `evaluate()` converts any hold scheduled at or beyond
+   `window_expires_at` into a STOP — holding a message until after the case has expired is a drop with extra steps.
+2. **A deferral must move the clock forward.** Enforced at the engine level, not per rule, so a future thirteenth
+   rule cannot reintroduce a livelock. Added after INC-005, where S-04 deferred to an instant that had already
+   passed and the case would have spun forever.
+3. **A background sweeper** force-transitions any case past its deadline, so termination does not depend on the
+   case being evaluated again.
+
+Proven by `tests/property/test_stopping_termination.py`: hypothesis generates hostile contexts — impossible counter
+combinations, windows in the past, promises decades away, every hour of the day — and
+`test_advancing_the_clock_always_reaches_a_terminal_state` repeatedly jumps to whatever instant the engine asked
+for, asserting convergence. 2,000 examples per property per CI run. The claim this licenses is stronger than
+*"we tested it"*: **no reachable input produces a case that runs forever.**
 
 ### 8.2 Kill switch and budgets
 
@@ -2308,7 +2320,7 @@ Sixteen phases (0–15). **Every phase carries DoD-J (§17.1): journal what brok
 | **1** | Data model + 420-txn seed | `db/base.py`, `db/types.py`, `db/enums.py`, `db/ids.py`, `db/models.py`, `db/session.py`, `db/seed.py` | WAL + FKs + `busy_timeout` verified **by querying the pragmas**, not assumed; all 18 §12.2 tables; timestamps stored as ISO-8601 UTC text through a type that rejects naive datetimes at both ends; seed reproducible byte-for-byte from `SEED=20260905` against a **fixed anchor instant** (never wall-clock, or the committed DB would differ every run); `data/revpilot.seed.db` committed; `test_db_constraints` proves every UNIQUE and FK actually fires |
 | **2** | Razorpay client + HMAC webhook ingestion | `tools/razorpay_client.py`, `routers/webhooks.py`, `tests/fixtures/razorpay/` | Valid HMAC 200 <15 ms; forged 401; replay 401; duplicate dropped; **real Test Mode field shapes captured as fixtures**; every doc divergence journalled |
 | **3** | Deterministic classifier + rail-health index | `agent/classifier.py`, `agent/rail_health.py` | `(error_source, error_step)` → category for all seeded failures; rail-health computed from our own log; **classifier accuracy on the golden set recorded as the LLM's baseline to beat** |
-| **4** | Stopping Rules Engine | `guardrails/stopping_rules.py` | All 12 rules implemented as pure predicates; `test_no_case_outlives_its_window` passes; firing counts exposed. All window and quiet-hours tests use `FakeClock`, never a global time patch |
+| **4** | Stopping Rules Engine | `guardrails/stopping_rules.py` | All 12 rules are pure predicates over a frozen context — no I/O, no clock read — so termination is testable by fast-forwarding rather than waiting. Four outcomes, not two (DEC-012): deferring is not stopping (a quiet-hours hold is sent at 09:05, never dropped) and degrading is not stopping (no marketing consent means send the transactional link at 0%, not send nothing). All twelve evaluate every time, never short-circuited, because per-rule firing counts are the dashboard's evidence the brakes work (DEC-013). Termination proven by property test over 2,000 generated contexts, not by sampling. Quiet hours wrap midnight and are evaluated in IST — a naive `start <= h < end` reports 23:00 as allowed and messages someone at 11 PM |
 | **5** | Policy firewall + `PolicyToken` | `guardrails/policy_engine.py`, `guardrails/token.py` | Every §26.2 branch covered; **hypothesis fuzzer green at 2,000 examples**; no code path to a write tool without a token (asserted by a test that greps the import graph) |
 | **6** | `LLMAdapter`, Gemini free tier, rate limiter, **response cache**, deterministic fallback | `llm/adapter.py`, `llm/gemini_adapter.py`, `llm/cached_adapter.py`, `llm/deterministic.py`, `llm/rate_limit.py`, `llm/prompts/` | All four adapters satisfy the protocol; Gemini `response_schema` output **re-validated through Pydantic**; one re-prompt then fallback; **full pipeline passes with zero API keys**; token-bucket RPM limiter + SQLite-persisted RPD counter; `LLM_CALL` rows record `source`; `make warm-cache` populates and commits `data/llm_cache.jsonl` |
 | **7** | LangGraph 7-node graph | `agent/graph.py`, `agent/state.py`, `agent/nodes/*.py` | End-to-end traversal; `MAX_NODE_VISITS` trips on a synthetic loop; `llm_calls ≤ 3` asserted; **test proves `execute_node` never reads `state["proposal"]`** |

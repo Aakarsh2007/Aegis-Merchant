@@ -224,3 +224,46 @@ section 4.3 task 1 describes, and it is where the LLM should earn its cost.
 point: the parameter stays in the signature so the handoff is visible in the code rather
 than hidden, and Phase 6 has a concrete, pre-registered target to beat rather than a vague
 aspiration.
+
+## DEC-012 · 2026-08-29 · Four outcomes, not two — DEFER and DEGRADE are first-class
+
+**Phase:** 4
+
+**Decision:** The stopping engine returns PROCEED / DEGRADE / DEFER / STOP.
+
+**Rejected:** A boolean gate (act / do not act), which is what "stopping rules" sounds like
+it needs. It collapses two distinctions that are worth real money:
+
+*Deferring is not stopping.* A message held for quiet hours must be sent at 09:05, not
+dropped. A boolean gate returning `False` at 22:00 would silently discard it, and the logs
+would look identical to a correct system while revenue quietly went missing.
+
+*Degrading is not stopping either.* When a customer has no marketing consent, the right
+move is to send the transactional recovery link at 0% — not to send nothing. Under a
+boolean gate the consent rule would suppress the whole recovery, and the compliance
+constraint would be costing us money instead of merely shaping the message.
+
+**Consequence:** the engine merges degradations from every firing rule (stripping a
+discount and downgrading a message class are independent reductions that can both apply),
+and a deferral past the recovery window is converted into a STOP, because holding until
+after expiry is a drop with extra steps.
+
+**Cost of being wrong:** More states to reason about, and a precedence order that has to be
+justified — STOP beats DEFER beats DEGRADE. Both are covered by property tests over
+generated contexts rather than by convention.
+
+## DEC-013 · 2026-08-29 · All twelve rules evaluate every time; never short-circuited
+
+**Phase:** 4
+
+**Decision:** `evaluate()` runs all twelve rules even after one has decided the outcome.
+
+**Rejected:** Returning at the first STOP. It is the obvious optimisation and it would cost
+us the thing the rules are *for* as evidence: the dashboard reports firings per rule
+(§14.6), and "S-05 fired 4 times today" is what shows a merchant the brakes work. Short-
+circuiting would silently under-report every rule ordered after the first blocker, and the
+under-reporting would be invisible.
+
+**Cost of being wrong:** Nothing measurable — twelve pure comparisons over in-memory data,
+with no I/O. The context is assembled once by the caller, so the cost was already paid
+before the first rule ran.

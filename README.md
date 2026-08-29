@@ -98,7 +98,11 @@ provenance are never summed into one number.
 
 The track bar asks for *"measured money recovered across a batch, with compliant
 escalation, stopping rules, and an audit trail."* Each clause maps to a named
-artefact in [`workflow.md` §1](workflow.md).
+artefact in [`workflow.md` §1](workflow.md). **Stopping rules** are built and proven:
+twelve named rules ([`stopping_rules.py`](apps/api/app/guardrails/stopping_rules.py)),
+each individually counted, with termination established by property test over 2,000
+generated contexts per run rather than by example
+([proof](tests/property/test_stopping_termination.py)).
 
 ---
 

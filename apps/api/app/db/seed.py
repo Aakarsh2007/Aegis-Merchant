@@ -851,8 +851,10 @@ def _report(db_path: Path, stats: SeedStats) -> None:
     print(f"  revenue at risk     Rs {stats.at_risk_paise / 100:,.0f}")
     print("  recovered           Rs 0   (nothing has run yet)")
     print()
-    print(f"  DECLARED SCENARIO: a {OUTAGE_DURATION_HOURS}h {OUTAGE_METHOD.value}/"
-          f"{OUTAGE_ISSUER} outage ({OUTAGE_FAILURES} bank-timeout failures),")
+    print(
+        f"  DECLARED SCENARIO: a {OUTAGE_DURATION_HOURS}h {OUTAGE_METHOD.value}/"
+        f"{OUTAGE_ISSUER} outage ({OUTAGE_FAILURES} bank-timeout failures),"
+    )
     print("        so the rail-health index has a genuinely degraded rail to find.")
     print("        Scenario design, not metric tuning: no rate or rupee target is")
     print("        aimed at, and these come out of the 96-failure budget.")
