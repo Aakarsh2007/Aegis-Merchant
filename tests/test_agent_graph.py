@@ -210,8 +210,18 @@ class TestEndToEnd:
         assert final.policy_token is None
 
     async def test_a_control_arm_case_is_observed_not_acted_on(self) -> None:
-        """A CONTROL case doing nothing is it doing its job (§14.2)."""
-        final = await run_case(ananya(), deps(control_arm_fraction=1.0))
+        """A CONTROL case doing nothing is it doing its job (§14.2).
+
+        Uses a case id that genuinely lands in control at the **production**
+        18% fraction, rather than forcing the fraction to 1.0 -- which
+        `assign_arm` now rejects, because a 100% control arm would mean never
+        acting at all. Testing against the real configuration is also a
+        stronger test.
+        """
+        final = await run_case(
+            ananya(case_id="RC-0000"),
+            deps(control_arm_fraction=0.18, experiment_key="revpilot_recovery_v1"),
+        )
         assert final.experiment_arm is ExperimentArm.CONTROL
         assert final.policy_verdict is PolicyVerdict.BLOCKED
         assert final.policy_token is None

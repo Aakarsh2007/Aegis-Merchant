@@ -26,11 +26,12 @@ the window is short and configurable, and the caller states which instant
 
 from __future__ import annotations
 
-import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Final
+
+from app.core.stats import wilson_bounds
 
 __all__ = [
     "MIN_SAMPLE_FOR_CONFIDENCE",
@@ -45,9 +46,6 @@ __all__ = [
 #: for *use* -- the Wilson bound already handles small samples -- but the point
 #: below which we refuse to make a *claim* about a rail in the UI.
 MIN_SAMPLE_FOR_CONFIDENCE: Final = 8
-
-#: 95% two-sided.
-_Z: Final = 1.96
 
 
 @dataclass(frozen=True)
@@ -69,29 +67,6 @@ class AttemptRecord:
     issuer: str | None
     succeeded: bool
     attempted_at: datetime
-
-
-def wilson_bounds(successes: int, trials: int, z: float = _Z) -> tuple[float, float]:
-    """Wilson score interval for a binomial proportion.
-
-    Chosen over the normal approximation because that one is actively wrong at
-    the extremes this system lives in: with 0 successes in 3 trials it produces
-    an interval of exactly [0, 0], asserting certainty from three data points.
-    Wilson gives roughly [0, 0.56] — correctly uncertain.
-    """
-    if trials <= 0:
-        return 0.0, 1.0
-    if successes < 0 or successes > trials:
-        raise ValueError(f"successes={successes} out of range for trials={trials}")
-
-    p = successes / trials
-    z2 = z * z
-    denom = 1 + z2 / trials
-    centre = p + z2 / (2 * trials)
-    margin = z * math.sqrt(p * (1 - p) / trials + z2 / (4 * trials * trials))
-    lower = (centre - margin) / denom
-    upper = (centre + margin) / denom
-    return max(0.0, lower), min(1.0, upper)
 
 
 @dataclass(frozen=True)

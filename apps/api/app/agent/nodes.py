@@ -12,7 +12,6 @@ waste, and an earlier revision of the plan had exactly that bug.
 
 from __future__ import annotations
 
-import hashlib
 import time
 from dataclasses import replace
 from typing import Protocol
@@ -39,6 +38,7 @@ from app.guardrails.stopping_rules import Decision, PolicyLimits, StoppingContex
 from app.llm.adapter import LLMAdapter
 from app.llm.routing import diagnose as routed_diagnose
 from app.llm.schemas import ProposalOutput
+from app.services.experiments import assign_arm
 
 __all__ = [
     "AgentDeps",
@@ -172,12 +172,15 @@ async def triage_node(state: RecoveryState, deps: AgentDeps) -> RecoveryState:
     started = time.perf_counter()
     verdict = evaluate(_stopping_context(state, deps))
 
-    # Deterministic from the case identity, so it is stable across restarts and
-    # replays, and independent of amount or LTV -- anything correlated with
-    # outcome would bias the measurement.
-    digest = hashlib.sha256(f"{deps.experiment_key}:{state.case_id}".encode()).digest()
-    fraction = int.from_bytes(digest[:8], "big") / 2**64
-    arm = ExperimentArm.CONTROL if fraction < deps.control_arm_fraction else ExperimentArm.TREATMENT
+    # One implementation, in app.services.experiments -- the arm must be
+    # identical wherever it is computed, and a second copy here would be a
+    # second thing to keep in sync (the INC-007 shape).
+    assignment = assign_arm(
+        state.case_id,
+        experiment_key=deps.experiment_key,
+        control_fraction=deps.control_arm_fraction,
+    )
+    arm = assignment.arm
 
     if verdict.decision is Decision.STOP:
         return state.with_trace(
@@ -192,7 +195,7 @@ async def triage_node(state: RecoveryState, deps: AgentDeps) -> RecoveryState:
             status=verdict.terminal_status or CaseStatus.SUPPRESSED,
             stopping_rule_fired=verdict.blocking_rule,
             experiment_arm=arm,
-            assignment_hash=digest.hex()[:16],
+            assignment_hash=assignment.assignment_hash,
         )
 
     return state.with_trace(
@@ -206,7 +209,7 @@ async def triage_node(state: RecoveryState, deps: AgentDeps) -> RecoveryState:
         ),
         status=CaseStatus.TRIAGED,
         experiment_arm=arm,
-        assignment_hash=digest.hex()[:16],
+        assignment_hash=assignment.assignment_hash,
     )
 
 

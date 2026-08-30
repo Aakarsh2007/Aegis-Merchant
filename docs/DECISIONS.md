@@ -466,3 +466,38 @@ state.** That is the §16 scenario-9 claim, demonstrated rather than asserted.
 
 **Cost of being wrong:** the probe costs one Test Mode payment link and about a minute. The
 alternative was discovering during the demo that two live links exist for one cart.
+
+## DEC-021 · 2026-08-30 · Report a smaller number, and say when it is not significant
+
+**Phase:** 9
+
+**Decision:** `/api/v1/metrics/attribution` returns gross and incremental side by side, with
+Wilson intervals on both arms, and attaches a written caveat to the report itself whenever
+the lift is not statistically distinguishable from zero.
+
+**Rejected:** reporting gross recovery alone, which is what a dashboard normally shows and
+what every one of our own illustrative figures had been. Measured over the real corpus the
+difference is not cosmetic:
+
+| | |
+|---|---|
+| gross recovered | ₹2,02,760 |
+| **incremental** | **₹60,217** |
+| absolute lift | 6.2% (treatment 29.2%, control 23.1%) |
+| statistically significant | **no** — 171 treated, 39 control, intervals overlap |
+
+Reporting ₹2.03L would have been defensible-sounding and wrong by a factor of three. Nearly
+a quarter of the control group paid without us.
+
+**Also rejected:** reporting the lift without the significance caveat. `lift_is_significant`
+existed as a boolean before this, and a boolean is something a caller can fail to read. The
+number is going on a dashboard, where an unqualified 6% reads as a result rather than as
+noise, so the caveat is now a sentence on the report.
+
+**The uncomfortable part, kept deliberately:** with a hackathon-sized batch the honest
+answer is usually "not significant", and the system says so. A measurement framework that
+only ever confirms the intervention would not be a measurement framework.
+
+**Cost of being wrong:** none. Every condition in the attribution rule can only *reduce*
+what we claim, and the report cannot silently become optimistic — `has_control_arm: false`
+sets incremental to zero with a note rather than falling back to gross.

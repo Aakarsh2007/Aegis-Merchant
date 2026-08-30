@@ -29,12 +29,34 @@ away from the data without someone noticing.
 | Customers | 140 (6 opted out · 4 DND-registered · ≥22 without marketing consent) |
 | Captured GMV | ₹7,93,199 over a 14-day window (implied ~₹17.0L/month) |
 | Revenue at risk | ₹11,84,629 |
-| Recovered so far | **₹0** |
+| Recovered so far | **₹0** — nothing has run against live traffic |
 | Reproducible | Byte-for-byte from `SEED=20260905` against a fixed anchor instant |
 | Declared scenario | A 3-hour `upi/HDFC` outage (41.0% over 39 attempts vs a 65% baseline), so there is a genuinely degraded rail to detect. Scenario design, not metric tuning — see [INC-004](docs/INCIDENTS.md) |
 
 Failures are **deliberately over-sampled** — a corpus with three failures would exercise
 nothing — so rates computed over it are rates of the sample, not of GlowKart's true funnel.
+
+### What the agent does with it, measured
+
+Running all 210 eligible cases through the agent and the attribution rules:
+
+| | |
+|---|---|
+| Authorised for execution | 139 · escalated to a human 25 · stopped by policy 11 |
+| Held as CONTROL, never acted on | 39 (18.6%) |
+| Gross recovered | ₹2,02,760 — *what a dashboard would show* |
+| **Net incremental** | **₹60,217** — *what we actually caused* |
+| Absolute lift | 6.2% (treatment 29.2%, control 23.1%) |
+| Statistically significant | **No.** 39 control cases; the 95% intervals overlap. Reported as directional. |
+
+Nearly a quarter of the control group paid **without us**. Reporting the gross figure would
+have overstated our contribution by a factor of three, and the system refuses to.
+
+> **Declared:** the customer-response model in the simulated batch is a parameter (21%
+> baseline self-recovery, 7–14% treated uplift by playbook), grounded in published
+> recovery benchmarks — not a measured population value. What is real and unmodified is the
+> **machinery**: arm assignment, the six attribution conditions and the lift computation run
+> identically on live Razorpay traffic, where the outcomes are genuine.
 
 ---
 
