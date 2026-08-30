@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------- database
     database_url: str = "sqlite+aiosqlite:///./revpilot.db"
 
+    #: Bearer token for the read and money-moving endpoints (§13.5).
+    #: Deliberately empty by default so Judge Mode runs with zero credentials.
+    #: When empty outside production the API is open and says so loudly
+    #: (X-Auth-Mode header, /healthz/deep, a startup warning); when empty IN
+    #: production the app refuses to start. A service that boots happily with
+    #: authentication silently disabled is the failure this prevents.
+    api_token: str = ""
+
     # ------------------------------------------------------------- razorpay
     # Absent keys are not an error: the app falls back to MockRazorpayProvider
     # so Judge Mode runs with zero credentials (workflow.md §22).

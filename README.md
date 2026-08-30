@@ -126,6 +126,37 @@ each individually counted, with termination established by property test over 2,
 generated contexts per run rather than by example
 ([proof](tests/property/test_stopping_termination.py)).
 
+### Break the audit chain yourself
+
+The one claim in this project you should not take on trust. A verifier nobody
+has watched fail is indistinguishable from one that returns `true`:
+
+```bash
+curl -s localhost:8000/api/v1/audit/verify
+#  {"valid": true, "blocks": 5, "head_hash": "462e7c54...", ...}
+
+curl -s -X POST localhost:8000/api/v1/audit/tamper      -H 'content-type: application/json'      -d '{"block_index": 2, "mode": "payload"}'
+
+curl -s localhost:8000/api/v1/audit/verify
+#  {"valid": false,
+#   "first_divergence_index": 2,
+#   "reason": "block 2: payload does not match its stored hash"}
+```
+
+`mode` also accepts `hash` and `timestamp`, which trip different checks. The
+endpoint is refused in production and the tests assert that.
+
+**What the chain does not do**, stated because it is the first thing a reader
+who knows hash chains will ask: **deleting the last *k* blocks is undetectable
+from the chain alone** — what remains is a shorter, perfectly valid chain. No
+construction living entirely inside the database it protects can prevent that.
+`verify` therefore returns `head_hash` and `blocks` so an external observer who
+recorded them earlier can catch a rollback we cannot catch ourselves, and a
+test asserts this limitation rather than hiding it ([DEC-022](docs/DECISIONS.md)).
+What is honestly claimed: an in-place edit requires rewriting every subsequent
+block, a partial edit is loudly detectable, and the cost of a silent change goes
+from one `UPDATE` to a full rewrite.
+
 ---
 
 ## Architecture in one paragraph
@@ -183,6 +214,12 @@ Named plainly, because volunteering them is cheaper than having them found.
 - **Out of scope for a hackathon build**, and not pretended otherwise: multi-tenant
   isolation beyond a merchant token, key rotation, public-endpoint rate limiting,
   dashboard CSRF, secret management beyond a local `.env`.
+- **The audit chain cannot detect tail truncation**, and says so on every successful
+  verification. See the section above; this is a property of the construction, not a
+  gap in the implementation.
+- **Auth is a single shared bearer token**, not per-user identity. Unset, the API is
+  open outside production and marks every response `X-Auth-Mode: disabled`; in
+  production an unset token makes the app refuse to start ([DEC-023](docs/DECISIONS.md)).
 - **NPCI mandate timings** are implemented as the correct *mechanism* with the exact
   numbers as config flagged `VERIFY_BEFORE_PRODUCTION`. Claiming certainty we do not
   have would be worse than flagging it.

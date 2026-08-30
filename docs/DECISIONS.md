@@ -501,3 +501,69 @@ only ever confirms the intervention would not be a measurement framework.
 **Cost of being wrong:** none. Every condition in the attribution rule can only *reduce*
 what we claim, and the report cannot silently become optimistic — `has_control_arm: false`
 sets incremental to zero with a note rather than falling back to gross.
+
+## DEC-022 · 2026-08-30 · Ship the audit chain with its limitations written down
+
+**Phase:** 10
+
+**Decision:** `verify_blocks` returns `head_hash` and `blocks` on every response, and the
+success `reason` states in plain words that **tail truncation cannot be detected from the
+chain alone**. A test asserts that limitation rather than papering over it.
+
+**Rejected:** the usual presentation — `{"valid": true}` and a paragraph about
+tamper-proofing. A hash chain that lives entirely inside the database it protects cannot
+detect the deletion of its own last *k* blocks: what remains is a shorter, perfectly valid
+chain. Every construction of this kind has that property. Most write-ups do not mention it.
+
+Claiming "tamper-proof" would be the single easiest thing in this project to disprove, and a
+judge who knows hash chains would find it in one question. What we can honestly claim is
+narrower and still worth having: an in-place edit requires rewriting every subsequent block,
+a partial edit is loudly detectable, and the cost of a silent change goes from one `UPDATE`
+to a full rewrite.
+
+**Cost of being wrong:** none for the mechanism, which is unaffected. The cost of the
+*opposite* choice would have been credibility on every other number we report.
+
+---
+
+## DEC-023 · 2026-08-30 · Refuse to start rather than serve unauthenticated
+
+**Phase:** 10
+
+**Decision:** `API_TOKEN` unset in production raises at `create_app`, and the process does
+not start. Unset outside production means the API is open, every response carries
+`X-Auth-Mode: disabled`, `/health/deep` reports `auth: "disabled"`, and a warning is logged
+at startup.
+
+**Rejected:** requiring a token everywhere. Judge Mode must run with zero credentials (§22),
+and a demo that cannot start without secrets is a demo nobody runs.
+
+**Also rejected:** defaulting to a token baked into the repo. A default credential in a
+public repository is not authentication, and it would be the first thing found.
+
+**Also rejected:** checking at request time. The realistic failure is not "someone chose weak
+auth", it is "auth was never configured and nothing said so". A request-time check leaves
+every endpoint open until somebody notices; a startup failure is loud, immediate and
+impossible to miss.
+
+**Cost of being wrong:** a misconfigured production deploy fails to boot. That is the correct
+direction to fail — the alternative is an open money-moving API that looks healthy.
+
+---
+
+## DEC-024 · 2026-08-30 · Ship the tamper button
+
+**Phase:** 10
+
+**Decision:** `POST /api/v1/audit/tamper` corrupts a chosen block three different ways, is
+gated on `settings.simulation_allowed` (environment, not a caller-supplied header), and is
+refused in production with 403.
+
+**Rejected:** describing the verifier's behaviour in the README instead. A verifier nobody has
+watched fail is indistinguishable from `return True`, and the reader has no way to tell them
+apart. The button lets a judge break the chain on their own machine and watch the check name
+the block, the index and the reason.
+
+**Cost of being wrong:** an endpoint that damages audit data exists in the codebase. Contained
+by the environment gate, a `pattern`-constrained enum of modes, `extra="forbid"`, and tests
+asserting the 403 in production.

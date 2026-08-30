@@ -48,10 +48,27 @@ class TestDeepHealth:
         }
 
     def test_unbuilt_subsystems_report_not_implemented(self, client: TestClient) -> None:
-        """The endpoint must never claim a subsystem is healthy before it exists."""
+        """The endpoint must never claim a subsystem is healthy before it exists.
+
+        `audit_chain` left this list in Phase 10 and is asserted positively
+        below. The remaining keys stay here until their phase wires a real
+        probe — under-reporting a built subsystem is safe, claiming an unbuilt
+        one is not, and this test only guards the direction that matters.
+        """
         checks = client.get("/api/v1/health/deep").json()["checks"]
-        for key in ("database", "audit_chain", "outbox_depth", "dlq_depth", "scheduler"):
+        for key in ("database", "outbox_depth", "dlq_depth", "scheduler"):
             assert checks[key] == "not_implemented"
+
+    def test_audit_chain_is_reported_as_built(self, client: TestClient) -> None:
+        """Phase 10 built it, so the endpoint must now say where to check it."""
+        checks = client.get("/api/v1/health/deep").json()["checks"]
+        assert checks["audit_chain"] != "not_implemented"
+        assert "/api/v1/audit/verify" in checks["audit_chain"]
+
+    def test_auth_posture_is_declared(self, client: TestClient) -> None:
+        """An open API that looks identical to a secured one is the failure
+        worth preventing (DEC-023)."""
+        assert client.get("/api/v1/health/deep").json()["auth"] in {"enforced", "disabled"}
 
     def test_surfaces_live_policy_bounds(self, client: TestClient) -> None:
         policy = client.get("/api/v1/health/deep").json()["policy"]
