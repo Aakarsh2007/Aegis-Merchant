@@ -1,0 +1,72 @@
+{
+  "_fixture_meta": {
+    "provenance": "captured_test_mode",
+    "source": "GET /v1/payments (live Razorpay Test Mode)",
+    "note": "Contact details redacted before writing.",
+    "observed_error_sources": [
+      "business",
+      "customer"
+    ],
+    "observed_error_steps": [
+      "payment_authentication",
+      "payment_initiation"
+    ]
+  },
+  "entity": "event",
+  "event": "payment.failed",
+  "contains": [
+    "payment"
+  ],
+  "payload": {
+    "payment": {
+      "entity": {
+        "id": "pay_TVsdMjsINCiB8s",
+        "entity": "payment",
+        "amount": 429900,
+        "amount_captured": null,
+        "currency": "INR",
+        "status": "failed",
+        "order_id": "order_TVsK1YkB9Sbou3",
+        "invoice_id": null,
+        "international": false,
+        "method": "card",
+        "amount_refunded": 0,
+        "refund_status": null,
+        "captured": false,
+        "description": "#TVrxqZZwibcZym",
+        "card_id": "card_TVsdMvxcVqf3cj",
+        "card": {
+          "id": "card_TVsdMvxcVqf3cj",
+          "entity": "card",
+          "name": "",
+          "last4": "8430",
+          "network": "Visa",
+          "type": "credit",
+          "issuer": "HDFC",
+          "international": false,
+          "emi": true,
+          "sub_type": "consumer",
+          "token_iin": "485498060"
+        },
+        "bank": null,
+        "wallet": null,
+        "vpa": null,
+        "email": "REDACTED",
+        "contact": "REDACTED",
+        "notes": [],
+        "fee": null,
+        "tax": null,
+        "error_code": "BAD_REQUEST_ERROR",
+        "error_description": "Your payment has been cancelled. Try again or complete the payment later.",
+        "error_source": "customer",
+        "error_step": "payment_authentication",
+        "error_reason": "payment_cancelled",
+        "acquirer_data": {
+          "auth_code": null
+        },
+        "created_at": 1788070857
+      }
+    }
+  },
+  "created_at": 1788070857
+}

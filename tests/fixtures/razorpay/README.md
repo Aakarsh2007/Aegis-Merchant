@@ -2,11 +2,19 @@
 
 ## Provenance — read this before trusting these files
 
-These payloads are built from Razorpay's **published documentation**, not captured
-from a live Test Mode account. That distinction matters and is stated here rather
-than buried, because the deterministic failure classifier in Phase 3 keys on
-`error_source` / `error_step`, and a classifier built against assumed field shapes
-is a classifier built on sand.
+Most of these payloads are built from Razorpay's **published documentation**.
+One — `payment.failed.captured.json` — is a real Test Mode capture. That
+distinction matters and is stated here rather than buried, because the
+deterministic failure classifier in Phase 3 keys on `error_source` /
+`error_step`, and a classifier built against assumed field shapes is a
+classifier built on sand.
+
+**It was not a hypothetical risk.** The first real capture (2026-08-30)
+immediately showed that Razorpay returns `error_reason: "payment_cancelled"`
+for an abandoned checkout, while the classifier's marker table carried four
+*invented* spellings of that event and not the real one. See INC-015. The
+verdict survived on a fallback path; the confidence and the audit-trail
+reasoning did not.
 
 Each file carries a `_fixture_meta.provenance` field:
 

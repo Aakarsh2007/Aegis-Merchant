@@ -108,6 +108,14 @@ _REASON_MARKERS: Final[tuple[tuple[str, FailureCategory], ...]] = (
     ("mandate", FailureCategory.MANDATE_INVALID),
     # 2. Explicit customer agency. A phrase naming the user is more specific
     #    than a word describing the mechanism they abandoned.
+    #
+    #    CAPTURED (INC-015): `payment_cancelled` is the string Razorpay Test
+    #    Mode actually returns when a customer abandons the checkout. This
+    #    table originally carried four *guessed* spellings of that event and
+    #    not the real one, so every genuine cancellation fell through to the
+    #    (source, step) fallback. The verdict happened to survive; the stated
+    #    reasoning did not.
+    ("payment_cancelled", FailureCategory.AUTHENTICATION_ABANDONED),  # observed live
     ("by_user", FailureCategory.AUTHENTICATION_ABANDONED),
     ("user_cancel", FailureCategory.AUTHENTICATION_ABANDONED),
     ("cancelled_by", FailureCategory.AUTHENTICATION_ABANDONED),

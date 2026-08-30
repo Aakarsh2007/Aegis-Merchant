@@ -507,3 +507,74 @@ most costly to have broken. It was found only because the crash-recovery test si
 real crash rather than mocking around it. And the structural lesson: a serialise/deserialise
 pair belongs in one place with a round-trip test, because when they live apart they drift
 silently and the failure surfaces somewhere unrelated.
+
+
+## INC-015 · Four guesses at a string, and not the one Razorpay sends
+
+**Symptom:** none. That is the point of this entry.
+
+The deterministic classifier returned the correct category for a real captured
+cancellation, the golden set scored 96.5%, and 558 tests passed. Nothing was
+red.
+
+**What was actually wrong:** `_REASON_MARKERS` carried four invented spellings
+of a customer cancellation — `user_cancel`, `cancelled_by`, `canceled_by`,
+`authentication_cancelled` — and Razorpay Test Mode actually returns
+`payment_cancelled`, which matches none of them. Every genuine cancellation
+missed the reason table entirely and fell through to the `(error_source,
+error_step)` fallback.
+
+**Why it survived:** the fallback happens to map
+`(customer, payment_authentication)` to `AUTHENTICATION_ABANDONED`, which is
+the right answer. The classifier reached a correct verdict by a route it did
+not intend, from evidence it did not have. A test asserting only the category
+passes on the broken code — which is why the tests added here assert the
+*evidence*, not the outcome.
+
+**What it cost, concretely:**
+
+| | before | after |
+|---|---|---|
+| confidence | 0.85 (source+step) | 0.95 (exact) |
+| stated reasoning | "**No usable error_reason**" | "reason='payment_cancelled'. All three agree." |
+
+The reasoning string is written into the audit chain and shown to the operator.
+It asserted that Razorpay sent no usable reason when Razorpay had sent a precise
+one. A human reviewing that case would have been told the provider was vaguer
+than it was — a false statement in an audit record, which is worse than a wrong
+number because it is not checkable from inside the system.
+
+The understated confidence did not change behaviour here (`needs_llm_review`
+triggers below 0.6, and 0.85 clears it), but it was luck, not design: the same
+gap on a category with a threshold nearer 0.85 would have sent every real
+cancellation for an unnecessary LLM review.
+
+**Root cause:** the marker table was written from documentation and reasoning
+about what Razorpay *would* plausibly call things. Four variants were invented
+for one event, which felt like thoroughness and was actually four guesses with
+no ground truth behind any of them. Breadth is not evidence.
+
+**Fix:** added `payment_cancelled`, the string observed live, placed in the
+customer-agency block so mandate cancellations keep priority (a mandate retry
+burns a scheme re-presentation). Entries are now annotated by provenance, so
+the next reader can tell which are grounded and which are still guesses.
+
+**Regression test:** four tests in `tests/test_classifier.py`, pinned to
+`payment.failed.captured.json` rather than to a literal we chose — if Razorpay
+changes the string, they fail. One asserts the fixture is still
+`provenance: captured_test_mode`, because a fixture that quietly reverted to
+`documented_shape` would make the others vacuous while still green (INC-006).
+Verified by sabotage: removing the marker fails exactly the two tests that
+should fail, and the other 43 stay green — which is the demonstration that the
+old suite could not see this.
+
+**What was learned:** the golden set measured *accuracy against inputs we
+wrote*. Our inputs and our classifier shared an author, so they shared his
+assumptions, and the score was partly a measurement of that agreement. One real
+payment from the provider found in ninety seconds what 96.5% on 200 constructed
+cases could not. The `documented_shape` provenance marker was carrying real
+risk, exactly as the fixtures README warned it was.
+
+**Related:** INC-003 (the same table, ordered wrongly), INC-006 (green tests
+proving nothing), INC-008/INC-012 (both also found only by calling the real
+provider).

@@ -7,9 +7,13 @@ that cost money or route around a control when violated.
 
 from __future__ import annotations
 
+import json
+import pathlib
+
 import pytest
 
 from app.agent.classifier import (
+    _REASON_MARKERS,
     CONF_CONFLICT,
     CONF_EXACT,
     CONF_NONE,
@@ -295,3 +299,101 @@ class TestAbandonedCheckout:
             assert classify_abandoned_checkout(
                 ltv_paise=ltv, prior_orders=orders, cart_amount_paise=500_000
             ).is_recoverable
+
+
+# ===========================================================================
+# INC-015: the marker table was built from guesses, and the guesses were wrong
+# ===========================================================================
+#
+# A real Test Mode cancellation returns error_reason='payment_cancelled'. The
+# table carried four invented spellings of that event -- 'user_cancel',
+# 'cancelled_by', 'canceled_by', 'authentication_cancelled' -- and not the one
+# Razorpay actually sends. These tests are pinned to the CAPTURED fixture, so
+# they fail if the real string ever changes, rather than to a literal we chose.
+
+CAPTURED = pathlib.Path(__file__).parent / "fixtures" / "razorpay" / "payment.failed.captured.json"
+
+
+def _captured_entity() -> dict[str, object] | None:
+    if not CAPTURED.exists():
+        return None
+    doc = json.loads(CAPTURED.read_text(encoding="utf-8"))
+    return doc["payload"]["payment"]["entity"]
+
+
+def test_the_captured_fixture_is_a_real_capture() -> None:
+    """A fixture that quietly reverted to documented_shape would make the
+    tests below vacuous -- they would still pass, against our own guesses."""
+    entity = _captured_entity()
+    if entity is None:
+        pytest.skip("no captured fixture; run `python tasks.py capture-fixtures`")
+    doc = json.loads(CAPTURED.read_text(encoding="utf-8"))
+    assert doc["_fixture_meta"]["provenance"] == "captured_test_mode"
+
+
+def test_real_cancellation_reason_is_recognised_not_merely_survived() -> None:
+    """The pre-INC-015 classifier reached the right CATEGORY through the
+    (source, step) fallback while reporting 'No usable error_reason' -- a
+    false statement written into the audit trail. Asserting the category
+    alone would have passed on the broken code, so this asserts the evidence
+    the classifier claims to have used."""
+    entity = _captured_entity()
+    if entity is None:
+        pytest.skip("no captured fixture")
+    d = classify(
+        error_source=str(entity["error_source"]),
+        error_step=str(entity["error_step"]),
+        error_reason=str(entity["error_reason"]),
+        method=str(entity["method"]),
+    )
+    assert d.category is FailureCategory.AUTHENTICATION_ABANDONED
+    assert d.confidence == CONF_EXACT, "a recognised reason must score as an exact match"
+    assert str(entity["error_reason"]) in d.reasoning
+    assert "No usable error_reason" not in d.reasoning
+
+
+def test_captured_reason_is_in_the_marker_table() -> None:
+    entity = _captured_entity()
+    if entity is None:
+        pytest.skip("no captured fixture")
+    reason = str(entity["error_reason"])
+    assert any(marker in reason for marker, _ in _REASON_MARKERS), (
+        f"Razorpay sends {reason!r} and the marker table does not know it"
+    )
+
+
+def test_the_new_marker_did_not_steal_mandate_cancellations() -> None:
+    """'payment_cancelled' sits in the customer-agency block, which is checked
+    after mandates. A mandate cancellation must still be MANDATE_INVALID:
+    retrying a dead mandate burns a scheme re-presentation and cannot succeed."""
+    d = classify(error_source=None, error_step=None, error_reason="mandate_cancelled", method="upi")
+    assert d.category is FailureCategory.MANDATE_INVALID
+
+
+def test_business_source_survives_the_new_marker() -> None:
+    """INC-003, re-asserted against the string added in INC-015. Every new
+    marker is a new candidate for routing around the merchant's risk control."""
+    d = classify(
+        error_source="business",
+        error_step="payment_initiation",
+        error_reason="payment_cancelled",
+        method="card",
+    )
+    assert d.category is FailureCategory.RISK_BLOCKED
+    assert not d.is_recoverable
+    assert not d.retry_same_rail
+
+
+def test_real_business_source_failure_is_blocked() -> None:
+    """The second captured payment is a genuine business-source rejection
+    ('international_transaction_not_allowed'), so the INC-003 gate is now
+    verified against real provider output rather than a constructed input."""
+    d = classify(
+        error_source="business",
+        error_step="payment_initiation",
+        error_reason="international_transaction_not_allowed",
+        method="card",
+    )
+    assert d.category is FailureCategory.RISK_BLOCKED
+    assert not d.is_recoverable
+    assert not d.discount_could_help, "margin must not be spent on a risk block"
