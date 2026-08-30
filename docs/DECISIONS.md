@@ -714,3 +714,50 @@ so the provider — not our bookkeeping — is what prevents the double charge.
 **Cost of being wrong:** a genuinely-failed action whose reference was somehow consumed
 cannot be retried through this path and needs an operator. That is the correct direction to
 fail for an endpoint that can move money twice.
+
+## DEC-031 · 2026-08-30 · Simulated recoveries get their own tile, not a footnote
+
+**Phase:** 12b
+
+**Decision:** `/metrics/overview` returns **two** gross figures. `gross_recovered` sums only
+recoveries proven by a real signed webhook and is badged `RAZORPAY_VERIFIED`;
+`gross_simulated` sums those settled by the batch runner and is badged `SIMULATED`. Both
+render, and the verified one renders **even at zero**.
+
+**Why this was forced.** `recovery_requires_proof` is a CHECK constraint: a recovered amount
+cannot exist without a verifying event id. So the batch runner *must* write one. Any
+realistic-looking id would have been summed into the verified column, and the dashboard would
+have reported ₹2,02,760 of seeded outcomes as webhook-proven — the exact overclaim the badge
+exists to prevent, and undetectable from the outside. The `sim_evt_` prefix is what makes the
+two separable.
+
+**Rejected:** one combined figure with the weaker badge. §14.5 says a figure needing two
+badges is two figures, and averaging a verified number with a simulated one produces something
+that is neither, labelled as whichever the author preferred.
+
+**Rejected:** hiding the verified tile while it reads zero. A missing tile reads as *"not
+measured"*; a zero reads as *"measured, and none"*. The second is true and is the more useful
+thing for a judge to see.
+
+**Cost of being wrong:** the headline number on screen is smaller and needs a sentence of
+explanation. That sentence is the product.
+
+---
+
+## DEC-032 · 2026-08-30 · A failed fetch renders an error, never a zero
+
+**Phase:** 12b
+
+**Decision:** `safeFetch` returns a discriminated `Result<T>` and every panel renders an
+explicit `FetchError` when the API is unreachable.
+
+**Rejected:** the ordinary `fetch(...).catch(() => defaults)` pattern, which renders
+`Rs 0.00` when the backend is down. Zero is a number a viewer will believe, and it is
+indistinguishable from a real measurement — during a live demo it would be read as "the agent
+recovered nothing".
+
+**Also decided:** each panel is an independent server component, so one failing endpoint
+degrades one card rather than blanking the page.
+
+**Cost of being wrong:** a visibly broken card instead of a plausibly wrong number. That is
+the correct direction.

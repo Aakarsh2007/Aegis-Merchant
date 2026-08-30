@@ -15,7 +15,7 @@ questions.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Final
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,12 +50,28 @@ _INR_PER_MILLION_INPUT_TOKENS = 7.0
 _INR_PER_MILLION_OUTPUT_TOKENS = 28.0
 
 
+#: A verifying event id starting with this was produced by the batch
+#: simulator, not by Razorpay. The distinction is load-bearing: the schema's
+#: `recovery_requires_proof` CHECK forces *an* id, and a simulator that wrote
+#: a realistic-looking one would silently promote seeded outcomes to
+#: RAZORPAY_VERIFIED -- precisely the overclaim the badge exists to prevent.
+SIMULATED_EVENT_PREFIX: Final = "sim_evt_"
+
+
 @dataclass(frozen=True)
 class OverviewReport:
-    """The five tiles. Gross and net travel together, always."""
+    """The five tiles. Gross and net travel together, always.
+
+    Gross is **two** figures, not one. Recoveries proven by a real signed
+    webhook and recoveries produced by the batch simulator carry different
+    badges, and §14.5 forbids a tile mixing provenance: a figure that would
+    need two badges is two figures. Summing them would produce a number that
+    is neither, labelled as whichever the author preferred.
+    """
 
     at_risk: Figure
     gross_recovered: Figure
+    gross_simulated: Figure
     net_incremental: Figure
     open_cases: Count
     control_cases: Count
@@ -68,6 +84,7 @@ class OverviewReport:
             # Adjacent in the payload as well as on screen. A client that
             # renders the first key it finds still gets both.
             "gross_recovered": self.gross_recovered.as_dict(),
+            "gross_simulated": self.gross_simulated.as_dict(),
             "net_incremental": self.net_incremental.as_dict(),
             "open_cases": self.open_cases.as_dict(),
             "control_cases": self.control_cases.as_dict(),
@@ -99,10 +116,20 @@ async def overview(session: AsyncSession, *, clock: Clock) -> OverviewReport:
             select(func.count(RecoveryCase.id)).where(RecoveryCase.status.in_(open_statuses))
         )
     ) or 0
-    gross_paise = (
+    # Split by who proved it. A real Razorpay event id and a simulator's id
+    # are different claims and cannot share a tile.
+    verified_paise = (
         await session.scalar(
             select(func.coalesce(func.sum(RecoveryCase.recovered_amount_paise), 0)).where(
-                RecoveryCase.recovery_verified_by.is_not(None)
+                RecoveryCase.recovery_verified_by.is_not(None),
+                ~RecoveryCase.recovery_verified_by.startswith(SIMULATED_EVENT_PREFIX),
+            )
+        )
+    ) or 0
+    simulated_paise = (
+        await session.scalar(
+            select(func.coalesce(func.sum(RecoveryCase.recovered_amount_paise), 0)).where(
+                RecoveryCase.recovery_verified_by.startswith(SIMULATED_EVENT_PREFIX)
             )
         )
     ) or 0
@@ -148,12 +175,23 @@ async def overview(session: AsyncSession, *, clock: Clock) -> OverviewReport:
             basis=f"sum of amount over {open_count} non-terminal cases in the seeded corpus",
         ),
         gross_recovered=Figure(
-            paise=int(gross_paise),
+            paise=int(verified_paise),
             provenance=Provenance.RAZORPAY_VERIFIED,
             basis=(
-                "sum of recovered_amount over cases with a verifying webhook; the "
-                "recovery_requires_proof CHECK constraint makes an unverified "
-                "recovery unrepresentable"
+                "sum of recovered_amount over cases proven by a REAL signed Razorpay "
+                "webhook; the recovery_requires_proof CHECK makes an unverified "
+                "recovery unrepresentable. Zero here means nothing has yet been "
+                "recovered against live traffic, which is the honest figure."
+            ),
+        ),
+        gross_simulated=Figure(
+            paise=int(simulated_paise),
+            provenance=Provenance.SIMULATED,
+            basis=(
+                "sum of recovered_amount over cases settled by the batch simulator. "
+                "The attribution machinery is real and unmodified; the customer "
+                "responses are a declared parameter. Kept separate from the verified "
+                "figure because they are different claims (§14.5)."
             ),
         ),
         net_incremental=net,

@@ -109,9 +109,27 @@ def fuzz() -> int:
     return run([PY, "-m", "pytest", "-m", "property"])
 
 
-@task("check", "Everything CI runs: lint, types, tests")
+@task("web-check", "Typecheck and lint the Command Center")
+def web_check() -> int:
+    """tsc + eslint on the frontend.
+
+    Skipped cleanly when node_modules is absent, so `check` still works on a
+    fresh clone where only the Python side has been installed.
+    """
+    npm = shutil.which("npm")
+    if npm is None or not (WEB / "node_modules").exists():
+        print("• skipping web checks (run `npm install` in apps/web first)")
+        return 0
+    npx = shutil.which("npx") or npm
+    return _chain(
+        run([npx, "tsc", "--noEmit"], cwd=WEB),
+        run([npx, "eslint", "src"], cwd=WEB),
+    )
+
+
+@task("check", "Everything CI runs: lint, types, tests, web")
 def check() -> int:
-    return _chain(lint(), types(), test())
+    return _chain(lint(), types(), test(), web_check())
 
 
 # ---------------------------------------------------------------------------
@@ -181,9 +199,15 @@ def warm_cache() -> int:
     return run([PY, "-m", "app.llm.warm_cache", *sys.argv[2:]], cwd=API)
 
 
-@task("batch", "Run the 420-transaction batch (Phase 13)")
+@task("batch", "Put the seeded corpus through the agent")
 def batch() -> int:
-    return _pending("Phase 13")
+    """Create cases, run them through the graph, and settle a proportion.
+
+    Reproducible and re-runnable: it clears its own previous output and seeds
+    its RNG. Every settled case is recorded with a `sim_evt_` verifier, so the
+    dashboard reports it as SIMULATED and never as RAZORPAY VERIFIED.
+    """
+    return run([PY, "-m", "app.workers.batch_cli", *sys.argv[2:]], cwd=API)
 
 
 @task("chaos", "Inject a fault (Phase 13)")

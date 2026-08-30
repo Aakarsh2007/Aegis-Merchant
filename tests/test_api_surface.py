@@ -170,6 +170,28 @@ class TestOverview:
         body = client.get("/api/v1/metrics/overview", headers=_auth()).json()
         assert body["gross_recovered"]["provenance"] == "RAZORPAY_VERIFIED"
 
+    def test_simulated_recoveries_never_reach_the_verified_tile(self, client: TestClient) -> None:
+        """The load-bearing separation (INC-018 / DEC-031).
+
+        The schema forces *an* event id onto every recovery, so the batch
+        simulator has to write one. If those ids were summed into the verified
+        figure, seeded outcomes would be reported as webhook-proven — the exact
+        overclaim the badge exists to prevent, and invisible from the outside.
+        """
+        body = client.get("/api/v1/metrics/overview", headers=_auth()).json()
+        assert body["gross_simulated"]["provenance"] == "SIMULATED"
+        # Two figures, never summed: §14.5 forbids a tile mixing provenance.
+        assert body["gross_recovered"]["paise"] != body["gross_simulated"]["paise"] or (
+            body["gross_recovered"]["paise"] == 0
+        )
+
+    def test_the_verified_figure_is_zero_before_live_traffic(self, client: TestClient) -> None:
+        """Nothing has run against production, so the honest verified figure is
+        zero — and it is shown rather than hidden, because a missing tile reads
+        as "not measured" while a zero reads as "measured, and none"."""
+        body = client.get("/api/v1/metrics/overview", headers=_auth()).json()
+        assert body["gross_recovered"]["paise"] == 0
+
     def test_at_risk_is_simulated_not_verified(self, client: TestClient) -> None:
         """Money that has not moved cannot be verified by anything."""
         body = client.get("/api/v1/metrics/overview", headers=_auth()).json()

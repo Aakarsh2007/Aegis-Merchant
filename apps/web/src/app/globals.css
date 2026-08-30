@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+/*
+ * Razorpay-native palette.
+ *
+ * Drawn from Razorpay's own product surfaces so the Command Center reads as
+ * something that belongs beside the merchant dashboard rather than beside it
+ * in a different font. The navy (#02042B) and blue (#3395FF) are theirs; the
+ * rest is a neutral scale built to sit with them.
+ *
+ * Deliberately NOT their logo, wordmark, or any branding asset: this is a
+ * third-party tool that looks at home in their ecosystem, and passing it off
+ * as a first-party Razorpay product would be a different thing entirely.
+ */
+@theme {
+  --color-ink-950: #02042b; /* Razorpay navy — page ground */
+  --color-ink-900: #0a0e3f;
+  --color-ink-800: #141a52;
+  --color-ink-700: #1f2668;
+  --color-ink-600: #2d3577;
+  --color-ink-500: #4a5490;
+
+  --color-brand-500: #3395ff; /* Razorpay blue */
+  --color-brand-400: #5aabff;
+  --color-brand-600: #1a7ae6;
+
+  --color-paper-50: #f7f9fc;
+  --color-paper-100: #eef2f8;
+  --color-paper-300: #c3cddb;
+  --color-paper-500: #8a97ab;
+
+  /* Semantic. Money states, not decoration. */
+  --color-verified-500: #10b981; /* RAZORPAY_VERIFIED */
+  --color-simulated-500: #f59e0b; /* SIMULATED */
+  --color-estimated-500: #8b5cf6; /* ESTIMATED */
+  --color-danger-500: #ef4444;
+  --color-control-500: #64748b; /* the untouched holdout arm */
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+}
+
+html,
+body {
+  background: var(--color-ink-950);
+  color: var(--color-paper-100);
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Every figure is tabular-nums. Proportional digits make a column of rupee
+ * amounts jitter as it updates over SSE, which reads as instability in a
+ * dashboard whose entire argument is that its numbers are trustworthy.
+ */
+.numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

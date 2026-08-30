@@ -670,3 +670,59 @@ tests our logic instead of the client library's streaming semantics.
 
 **What was learned:** `mypy --strict` clean and `ruff` clean is not evidence that an object
 works. Both tools were completely satisfied by a class that could not be put in a set.
+
+
+## INC-018 · One enum value meaning two incompatible things, and a lift of minus sixty percent
+
+**Symptom:** the dashboard's first live render showed **net incremental of −₹5,91,178** and a
+lift of **−60.5%**, where Phase 9 had measured +6.2% and +₹60,217 over the same corpus.
+
+**Wrong theory, five minutes lost:** that the batch runner's response model was
+mis-parameterised. It was not — the parameters were byte-identical to Phase 9's.
+
+**Root cause.** `RESOLVED_ORGANIC` was carrying two incompatible meanings.
+
+`agent/nodes.py::_blocked_status` maps a control-arm block to `RESOLVED_ORGANIC` with the
+comment *"a control-arm case is doing its job"* — meaning **held as a holdout**.
+`services/attribution.py` reads the same value as **settled without our involvement**, which
+is what it means everywhere else in the system.
+
+So every control case that was merely *held* was counted as a case that *paid*:
+
+| | before | after |
+|---|---|---|
+| control settled | 35/39 = **89.7%** | 9/39 = **23.1%** |
+| treatment settled | 50/171 = 29.2% | 50/171 = 29.2% |
+| lift | **−60.5%** | **+6.2%** |
+
+Treatment was correct throughout. Only the control arm was wrong, and it was wrong in the
+direction that makes the product look *worse* — which is the only reason it was noticed
+rather than shipped.
+
+**Why the tests did not catch it.** `tests/test_attribution.py` builds `CaseOutcome` objects
+directly with an explicit `paid` boolean, so it never exercises the inference from case
+status. The Phase 9 measurement script computed `paid` from its own in-memory simulation
+rather than by reading a status back out of the database. Nothing had ever round-tripped a
+control case through *persistence* and back into the attribution population — the batch
+runner was the first thing to do it, and it found the collision immediately.
+
+**Fix:** the batch derives `acted` from the **arm**, not from the status, and writes the
+terminal status from whether the customer actually paid. A control case that did not pay is
+`EXPIRED` — the window closed with no payment — not `RESOLVED_ORGANIC`, because claiming
+otherwise asserts a settlement that never happened.
+
+**Regression test:** `test_control_conversion_matches_the_declared_baseline` asserts control
+conversion sits near the declared 21% rather than near 90%. A test asserting only "lift is
+positive" would have passed on the broken code once the sign flipped back.
+
+**Not yet fixed, and stated as such:** `_blocked_status` still returns `RESOLVED_ORGANIC` for
+a control-arm block. The batch now overrides it, so the measured numbers are right, but any
+*other* consumer reading case status directly would hit the same collision. The real fix is a
+distinct terminal state for "observed, never acted on", which is a schema change and is
+deferred to Phase 13 rather than smuggled into a UI phase.
+
+**What was learned:** an enum value is an interface. `RESOLVED_ORGANIC` was given a second
+meaning in one module by someone reasoning locally and correctly — a held control case *is*
+doing its job — and the collision was invisible until a component read it from a different
+angle. The systems that caught it were the ones that persisted data and read it back, not the
+ones that constructed objects in memory.

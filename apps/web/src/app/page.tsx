@@ -1,0 +1,114 @@
+/**
+ * The Command Center.
+ *
+ * Layout order is the argument, in sequence:
+ *
+ * 1. **The numbers**, with gross and net adjacent — because the first question
+ *    is "how much", and the second is "how do you know".
+ * 2. **The lift panel**, which answers the second question with a control arm.
+ * 3. **The brakes and the ledger**, which answer "what stopped it" and "can I
+ *    check any of this".
+ * 4. **The cases**, where a judge can follow one recovery end to end.
+ *
+ * Every panel is a server component that fetches independently, so a failing
+ * endpoint degrades one card rather than blanking the page — and each failure
+ * renders an explicit error instead of a zero.
+ */
+import { Suspense } from "react";
+import { ApprovalsQueue } from "@/components/ApprovalsQueue";
+import { AttributionPanel } from "@/components/AttributionPanel";
+import { AuditVerifier } from "@/components/AuditVerifier";
+import { CasesTable } from "@/components/CasesTable";
+import { CostPanel } from "@/components/CostPanel";
+import { MetricsBar } from "@/components/MetricsBar";
+import { PipelineStream } from "@/components/PipelineStream";
+import { StoppingRulesPanel } from "@/components/StoppingRulesPanel";
+
+export const dynamic = "force-dynamic";
+
+function Skeleton({ label }: { label: string }) {
+  return (
+    <div className="rounded-xl border border-ink-700 bg-ink-900/40 p-4">
+      <div className="h-3 w-32 animate-pulse rounded bg-ink-700" />
+      <div className="mt-3 h-6 w-24 animate-pulse rounded bg-ink-800" />
+      <p className="mt-3 text-[10px] text-paper-500">Loading {label}…</p>
+    </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-[1400px] px-5 py-6">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-ink-800 pb-5">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight text-paper-50">
+            RevPilot
+            <span className="ml-2 text-sm font-normal text-paper-500">
+              Revenue Recovery Command Center
+            </span>
+          </h1>
+          <p className="mt-1 max-w-2xl text-[11px] leading-relaxed text-paper-500">
+            An agent that finds lost revenue and acts on it inside a policy
+            firewall. Every rupee figure below carries a provenance badge —{" "}
+            <span className="text-verified-500">RAZORPAY VERIFIED</span> means a
+            signed webhook proves it,{" "}
+            <span className="text-simulated-500">SIMULATED</span> means real
+            machinery over a seeded corpus,{" "}
+            <span className="text-estimated-500">ESTIMATED</span> means a
+            projection. Hover any number for its basis.
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] uppercase tracking-wider text-paper-500">
+            Merchant
+          </p>
+          <p className="text-sm font-medium text-paper-100">GlowKart</p>
+        </div>
+      </header>
+
+      <Suspense fallback={<Skeleton label="metrics" />}>
+        <MetricsBar />
+      </Suspense>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="space-y-4">
+          <Suspense fallback={<Skeleton label="attribution" />}>
+            <AttributionPanel />
+          </Suspense>
+          <Suspense fallback={<Skeleton label="approvals" />}>
+            <ApprovalsQueue />
+          </Suspense>
+        </div>
+
+        <div className="space-y-4">
+          <Suspense fallback={<Skeleton label="stopping rules" />}>
+            <StoppingRulesPanel />
+          </Suspense>
+          <AuditVerifier />
+        </div>
+
+        <div className="flex min-h-[520px] flex-col gap-4">
+          <PipelineStream />
+          <Suspense fallback={<Skeleton label="cost" />}>
+            <CostPanel />
+          </Suspense>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <Suspense fallback={<Skeleton label="cases" />}>
+          <CasesTable />
+        </Suspense>
+      </div>
+
+      <footer className="mt-8 border-t border-ink-800 pt-4 text-[10px] leading-relaxed text-paper-500">
+        Nothing here has run against live production traffic. The machinery —
+        arm assignment, the six attribution conditions, the policy firewall, the
+        audit chain — is the same code that would run on real Razorpay traffic;
+        the customer responses in the seeded corpus are a declared parameter and
+        are badged <span className="text-simulated-500">SIMULATED</span>{" "}
+        accordingly.
+      </footer>
+    </main>
+  );
+}

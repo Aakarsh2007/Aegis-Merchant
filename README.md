@@ -9,16 +9,16 @@ Razorpay AI Buildathon 2026 · Track: **AI Revenue Recovery**
 
 [![CI](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml/badge.svg)](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml)
 
-> **Build status: Phase 12a of 15 complete.** Built and tested: the injected clock,
+> **Build status: Phase 12b of 15 complete.** Built and tested: the injected clock,
 > the 18-table schema and seeded corpus, the signed-webhook boundary, the
 > deterministic classifier, twelve stopping rules with a property-based termination
 > proof, the policy firewall and capability token, the LLM adapter stack with a
 > committed response cache, the seven-node agent graph, the transactional outbox,
 > attribution with a holdout control arm, the SHA-256 audit chain and its public
 > verifier, bearer auth, HITL approvals, the template render boundary, and the REST +
-> SSE surface. Remaining: the Command Center UI (12b), the batch runner and chaos
-> suite (13), real inbound webhooks over a tunnel (14), and the eval harness and video
-> (15).
+> SSE surface, the Command Center, and the batch runner. Remaining: playbooks 2-4 and
+> the chaos suite (13), real inbound webhooks over a tunnel (14), and the eval harness
+> and video (15).
 >
 > The full architecture, and the reasoning behind every choice in it, is in
 > [`workflow.md`](workflow.md) — a build contract written before the first line of code.
@@ -221,8 +221,10 @@ apps/api/app/
   services/metrics.py      tile queries; gross and net are never separated
   security/auth.py         bearer auth; refuses to start unset in production
   routers/                 webhooks, cases, metrics, approvals, audit, dlq, stream
+  workers/batch.py         puts the corpus through the agent; marks output SIMULATED
 apps/web/openapi.json      the committed API contract the UI generates types from
-apps/web/                  Next.js Command Center                      (Phase 12b)
+apps/web/src/lib/api.ts    typed client; a failed fetch is an error, never a zero
+apps/web/src/components/   metrics, attribution, stopping rules, audit verifier, SSE
 data/revpilot.seed.db      committed demo database — inspectable without our code
 tests/                     unit, integration, eval, property suites
 docs/INCIDENTS.md          engineering journal — real breakages, wrong theories included
