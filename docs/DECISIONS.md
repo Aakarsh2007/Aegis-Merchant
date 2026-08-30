@@ -567,3 +567,80 @@ the block, the index and the reason.
 **Cost of being wrong:** an endpoint that damages audit data exists in the codebase. Contained
 by the environment gate, a `pattern`-constrained enum of modes, `extra="forbid"`, and tests
 asserting the 403 in production.
+
+## DEC-025 · 2026-08-30 · The model fills slots; it never writes a message
+
+**Phase:** 11
+
+**Decision:** `guardrails/consent.py` renders outbound text by substituting named slots into
+a template row marked `approved`. Slot names are checked against an allowlist, values are
+substituted in a single pass and never re-scanned, and any failure refuses rather than
+producing a partial message.
+
+**Rejected:** `body.format(**slots)`, which is the obvious implementation. `str.format`
+walks attribute and index expressions, so `{x.__class__.__init__.__globals__}` reads
+process globals and a value containing braces gets re-examined. Our bodies come from an
+approved DB row rather than user input, which makes that unlikely rather than impossible —
+and "unlikely" is a poor property for the code that renders every outbound message.
+
+**Also rejected:** letting the LLM write the final copy and checking it afterwards. A
+message's compliance class is a property of what it *says*, and the interesting failure is
+not "the agent chose to send marketing without consent" — S-08 catches that — but "the
+agent chose transactional and the model wrote *20% off!* into it". No classifier we could
+write would be a better control than making the failure unrepresentable.
+
+**A real bug this produced, and the fix:** the first version checked for leftover braces in
+the *rendered* output, which conflated a malformed template (`"Hi {first_name"`, our bug)
+with a slot value that legitimately contains a brace (a customer who typed `{link}` into
+the name field, their data). The tests caught it. Structure is now validated on the
+template before substitution, and values are treated as opaque throughout.
+
+**Cost of being wrong:** a template that cannot render refuses and the case escalates to a
+human, which is the correct direction. The seeded templates are all asserted renderable, so
+the refusal path cannot fire during the demo.
+
+---
+
+## DEC-026 · 2026-08-30 · Expiry is checked before the hash
+
+**Phase:** 11
+
+**Decision:** `POST /approvals/{id}/action` checks, in order: already-actioned (409),
+past TTL (409), then `policy_applied_hash` (409). `reviewed_by` comes from the
+authenticated principal and the request schema is `extra="forbid"`, so a body attempting
+to name its own reviewer is a 422 rather than a silently ignored field.
+
+**Rejected:** checking the hash first. A correct hash does not make four-hour-old
+information fresh — the TTL exists precisely because the world moves — so an expired
+approval must lose either way. Ordering them the other way would let a stale approval
+through whenever the underlying action happened not to change.
+
+**Also rejected:** making `policy_applied_hash` optional with a skip-if-absent fallback.
+A guard that can be bypassed by omitting a field is not a guard.
+
+**Cost of being wrong:** a reviewer occasionally has to re-read and re-approve. That is
+the intended cost: the alternative is a human authorising one action and a different one
+executing.
+
+---
+
+## DEC-027 · 2026-08-30 · A held message is cancelled, not silently sent late
+
+**Phase:** 11
+
+**Decision:** a queued send whose case reached a terminal state, or whose release time
+falls after `window_expires_at`, is marked DEAD by the sweeper before the drainer can
+reach it — with the reason recorded in the audit chain.
+
+**Rejected:** letting the drainer send it. See INC-016: it spends one of two permitted
+contacts, messages someone about a payment we are no longer pursuing, and the result is
+structurally unattributable because no case is in `MONITORING`.
+
+**Also rejected:** dropping the row silently. `stale_deferrals` is reported separately
+from `expired_approvals` in `SweepResult` specifically because this number is a *loss* —
+money we held a message for and then could not pursue — and folding it into a general
+"cleaned up N rows" would hide the signal that quiet hours are costing us recoveries.
+
+**Cost of being wrong:** a message that could legitimately have been sent is cancelled if
+the window arithmetic is wrong. Bounded by tests at every hour of the day, and by the
+control case asserting a healthy deferral survives the same sweep.

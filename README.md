@@ -217,6 +217,11 @@ Named plainly, because volunteering them is cheaper than having them found.
 - **The audit chain cannot detect tail truncation**, and says so on every successful
   verification. See the section above; this is a property of the construction, not a
   gap in the implementation.
+- **Outbound messaging is template-only by construction.** The model fills named
+  slots in a DLT-registered template and cannot emit free text. That is a real
+  constraint, not a limitation we regret: a message's compliance class is a property
+  of what it says, and no post-hoc classifier would be a better control than making
+  the failure unrepresentable ([DEC-025](docs/DECISIONS.md)).
 - **Auth is a single shared bearer token**, not per-user identity. Unset, the API is
   open outside production and marks every response `X-Auth-Mode: disabled`; in
   production an unset token makes the app refuse to start ([DEC-023](docs/DECISIONS.md)).

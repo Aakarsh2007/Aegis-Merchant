@@ -18,6 +18,7 @@ from app.config import Settings, get_settings
 from app.core.clock import Clock, SystemClock, iso_ist
 from app.deps import get_clock as _deps_get_clock
 from app.deps import get_provider
+from app.routers import approvals as approvals_router
 from app.routers import audit as audit_router
 from app.routers import webhooks
 from app.security.auth import auth_mode
@@ -103,6 +104,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(webhooks.router)
     app.include_router(audit_router.router)
+    app.include_router(approvals_router.router)
 
     @app.get("/healthz", tags=["health"], summary="Liveness probe")
     async def healthz() -> dict[str, Any]:

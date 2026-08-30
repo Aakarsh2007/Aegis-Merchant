@@ -578,3 +578,54 @@ risk, exactly as the fixtures README warned it was.
 **Related:** INC-003 (the same table, ordered wrongly), INC-006 (green tests
 proving nothing), INC-008/INC-012 (both also found only by calling the real
 provider).
+
+
+## INC-016 · The held message that would have been sent to a dead case
+
+**Symptom:** none yet, because no message has ever been held in production. Found by
+reading the drainer's query while wiring the Phase 11 sweeper, not by anything breaking.
+
+**What was wrong:** S-09 defers a quiet-hours message by setting
+`outbox.next_attempt_at` to 09:05 IST. The drainer collects work with
+
+```sql
+WHERE status = 'PENDING' AND next_attempt_at <= now
+```
+
+and **nothing checked whether the case was still alive**. A message deferred at 22:00 for
+a case whose 24-hour recovery window closed at 03:00 would be sent at 09:05 — a fresh
+payment link, six hours after the case was over.
+
+**Why it is worse than a dropped message.** A drop loses one opportunity. This *spends*
+one of the two contacts S-05 permits, messages someone about a payment we are no longer
+pursuing, and produces a link attributable to nothing: no case is in `MONITORING`, so
+attribution condition 4 rejects the resulting webhook and the money — if it arrives —
+counts as organic. We would have paid the full compliance and goodwill cost of a contact
+and been structurally unable to claim the result.
+
+**Why nobody caught it earlier.** Quiet hours were tested as a *predicate* — the wrapping
+21:00/09:00 window, IST versus UTC, month rollover, merchant-editable bounds — and every
+one of those tests passes. The predicate was never wrong. What was missing was any test
+that followed a message *through* the deferral, and the gap only exists because quiet
+hours can hold a message for eleven hours while a 24-hour window is running.
+
+**Root cause:** two components each correct in isolation. S-09 decides *when* to send;
+the drainer decides *what* is due. Neither was responsible for "is this still worth
+sending", so neither did it.
+
+**Fix:** `Scheduler._kill_stale_deferrals` marks a queued send DEAD before the drainer can
+reach it, when either the case has reached a terminal state or the release time is past
+`window_expires_at`. Both conditions are audited with the reason.
+
+**Regression test:** `tests/test_quiet_hours_roundtrip.py` follows one message across all
+four components at every hour of the day. The load-bearing pair is
+`test_a_message_held_at_2200_is_due_at_0905` (held, not dropped) and
+`test_a_hold_that_outlives_the_window_is_cancelled_not_sent` (cancelled, not sent) — a
+sweep that killed everything would pass the second alone, and a sweep that killed nothing
+would pass the first alone. Verified by sabotage: stubbing the sweep to return 0 fails
+exactly three tests.
+
+**What was learned:** testing a predicate is not testing the behaviour the predicate exists
+to produce. "Never drop a message" is a claim about four components, and it was only ever
+tested in one of them. The tests that found this are the ones that follow a thing through
+a system rather than asserting a function returns the right value.
