@@ -190,9 +190,7 @@ class TestChaos:
         production process cannot be made to inject faults by any route.
         """
         simulation.state.active = "provider_down"
-        monkeypatch.setattr(
-            simulation, "get_settings", lambda: _settings(environment="production")
-        )
+        monkeypatch.setattr(simulation, "get_settings", lambda: _settings(environment="production"))
         assert simulation.active_fault() is None
 
         monkeypatch.setattr(

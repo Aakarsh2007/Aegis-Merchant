@@ -98,7 +98,22 @@ class RazorpayProvider:
         except ValueError:
             payload = {"raw_text": response.text[:500]}
 
-        error = payload.get("error", {}) if isinstance(payload, dict) else {}
+        # Razorpay documents `{"error": {"code": ..., "description": ...}}`, but
+        # not every response uses it: a 401 on a product that is not enabled
+        # returns `{"error": "Unauthorized"}` -- a plain string (INC-019).
+        # Assuming the object shape raised AttributeError here, which is
+        # neither ProviderRetryable nor ProviderPermanent, so it escaped the
+        # outbox's classification entirely and would have left a row stuck in
+        # SENDING. Both shapes are handled, and anything else degrades to text
+        # rather than crashing the caller.
+        raw_error = payload.get("error") if isinstance(payload, dict) else None
+        if isinstance(raw_error, dict):
+            error: dict[str, Any] = raw_error
+        elif isinstance(raw_error, str):
+            error = {"description": raw_error}
+        else:
+            error = {}
+
         description = str(error.get("description", "")).lower()
         code = error.get("code")
         message = f"{method} {path} -> {response.status_code}: {error.get('description', response.text[:200])}"

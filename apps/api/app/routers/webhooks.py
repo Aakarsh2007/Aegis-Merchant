@@ -21,7 +21,10 @@ we have already handled.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Request, Response, status
@@ -37,6 +40,8 @@ from app.ingest.normalise import normalise
 from app.security.webhook import verify_signature, verify_timestamp
 
 __all__ = ["router"]
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/webhooks", tags=["webhooks"])
 
@@ -61,6 +66,39 @@ async def _process_event(event_row_id: str, payload: dict[str, Any], event_id: s
     event = normalise(payload, event_id=event_id)
     # Structured logging lands in Phase 11; until then this is the seam.
     _ = event
+
+
+def _log_rejected_signature(raw_body: bytes, received: str | None, settings: Settings) -> None:
+    """Development-only diagnostics for the commonest integration failure.
+
+    "Every delivery returns 401" has three causes that look identical from the
+    outside: the secret differs, something re-encoded the body in transit, or
+    the wrong secret was pasted into the dashboard. Distinguishing them without
+    the raw bytes is guesswork, and the raw bytes are exactly what the handler
+    discards on rejection.
+
+    So in development it logs what would let a human tell them apart: the
+    signature received, the signature our secret produces over the *same*
+    bytes, and the head of the body. Never in production -- that would write
+    customer payloads into a log file.
+    """
+    if not settings.simulation_allowed:
+        return
+    expected = hmac.new(
+        settings.razorpay_webhook_secret.encode(), raw_body, hashlib.sha256
+    ).hexdigest()
+    log.warning(
+        "webhook signature rejected"
+        " | received=%s"
+        " | expected=%s (HMAC of these exact bytes with our configured secret)"
+        " | body=%d bytes starting %r"
+        " | If `expected` is stable across retries but never matches `received`,"
+        " the secret in the Razorpay dashboard differs from RAZORPAY_WEBHOOK_SECRET.",
+        received,
+        expected,
+        len(raw_body),
+        raw_body[:100],
+    )
 
 
 @router.post(
@@ -90,6 +128,7 @@ async def razorpay_webhook(
     if not signature.valid:
         # Deliberately terse: an attacker probing the endpoint learns only that
         # it was rejected, not which check rejected it. The reason is logged.
+        _log_rejected_signature(raw_body, x_razorpay_signature, settings)
         response.status_code = status.HTTP_401_UNAUTHORIZED
         return {"status": "rejected", "reason": signature.reason}
 
@@ -107,6 +146,18 @@ async def razorpay_webhook(
         event.event_ts, clock.now_utc(), settings.webhook_replay_tolerance_s
     )
     if not freshness.valid:
+        # A DIFFERENT 401 from the signature one, and they are indistinguishable
+        # from outside -- which cost real debugging time here. A correctly
+        # signed retry of an event from an hour ago lands on this branch, so
+        # "every delivery returns 401" can mean the secret is fine and the
+        # events are simply stale.
+        log.warning(
+            "webhook rejected as stale | event_ts=%s | now=%s | tolerance=%ss"
+            " | signature was VALID; this is the replay window, not the secret",
+            event.event_ts.isoformat() if event.event_ts else None,
+            clock.now_utc().isoformat(),
+            settings.webhook_replay_tolerance_s,
+        )
         response.status_code = status.HTTP_401_UNAUTHORIZED
         return {"status": "rejected", "reason": freshness.reason}
 

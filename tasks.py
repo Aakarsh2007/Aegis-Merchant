@@ -250,9 +250,15 @@ def capture_fixtures() -> int:
     return run([PY, "-m", "app.tools.capture_fixtures"], cwd=API)
 
 
-@task("tunnel", "Expose the local API over HTTPS for real webhooks (Phase 14)")
+@task("tunnel", "Expose the local API over HTTPS for real webhooks")
 def tunnel() -> int:
-    return _pending("Phase 14")
+    """Start a Cloudflare quick tunnel and print the registration steps.
+
+    No account, no card, no configuration. The URL is ephemeral and changes on
+    every run, which is the correct trade for a demo and is stated plainly
+    rather than discovered when a webhook stops arriving.
+    """
+    return run([PY, "-m", "app.tools.tunnel", *sys.argv[2:]], cwd=API)
 
 
 @task("clean", "Remove caches and build artefacts (never the seed database)")

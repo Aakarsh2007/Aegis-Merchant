@@ -9,7 +9,7 @@ Razorpay AI Buildathon 2026 · Track: **AI Revenue Recovery**
 
 [![CI](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml/badge.svg)](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml)
 
-> **Build status: Phase 13 of 15 complete.** Built and tested: the injected clock,
+> **Build status: Phase 14 of 15 complete.** Built and tested: the injected clock,
 > the 18-table schema and seeded corpus, the signed-webhook boundary, the
 > deterministic classifier, twelve stopping rules with a property-based termination
 > proof, the policy firewall and capability token, the LLM adapter stack with a
@@ -17,8 +17,8 @@ Razorpay AI Buildathon 2026 · Track: **AI Revenue Recovery**
 > attribution with a holdout control arm, the SHA-256 audit chain and its public
 > verifier, bearer auth, HITL approvals, the template render boundary, and the REST +
 > SSE surface, the Command Center, the batch runner, all four playbooks, the morning
-> briefing and the chaos suite. Remaining: real inbound webhooks over a tunnel (14), and
-> the eval harness and video (15).
+> briefing and the chaos suite, and **real inbound webhooks verified end to end against
+> live Razorpay** (see below). Remaining: the eval harness and demo video (15).
 >
 > The full architecture, and the reasoning behind every choice in it, is in
 > [`workflow.md`](workflow.md) — a build contract written before the first line of code.
@@ -136,6 +136,28 @@ twelve named rules ([`stopping_rules.py`](apps/api/app/guardrails/stopping_rules
 each individually counted, with termination established by property test over 2,000
 generated contexts per run rather than by example
 ([proof](tests/property/test_stopping_termination.py)).
+
+### A real Razorpay webhook, verified
+
+Not a fixture we wrote. Razorpay's own infrastructure delivered this over a
+public tunnel:
+
+```
+event_id          TW3Rfq6VhWiuwC
+event_type        payment_link.paid
+signature_valid   TRUE
+status            ACCEPTED (HTTP 200)
+delivered by      52.66.76.63   (Razorpay, Mumbai)
+reference_id      rvp_live_v2_...   <- a reference WE issued
+```
+
+That last line is attribution condition 3 — the difference between attribution
+and coincidence — satisfied by a real event rather than a constructed one. The
+payload is committed at `tests/fixtures/razorpay/payment_link.paid.captured.json`
+with contact details redacted.
+
+Reproduce it with `python tasks.py tunnel`; the steps are in
+[`docs/webhooks.md`](docs/webhooks.md).
 
 ### Break the audit chain yourself
 

@@ -726,3 +726,124 @@ meaning in one module by someone reasoning locally and correctly — a held cont
 doing its job — and the collision was invisible until a component read it from a different
 angle. The systems that caught it were the ones that persisted data and read it back, not the
 ones that constructed objects in memory.
+
+
+## INC-019 · An error shape Razorpay documents, and one it actually sends
+
+**Symptom:** `AttributeError: 'str' object has no attribute 'get'` from the Razorpay client,
+while investigating why `subscription.charged` was missing from the webhook event list.
+
+**Root cause.** Razorpay documents its errors as
+`{"error": {"code": ..., "description": ...}}`, and the client assumed that shape:
+
+```python
+error = payload.get("error", {})
+description = str(error.get("description", "")).lower()   # <- explodes
+```
+
+A 401 for a product that is **not enabled on the account** returns
+`{"error": "Unauthorized"}` — the value is a plain string, so `.get` does not exist.
+
+**Why it is worse than a crash.** `AttributeError` is neither `ProviderRetryable` nor
+`ProviderPermanent`, so it escaped the outbox's entire classification path. The executor
+catches those two and decides retry-or-dead-letter; an unclassified exception propagates past
+both, leaving the outbox row in `SENDING` — the exact state the reconciler exists to clean up,
+reached by a route the reconciler was never designed for. A payment action could have been
+stranded by an error-message format.
+
+**How it was found.** Not by a test. By calling `/subscriptions` on the real account to check
+whether Subscriptions was enabled, because the user reported a missing webhook event. The
+answer was "no, it is 401" — and getting that answer crashed our client.
+
+**Fix:** both shapes are handled, plus a list, plus a missing key, plus a non-JSON body. Every
+path now produces a classified provider error.
+
+**Regression test:** `test_every_error_shape_is_classified_not_crashed`, parametrised over
+four bodies, and `test_a_non_json_error_body_is_classified` for an HTML page from a proxy.
+Verified by sabotage: restoring the assumption fails exactly the two shapes it cannot handle.
+
+**Related finding, not a bug:** `subscription.charged` is absent from the dashboard's event
+list because Subscriptions is not enabled on this Test Mode account — `/subscriptions` and
+`/plans` return 401 while `/payment_links` returns 200 on the same credentials. The
+subscription playbook is exercised entirely by the seeded corpus and needs no live
+subscription; only the *live webhook* for it is unavailable, and that is a property of the
+account rather than of the code.
+
+**What was learned:** an API's documented error shape is the shape it returns when it is
+working. The interesting responses — the ones from a disabled product, a proxy, a rate
+limiter — are exactly the ones nobody documents, and they arrive on the error path where the
+handling is least exercised.
+
+
+## INC-020 · Every log line the application wrote at runtime went nowhere
+
+**Symptom:** a signature diagnostic added specifically to debug a failing webhook did not
+appear in the log. The rejection happened — the HTTP 401 was there — but the `log.warning`
+immediately before it produced nothing.
+
+**Root cause:** uvicorn configures the `uvicorn.*` loggers and leaves the **root logger
+without a handler**. Application loggers propagate to root, find no handler, and the record
+is discarded. Eight call sites were affected: the approval-TTL sweeper's expiry counts, the
+outbox drainer's retry notices, the SSE bus's dropped-event warning, the fault-injection
+audit line, and the webhook diagnostics.
+
+**Why it stayed hidden for fourteen phases.** One warning *did* appear — the `API_TOKEN is
+not set` line — and it appears on every boot, at the top of the log, where it reads as proof
+that logging works. It is emitted inside `create_app`, while the application is being built,
+**before** uvicorn installs its logging config. Everything after startup vanished.
+
+That is the worst available arrangement. Silence would have prompted a look; a single
+convincing line at the top prompted nothing.
+
+**Fix:** `_configure_logging` attaches a `StreamHandler` to the root logger if it has none,
+and sets the level from `settings.debug`. Guarded on "if it has none" so a real deployment
+with its own logging configuration is left alone.
+
+**What it cost:** the webhook debugging session below. Without runtime logs the only evidence
+was HTTP status codes, and two entirely different rejections both return 401.
+
+**What was learned:** "the logs show nothing" is ambiguous between *nothing happened* and
+*nothing is being written*, and the difference is not visible from inside the thing you are
+debugging. A single log line that appears at startup is not evidence that logging works —
+it is evidence that logging worked at startup.
+
+---
+
+## INC-021 · Two 401s that meant opposite things, and a fix I cannot prove was necessary
+
+**Symptom:** every Razorpay webhook delivery returned 401. Deliveries were definitely
+arriving — Razorpay's Mumbai egress IPs (`52.66.76.63`, `52.66.75.174`) were in the access
+log — and the payment itself had succeeded (`plink` status `paid`, `pay_TW2aaFse6F6wJw`
+captured).
+
+**What I concluded, and told the user:** the secret in the Razorpay dashboard must differ from
+`RAZORPAY_WEBHOOK_SECRET`. I had verified our side thoroughly — 38 bytes, no whitespace, no
+quotes, loaded correctly — and had proved our HMAC verification worked by sending a signed
+request through the same public tunnel and getting `200 accepted`.
+
+**What was actually also true:** `verify_timestamp` returns **401 as well**, on a completely
+different code path, for an event outside the 300-second replay window. Razorpay retries
+failed deliveries for hours, so by the time I was watching, every arriving request was a
+retry of an event forty minutes old — which would have been rejected for *staleness* even
+with a perfect signature.
+
+Two rejections, one status code, no logging on either (INC-020), and they mean opposite
+things: one says *your secret is wrong*, the other says *your secret is fine and this event
+is simply old*.
+
+**Resolution:** after the user re-entered the secret, a fresh payment produced
+`event_id TW3Rfq6VhWiuwC`, `payment_link.paid`, `signature_valid=1`, `200 ACCEPTED`.
+
+**The honest part:** I do not know whether re-entering the secret fixed it. The original
+secret may have been correct all along and every 401 I saw may have been staleness. I asked
+the user to redo work on a diagnosis I could not support, and the evidence to distinguish the
+two cases did not exist until I added it.
+
+**Fix:** the two rejections now log distinguishable messages —
+`webhook signature rejected | received=… | expected=…` versus
+`webhook rejected as stale | signature was VALID`. The second states explicitly that the
+secret is not the problem, because that is the sentence that would have saved the session.
+
+**What was learned:** before asking somebody to change a configuration, be able to state what
+evidence would prove the change unnecessary. I could not, which means I was guessing with
+someone else's time.

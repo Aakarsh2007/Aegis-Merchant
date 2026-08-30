@@ -84,3 +84,7 @@ legacy/
 
 # Hypothesis example database (machine-local)
 .hypothesis/
+
+# Portable tunnel binary, downloaded on demand by `python tasks.py tunnel`.
+# 55 MB and platform-specific; not something to carry in git.
+/tools/

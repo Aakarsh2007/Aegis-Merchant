@@ -813,3 +813,26 @@ collapsed by a refactor — which every individual assertion would still pass.
 
 **Cost of being wrong:** a live mandate gets re-presented when a link would have converted
 sooner. Recoverable. The opposite error is not.
+
+## DEC-035 · 2026-08-30 · An anonymous ephemeral tunnel, and saying so
+
+**Phase:** 14
+
+**Decision:** `python tasks.py tunnel` starts a Cloudflare **quick tunnel** — no account, no
+card, no configuration — and downloads `cloudflared` on demand into a gitignored `tools/`
+directory.
+
+**Rejected:** a named Cloudflare tunnel, which needs a login and a domain. Correct for
+production, wrong for a project whose whole premise is that a judge can clone it and run it
+on free tiers.
+
+**Rejected:** committing the 55 MB platform-specific binary, and installing it system-wide. A
+hackathon project should not modify the machine it is cloned onto.
+
+**The cost, stated rather than discovered:** the URL changes on every run, so the webhook must
+be re-registered each time. That is written in `docs/webhooks.md` and printed by the tunnel
+itself, because the alternative is finding out tomorrow when deliveries stop.
+
+**Also decided:** the task checks `/healthz` before starting and refuses if nothing answers.
+A tunnel to a dead port returns 502 for every delivery, which looks exactly like a signature
+failure and is not.

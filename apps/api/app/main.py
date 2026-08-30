@@ -56,6 +56,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
+def _configure_logging(settings: Settings) -> None:
+    """Make the application's own log records reach somewhere.
+
+    Uvicorn configures ``uvicorn.*`` loggers and leaves the root logger without
+    a handler, so every ``log.warning`` in this application was being silently
+    discarded at runtime -- the scheduler's expiry counts, the drainer's retry
+    notices, the webhook signature diagnostics, all of it.
+
+    It was invisible because the one message that DID appear -- the API_TOKEN
+    warning -- is emitted while the app is being built, before uvicorn takes
+    over logging. Everything after startup went nowhere, which is the worst
+    possible arrangement: it looks like logging works.
+
+    Only attaches a handler if the root logger has none, so a deployment that
+    configures logging properly is left alone.
+    """
+    root = logging.getLogger()
+    if not root.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s:    %(name)s | %(message)s"))
+        root.addHandler(handler)
+    root.setLevel(logging.DEBUG if settings.debug else logging.INFO)
+
+
 async def _run_checks(session: AsyncSession, clock: Clock) -> dict[str, Any]:
     """Real probes, replacing the Phase 0 placeholders.
 
@@ -122,6 +146,7 @@ async def _run_checks(session: AsyncSession, clock: Clock) -> dict[str, Any]:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    _configure_logging(settings)
 
     app = FastAPI(
         title="RevPilot AI",

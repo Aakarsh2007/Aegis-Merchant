@@ -1,0 +1,128 @@
+{
+  "_fixture_meta": {
+    "event_id": "TW3Rfq6VhWiuwC",
+    "note": "Delivered by Razorpay from 52.66.76.63, HMAC-verified against RAZORPAY_WEBHOOK_SECRET, acknowledged 200. Contact details redacted.",
+    "provenance": "captured_live_webhook",
+    "received_at": "2026-08-30T16:55:31.270Z",
+    "signature_verified": true,
+    "source": "a real signed Razorpay Test Mode delivery over a Cloudflare tunnel"
+  },
+  "account_id": "acc_TVgEITke1lMF46",
+  "contains": [
+    "payment_link",
+    "order",
+    "payment"
+  ],
+  "created_at": 1788108716,
+  "entity": "event",
+  "event": "payment_link.paid",
+  "payload": {
+    "order": {
+      "entity": {
+        "amount": 429900,
+        "amount_due": 0,
+        "amount_paid": 429900,
+        "attempts": 1,
+        "checkout": null,
+        "created_at": 1788108787,
+        "currency": "INR",
+        "description": null,
+        "entity": "order",
+        "id": "order_TW3PAOG4QCUmFv",
+        "notes": [],
+        "offer_id": null,
+        "receipt": "rvp_live_v2_1788108715",
+        "status": "paid"
+      }
+    },
+    "payment": {
+      "entity": {
+        "acquirer_data": {
+          "auth_code": "698334"
+        },
+        "amount": 429900,
+        "amount_refunded": 0,
+        "amount_transferred": 0,
+        "bank": null,
+        "base_amount": 429900,
+        "captured": true,
+        "card": {
+          "emi": false,
+          "entity": "card",
+          "id": "card_TW3RTCdnL1n757",
+          "international": false,
+          "issuer": "DCBL",
+          "last4": "1007",
+          "name": "",
+          "network": "Visa",
+          "sub_type": "consumer",
+          "token_iin": "410028000",
+          "type": "debit"
+        },
+        "card_id": "card_TW3RTCdnL1n757",
+        "contact": "REDACTED",
+        "created_at": 1788108919,
+        "currency": "INR",
+        "description": "#TW3NtsLuCF6ls5",
+        "email": "REDACTED",
+        "entity": "payment",
+        "error_code": null,
+        "error_description": null,
+        "error_reason": null,
+        "error_source": null,
+        "error_step": null,
+        "fee": 11160,
+        "fee_bearer": "platform",
+        "id": "pay_TW3RSr7ake8Qjc",
+        "international": false,
+        "invoice_id": null,
+        "method": "card",
+        "notes": [],
+        "order_id": "order_TW3PAOG4QCUmFv",
+        "refund_status": null,
+        "status": "captured",
+        "tax": 1702,
+        "vpa": null,
+        "wallet": null
+      }
+    },
+    "payment_link": {
+      "entity": {
+        "accept_partial": false,
+        "allow_full_payment": false,
+        "amount": 429900,
+        "amount_paid": 429900,
+        "cancelled_at": 0,
+        "created_at": 1788108716,
+        "currency": "INR",
+        "customer": {
+          "contact": "REDACTED",
+          "email": "REDACTED",
+          "name": "Ananya"
+        },
+        "description": "RevPilot - live webhook verification (attempt 2)",
+        "expire_by": 1788627115,
+        "expired_at": 0,
+        "first_min_partial_amount": 0,
+        "id": "plink_TW3NtsLuCF6ls5",
+        "notes": "REDACTED",
+        "notify": {
+          "email": "REDACTED",
+          "sms": false,
+          "whatsapp": false
+        },
+        "order_id": "order_TW3PAOG4QCUmFv",
+        "payment_plan": false,
+        "reference_id": "rvp_live_v2_1788108715",
+        "reminder_enable": false,
+        "reminders": {},
+        "short_url": "https://rzp.io/rzp/rhJq78pw",
+        "status": "paid",
+        "updated_at": 1788108928,
+        "upi_link": false,
+        "user_id": "",
+        "whatsapp_link": false
+      }
+    }
+  }
+}

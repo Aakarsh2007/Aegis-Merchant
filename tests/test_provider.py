@@ -233,6 +233,47 @@ class TestRazorpayProviderHTTP:
             await self.provider().create_payment_link(link_request())
 
     @respx.mock
+    @pytest.mark.parametrize(
+        "body",
+        [
+            # The documented shape.
+            {"error": {"code": "BAD_REQUEST_ERROR", "description": "nope"}},
+            # The shape Razorpay ACTUALLY returns on a 401 for a product that
+            # is not enabled on the account -- a plain string (INC-019).
+            {"error": "Unauthorized"},
+            # Defensive: neither shape.
+            {"error": ["unexpected"]},
+            {"message": "no error key at all"},
+        ],
+        ids=["documented_object", "plain_string", "list", "missing_key"],
+    )
+    async def test_every_error_shape_is_classified_not_crashed(
+        self, body: dict[str, object]
+    ) -> None:
+        """An unrecognised error body must still produce a provider error.
+
+        Assuming the documented object shape raised AttributeError, which is
+        neither ProviderRetryable nor ProviderPermanent -- so it escaped the
+        outbox's classification entirely and would have left the row in
+        SENDING. Found against the live API: /subscriptions returns
+        `{"error": "Unauthorized"}` when Subscriptions is not enabled.
+        """
+        respx.post(f"{RAZORPAY_API_BASE}/payment_links").mock(
+            return_value=httpx.Response(401, json=body)
+        )
+        with pytest.raises(ProviderPermanent):
+            await self.provider().create_payment_link(link_request())
+
+    @respx.mock
+    async def test_a_non_json_error_body_is_classified(self) -> None:
+        """An HTML error page from a proxy must not crash the caller either."""
+        respx.post(f"{RAZORPAY_API_BASE}/payment_links").mock(
+            return_value=httpx.Response(502, text="<html>Bad Gateway</html>")
+        )
+        with pytest.raises(ProviderRetryable):
+            await self.provider().create_payment_link(link_request())
+
+    @respx.mock
     async def test_duplicate_reference_detected(self) -> None:
         respx.post(f"{RAZORPAY_API_BASE}/payment_links").mock(
             return_value=httpx.Response(
