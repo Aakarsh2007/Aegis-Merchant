@@ -847,3 +847,58 @@ secret is not the problem, because that is the sentence that would have saved th
 **What was learned:** before asking somebody to change a configuration, be able to state what
 evidence would prove the change unnecessary. I could not, which means I was guessing with
 someone else's time.
+
+
+## INC-022 · Three of the twelve stopping rules could never fire
+
+**Symptom:** none. Twelve rules implemented, twelve rules unit-tested, termination proved by
+property test over 2,000 generated contexts per run, 878 tests green. Found by a systematic
+audit, not by anything breaking.
+
+**What was wrong.** `StoppingContext` is a dataclass with sensible defaults. The agent built
+it field by field in `nodes._stopping_context` — and never set five of them:
+
+| Field | Default it silently kept | Rule it disabled |
+|---|---|---|
+| `autopilot_enabled` | `True` | **S-12 kill switch** |
+| `actions_today` | `0` | **S-11 merchant budget** |
+| `discount_exposure_mtd_paise` | `0` | **S-11 merchant budget** |
+| `promise_active` | `False` | **S-10 promise-to-pay freeze** |
+| `promised_at` | `None` | **S-10 promise-to-pay freeze** |
+
+So `s12_kill_switch` evaluated `if not ctx.autopilot_enabled` against a constant `True`,
+forever. The merchant's kill switch — described in §8.2 as *"one dashboard toggle, effective
+immediately"*, the control that halts everything — **could not halt anything.**
+
+**Why every test passed.** The property tests hand `StoppingContext` objects to `evaluate()`
+directly, so hypothesis sets those fields itself and the rules behave correctly. The rules
+were never wrong. They were never *fed*. This is the INC-006 shape one level up: proven in
+isolation, disconnected in practice, and the proof is what makes it invisible — twelve
+passing rule tests read as twelve working rules.
+
+**The compounding factor:** the defaults are all the *permissive* value. `autopilot_enabled`
+defaulting to `True` means the failure mode is "the agent keeps acting", not "the agent stops".
+A dead safety control that defaults to *off* announces itself in about a minute; one that
+defaults to *on* is silent forever.
+
+**Fix:** the five fields are carried on `RecoveryState`, populated by the batch from
+`merchants.autopilot_enabled` and the promises table, and passed into the stopping context.
+`POST /api/v1/autopilot/toggle` was also specified in §20 and missing — a control with no
+operator interface, which is how it went unnoticed.
+
+**Regression test:** `tests/test_controls.py` runs a real case through the actual graph with
+autopilot off and asserts it reaches `SUPPRESSED` via `S12_KILL_SWITCH`, plus a control case
+with autopilot on that must *not* be suppressed — a graph that suppressed everything would
+pass the first test alone. Same for S-10 and S-11.
+
+The systematic guard is `test_every_stopping_rule_input_is_reachable_from_state`: it reflects
+over `StoppingContext`'s fields and fails if the agent does not populate one. A field added
+later without being plumbed through is caught by a test rather than by an incident.
+
+Verified by sabotage: un-wiring the five fields fails exactly those four tests.
+
+**What was learned:** a dataclass default is a decision, and on a safety-critical input it is
+a decision to disable the control. `StoppingContext` should arguably have required these
+fields with no default at all, so that forgetting one is a `TypeError` at construction rather
+than a rule that quietly never fires. Defaults are for values that are genuinely optional, and
+"is the kill switch on" is not optional.

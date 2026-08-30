@@ -9,25 +9,41 @@ Razorpay AI Buildathon 2026 · Track: **AI Revenue Recovery**
 
 [![CI](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml/badge.svg)](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml)
 
-> **Build status: Phase 14 of 15 complete.** Built and tested: the injected clock,
-> the 18-table schema and seeded corpus, the signed-webhook boundary, the
-> deterministic classifier, twelve stopping rules with a property-based termination
-> proof, the policy firewall and capability token, the LLM adapter stack with a
-> committed response cache, the seven-node agent graph, the transactional outbox,
-> attribution with a holdout control arm, the SHA-256 audit chain and its public
-> verifier, bearer auth, HITL approvals, the template render boundary, and the REST +
-> SSE surface, the Command Center, the batch runner, all four playbooks, the morning
-> briefing and the chaos suite, and **real inbound webhooks verified end to end against
-> live Razorpay** (see below). Remaining: the eval harness and demo video (15).
+> **Status: complete and running.** 900+ tests, `mypy --strict` clean, CI green.
+> Clone it and `python tasks.py demo` — no credentials, no Docker, no Postgres.
 >
-> The full architecture, and the reasoning behind every choice in it, is in
-> [`workflow.md`](workflow.md) — a build contract written before the first line of code.
->
-> **Every rupee figure below carries a provenance badge**, and the API enforces that
-> as a type rather than a convention: `RAZORPAY_VERIFIED` means a signed webhook
-> proves it, `SIMULATED` means real machinery over seeded inputs, `ESTIMATED` means a
-> projection. Nothing has run against live production traffic, and no figure claims
-> otherwise.
+> The full architecture and the reasoning behind every choice is in
+> [`workflow.md`](workflow.md), a build contract written before the first line of
+> code. Twenty-two things broke along the way and each is written up in
+> [`docs/INCIDENTS.md`](docs/INCIDENTS.md), wrong theories included.
+
+---
+
+## The number, and why it is smaller than the one you expected
+
+Over 210 recovery cases, with 39 of them deliberately **never contacted**:
+
+| | |
+|---|---|
+| Gross recovered | **₹2,02,760** — what a dashboard would show |
+| **Net incremental** | **₹60,217** — what we actually caused |
+| Absolute lift | 6.2% (treatment 29.2%, control 23.1%) |
+| Statistically significant | **No.** 39 control cases; the intervals overlap. |
+
+**Nearly a quarter of the control group paid without us.** Reporting the gross
+figure would overstate our contribution by roughly three times, so the system
+refuses to: `/metrics/overview` cannot return gross without also returning net,
+and a lift that is not distinguishable from zero says so *on the report*, not in
+a boolean a caller might forget to render.
+
+That is the whole argument. An agent that moves money is only as trustworthy as
+its willingness to report a smaller number.
+
+> **Provenance, enforced as a type.** Every rupee figure carries a badge —
+> `RAZORPAY_VERIFIED` (a signed webhook proves it), `SIMULATED` (real machinery,
+> seeded inputs), `ESTIMATED` (a projection). `Figure` cannot be constructed
+> without one, and a test walks the API response looking for anything
+> money-shaped, so it fails when a tile is *added* without a badge.
 
 ## The corpus, measured
 
@@ -73,19 +89,41 @@ have overstated our contribution by a factor of three, and the system refuses to
 
 ## Run it
 
-No credentials. No Docker, Postgres, Redis or message broker. Two commands.
-
 ```bash
 pip install -r apps/api/requirements.txt
-python tasks.py demo          # or: make demo
+cd apps/web && npm install && cd ../..     # optional: the dashboard
+python tasks.py demo
 ```
 
-Then open <http://localhost:8000/docs> · health at `/healthz` ·
-full dependency report at `/api/v1/health/deep`.
+`demo` seeds the corpus, runs 210 cases through the agent (~3 s, zero API
+calls), starts the API and opens the dashboard. Re-running is idempotent.
 
-`python tasks.py` on its own lists every task. `make <task>` is an exact alias
-(`make` is not installed on Windows, so `tasks.py` is the source of truth and the
-Makefile delegates to it).
+| | |
+|---|---|
+| Dashboard | <http://localhost:3000> |
+| API docs | <http://localhost:8000/docs> |
+| Verify the audit chain | <http://localhost:8000/api/v1/audit/verify> |
+| Dependency report | <http://localhost:8000/api/v1/health/deep> |
+
+### Four things to try, in order
+
+```bash
+# 1. Verify the audit chain, then break it, then verify again.
+curl localhost:8000/api/v1/audit/verify
+curl -X POST localhost:8000/api/v1/audit/tamper      -H 'content-type: application/json' -d '{"block_index":2,"mode":"payload"}'
+curl localhost:8000/api/v1/audit/verify     # valid:false, and it names the block
+
+# 2. Pull the kill switch and watch the agent stop.
+curl -X POST localhost:8000/api/v1/autopilot/toggle      -H 'content-type: application/json' -d '{"enabled":false}'
+
+# 3. Try to LOOSEN a policy bound. It refuses.
+curl -X POST localhost:8000/api/v1/policy      -H 'content-type: application/json' -d '{"max_discount_pct":90}'   # 409
+
+# 4. Read what the agent chose NOT to do.
+curl localhost:8000/api/v1/briefing/today
+```
+
+`python tasks.py` lists every command. `make <task>` is an exact alias.
 
 ### Progressive fidelity — every step is free
 
@@ -258,6 +296,47 @@ tasks.py                   every project command
 
 ---
 
+## Is this a product, or a demo?
+
+A fair question, answered precisely.
+
+**What is production-shaped and would survive contact with real traffic:** the
+signed-webhook boundary, the deterministic classifier, the policy firewall and
+its capability token, the twelve stopping rules, the transactional outbox with
+crash recovery, the attribution rules, the audit chain, the approval gate with
+its hash check, and the template render boundary. These are not sketches. They
+have edge-case tests, property tests, and in several cases sabotage tests that
+prove the test would catch the bug it was written for.
+
+**What is deliberately single-tenant.** Six of the eighteen tables carry a
+`merchant_id`; the other twelve reach a merchant transitively through a case. No
+API route filters by merchant, and the bearer token is one shared secret rather
+than a per-merchant credential. Turning this into multi-tenant SaaS is a real
+piece of work — scoping every query, per-merchant Razorpay credentials with
+encryption at rest, an onboarding flow, and a migration — and it is **not
+started**. Claiming otherwise would be the kind of overstatement the rest of
+this project exists to avoid.
+
+**What is simulated, and only this:** whether a customer pays after we contact
+them. The response model is a declared parameter (21% baseline self-recovery,
+7–14% treated uplift by playbook), printed on every batch run. Every settled
+case is written with a `sim_evt_` verifier so it reports as `SIMULATED` and
+**cannot reach the `RAZORPAY_VERIFIED` tile** — which is why that tile honestly
+reads ₹0.00.
+
+**What is mocked:** WhatsApp and SMS delivery. DLT template registration with
+Indian carriers is neither free nor instant, so the messages are rendered
+through the real template boundary and then not sent. The rendering is real; the
+delivery is not.
+
+**What would take this to production**, in order of effort: DLT registration and
+a messaging provider; multi-tenant scoping; Postgres instead of SQLite (the
+outbox is what makes that a swap rather than a rewrite); per-merchant encrypted
+credentials; and an onboarding flow. Nothing in that list requires redesigning
+what is here.
+
+---
+
 ## Known limitations
 
 Named plainly, because volunteering them is cheaper than having them found.
@@ -283,6 +362,20 @@ Named plainly, because volunteering them is cheaper than having them found.
 - **NPCI mandate timings** are implemented as the correct *mechanism* with the exact
   numbers as config flagged `VERIFY_BEFORE_PRODUCTION`. Claiming certainty we do not
   have would be worse than flagging it.
+
+---
+
+## Deploying it
+
+For judging, **running it locally is the best option** — a judge who clones the
+repo gets exactly what you have, with no environment drift and no credentials.
+
+If you do want it hosted: **frontend on Vercel, API on Render or Railway.** The
+API keeps state in SQLite and runs an in-process event bus, so it needs a
+persistent disk and a single long-lived instance — which is why the API does
+*not* go on Vercel's serverless runtime. Step-by-step instructions, the two
+things that will bite you, and a production checklist are in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ---
 

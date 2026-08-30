@@ -135,6 +135,63 @@
         "title": "Playbook",
         "type": "string"
       },
+      "PolicyRequest": {
+        "additionalProperties": false,
+        "description": "Tightenable bounds. Every field optional; omitted fields are unchanged.",
+        "properties": {
+          "daily_action_budget": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Action Budget"
+          },
+          "max_autonomous_amount_paise": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Autonomous Amount Paise"
+          },
+          "max_contacts_48h": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Contacts 48H"
+          },
+          "max_discount_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Discount Pct"
+          }
+        },
+        "title": "PolicyRequest",
+        "type": "object"
+      },
       "TamperRequest": {
         "additionalProperties": false,
         "description": "Which block to corrupt, and how.",
@@ -155,6 +212,32 @@
           "block_index"
         ],
         "title": "TamperRequest",
+        "type": "object"
+      },
+      "ToggleRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "ToggleRequest",
         "type": "object"
       },
       "ValidationError": {
@@ -505,6 +588,119 @@
         "summary": "Recompute the audit chain and report any divergence",
         "tags": [
           "audit"
+        ]
+      }
+    },
+    "/api/v1/autopilot": {
+      "get": {
+        "operationId": "autopilot_state_api_v1_autopilot_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Autopilot State Api V1 Autopilot Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Current kill-switch state",
+        "tags": [
+          "control"
+        ]
+      }
+    },
+    "/api/v1/autopilot/toggle": {
+      "post": {
+        "description": "Halt or resume autonomous action for every merchant on this instance.\n\nIdempotent: setting it to its current value is a no-op that still returns\n200, because a dashboard toggle double-clicked must not error.",
+        "operationId": "toggle_autopilot_api_v1_autopilot_toggle_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToggleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Toggle Autopilot Api V1 Autopilot Toggle Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The kill switch",
+        "tags": [
+          "control"
         ]
       }
     },
@@ -1121,6 +1317,120 @@
         "summary": "Firing counts by rule id, including zeroes",
         "tags": [
           "metrics"
+        ]
+      }
+    },
+    "/api/v1/policy": {
+      "post": {
+        "description": "Tighten a bound. Loosening is refused with 409.\n\nThe asymmetry is the point. Tightening reduces what the agent may do and is\nsafe to expose; loosening unlocks the firewall and must cost more than a\nPOST. An endpoint that could raise the discount ceiling is an endpoint worth\nattacking.",
+        "operationId": "tighten_policy_api_v1_policy_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Tighten Policy Api V1 Policy Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tighten a policy bound at runtime",
+        "tags": [
+          "control"
+        ]
+      }
+    },
+    "/api/v1/simulation/batch": {
+      "post": {
+        "description": "Kick off a batch without a terminal.\n\nDeliberately synchronous and deliberately capped. The batch takes about\ntwo seconds against the committed cache, so streaming progress would be\nmore machinery than the wait justifies -- and a fire-and-forget version\nwould need a job table to report failures honestly.",
+        "operationId": "run_batch_endpoint_api_v1_simulation_batch_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Run Batch Endpoint Api V1 Simulation Batch Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "[dev only] Run the corpus through the agent",
+        "tags": [
+          "simulation"
         ]
       }
     },

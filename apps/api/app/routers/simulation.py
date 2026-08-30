@@ -135,6 +135,55 @@ async def inject(
     }
 
 
+@router.post("/batch", summary="[dev only] Run the corpus through the agent")
+async def run_batch_endpoint(
+    settings: Annotated[Settings, Depends(get_settings)],
+    _principal: Annotated[Principal, Depends(require_api_token)],
+) -> dict[str, Any]:
+    """Kick off a batch without a terminal.
+
+    Deliberately synchronous and deliberately capped. The batch takes about
+    two seconds against the committed cache, so streaming progress would be
+    more machinery than the wait justifies -- and a fire-and-forget version
+    would need a job table to report failures honestly.
+    """
+    _guard(settings)
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from app.agent.nodes import AgentDeps
+    from app.core.clock import SystemClock
+    from app.db.session import get_sessionmaker
+    from app.llm.cache import CachedAdapter, ResponseCache
+    from app.workers.batch import run_batch
+
+    clock = SystemClock()
+    factory: async_sessionmaker[Any] = get_sessionmaker()
+    result = await run_batch(
+        factory,
+        clock=clock,
+        deps=AgentDeps(
+            clock=clock,
+            adapter=CachedAdapter(
+                cache=ResponseCache.load(), live=None, model=settings.gemini_model
+            ),
+            control_arm_fraction=settings.control_arm_fraction,
+            experiment_key="revpilot_recovery_v1",
+        ),
+    )
+    return {
+        "cases": result.cases_created,
+        "by_status": result.by_status,
+        "treated": result.treated,
+        "control": result.control,
+        "simulated_recovered_paise": result.simulated_recovered_paise,
+        "note": (
+            "Every settled case carries a sim_evt_ verifier, so it reports as "
+            "SIMULATED and can never reach the RAZORPAY VERIFIED tile."
+        ),
+    }
+
+
 def active_fault() -> str | None:
     """Read by the provider adapter. Returns None in production, always."""
     if not get_settings().simulation_allowed:

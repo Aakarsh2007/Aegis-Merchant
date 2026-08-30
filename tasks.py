@@ -16,8 +16,11 @@ from __future__ import annotations
 
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
+import time
+import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 
@@ -148,7 +151,7 @@ def api() -> int:
 @task("web", "Start the Command Center on :3000")
 def web() -> int:
     if not (WEB / "package.json").exists():
-        print("• web app not scaffolded yet (Phase 12)")
+        print("! the dashboard is not scaffolded; see apps/web/README or docs")
         return 0
     npm = shutil.which("npm")
     if npm is None:
@@ -157,21 +160,89 @@ def web() -> int:
     return run([npm, "run", "dev"], cwd=WEB)
 
 
-@task("demo", "One-command judge demo: seed, then start API + web")
+@task("demo", "One command: seed, run the batch, start the API and the dashboard")
 def demo() -> int:
-    print("\nRevPilot AI — Judge Mode")
-    print("  No credentials required. No Docker, Postgres or Redis.")
-    print("  Add GEMINI_API_KEY for live reasoning; RAZORPAY_* for real Test Mode links.\n")
-    print("• Phases 1-12 not yet built; starting the API only.")
-    return api()
+    """Everything a judge needs, in one command.
 
+    Seeds only if the database is absent, and runs the batch only if there are
+    no cases — so re-running is fast and produces identical numbers rather than
+    doubled ones.
 
-# ---------------------------------------------------------------------------
-# placeholders — each is implemented by its owning phase
-# ---------------------------------------------------------------------------
-def _pending(phase: str) -> int:
-    print(f"• not implemented yet — {phase}")
-    return 0
+    The API starts as a child process and the dashboard runs in the foreground,
+    so Ctrl+C stops both. Two terminals work equally well and are what the
+    README suggests for a demo you want to keep control of.
+    """
+    print()
+    print("  RevPilot AI - Judge Mode")
+    print("  No credentials required. No Docker, Postgres, Redis or Kafka.")
+    print("  Add GEMINI_API_KEY for live reasoning; RAZORPAY_* for real Test Mode links.")
+    print()
+
+    runtime_db = API / "revpilot.db"
+    if not runtime_db.exists():
+        seed_db = ROOT / "data" / "revpilot.seed.db"
+        if seed_db.exists():
+            shutil.copy(seed_db, runtime_db)
+            print("  [1/4] copied the committed demo database")
+        else:
+            print("  [1/4] seeding the 420-transaction corpus ...")
+            if seed() != 0:
+                return 1
+    else:
+        print("  [1/4] database present")
+
+    with sqlite3.connect(runtime_db) as conn:
+        try:
+            cases = conn.execute("select count(*) from recovery_cases").fetchone()[0]
+        except sqlite3.OperationalError:
+            cases = 0
+    if cases == 0:
+        print("  [2/4] running the corpus through the agent (~3 s, no API calls) ...")
+        if run([PY, "-m", "app.workers.batch_cli"], cwd=API) != 0:
+            return 1
+    else:
+        print(f"  [2/4] {cases} cases already present; skipping the batch")
+
+    npm = shutil.which("npm")
+    if npm is None or not (WEB / "node_modules").exists():
+        print("  [3/4] dashboard dependencies missing - run `npm install` in apps/web")
+        print("  [4/4] starting the API only")
+        print()
+        print("        API docs   http://localhost:8000/docs")
+        print()
+        return api()
+
+    print("  [3/4] starting the API on :8000 ...")
+    api_process = subprocess.Popen(
+        [PY, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"],
+        cwd=API,
+    )
+    try:
+        for _ in range(40):
+            try:
+                with urllib.request.urlopen("http://localhost:8000/healthz", timeout=1):
+                    break
+            except Exception:
+                time.sleep(0.5)
+        else:
+            print("! the API did not come up; see the output above")
+            return 1
+
+        print("  [4/4] starting the dashboard on :3000 ...")
+        print()
+        print("        Dashboard    http://localhost:3000")
+        print("        API docs     http://localhost:8000/docs")
+        print("        Verify chain http://localhost:8000/api/v1/audit/verify")
+        print()
+        print("        Ctrl+C stops both.")
+        print()
+        return run([npm, "run", "dev"], cwd=WEB)
+    finally:
+        api_process.terminate()
+        try:
+            api_process.wait(timeout=10)
+        except subprocess.TimeoutExpired:  # pragma: no cover
+            api_process.kill()
 
 
 @task("seed", "Seed the 420-transaction GlowKart corpus (runtime + committed demo DB)")
@@ -210,9 +281,14 @@ def batch() -> int:
     return run([PY, "-m", "app.workers.batch_cli", *sys.argv[2:]], cwd=API)
 
 
-@task("chaos", "Inject a fault (Phase 13)")
+@task("chaos", "Inject a fault into the running API")
 def chaos() -> int:
-    return _pending("Phase 13")
+    """Inject or clear a fault. Requires the API to be running.
+
+    `python tasks.py chaos provider_down` / `python tasks.py chaos clear`
+    """
+    fault = sys.argv[2] if len(sys.argv) > 2 else "clear"
+    return run([PY, "-m", "app.tools.chaos_cli", fault], cwd=API)
 
 
 @task("verify-audit", "Recompute and verify the SHA-256 audit chain")

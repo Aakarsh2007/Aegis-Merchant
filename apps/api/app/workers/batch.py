@@ -53,6 +53,7 @@ from app.db.enums import (
     ExperimentArm,
     PaymentStatus,
     Playbook,
+    PromiseStatus,
 )
 from app.db.ids import idempotency_hash, new_id
 from app.db.models import (
@@ -61,7 +62,9 @@ from app.db.models import (
     Consent,
     Customer,
     ExperimentAssignment,
+    Merchant,
     PaymentAttempt,
+    PromiseToPay,
     RecoveryAction,
     RecoveryCase,
 )
@@ -164,6 +167,24 @@ async def run_batch(
     """Put the corpus through the agent."""
     async with factory() as session:
         await _clear(session)
+        # Merchant-level facts, loaded once. Without these the stopping context
+        # falls back to dataclass defaults and S-10/S-11/S-12 cannot fire
+        # (INC-022) -- the rules would be present, proven, and never consulted.
+        merchants = {m.id: m for m in (await session.execute(select(Merchant))).scalars().all()}
+        # Keyed by case: a promise is made against a specific case, not a
+        # customer in general. The seeded corpus contains none, so this is
+        # empty in the demo -- but the lookup is real, and S-10 fires the
+        # moment one exists.
+        promises = {
+            p.case_id
+            for p in (
+                await session.execute(
+                    select(PromiseToPay).where(PromiseToPay.status == PromiseStatus.ACTIVE)
+                )
+            )
+            .scalars()
+            .all()
+        }
         rows = (
             await session.execute(
                 select(PaymentAttempt, Customer, Consent)
@@ -175,6 +196,8 @@ async def run_batch(
 
     rng = random.Random(SEED)
     chain = AuditChain(clock)
+    actions_today = 0
+    discount_exposure_paise = 0
     by_status: dict[str, int] = {}
     created = treated = control = settled = 0
     recovered_paise = 0
@@ -210,6 +233,16 @@ async def run_batch(
             consent_dnd=consent.dnd_registered,
             consent_opted_out=consent.opted_out,
             consent_transactional=consent.transactional,
+            autopilot_enabled=(
+                merchants[attempt.merchant_id].autopilot_enabled
+                if attempt.merchant_id in merchants
+                else True
+            ),
+            promise_active=case_id in promises,
+            # Counted as the batch proceeds, so the budget guard sees the
+            # spend this run has already committed rather than a stale total.
+            actions_today=actions_today,
+            discount_exposure_mtd_paise=discount_exposure_paise,
             order_status="created",
             window_expires_at=now + timedelta(hours=WINDOW_HOURS[playbook]),
         )
@@ -378,6 +411,8 @@ async def run_batch(
             # difference between a recovery and a burnt re-presentation.
             if acted and final.proposal is not None:
                 applied = final.policy_applied
+                actions_today += 1
+                discount_exposure_paise += applied.discount_amount_paise if applied else 0
                 session.add(
                     RecoveryAction(
                         id=new_id("action"),

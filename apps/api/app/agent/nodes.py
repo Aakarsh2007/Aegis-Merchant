@@ -111,6 +111,15 @@ def _stopping_context(
         "contacts_24h": state.contacts_24h,
         "contacts_48h": state.contacts_48h,
         "last_contact_at": state.last_contact_at,
+        # Merchant-level facts. Omitting these left S-10, S-11 and S-12
+        # evaluating against dataclass defaults, so they could never fire
+        # (INC-022). A safety control that cannot trigger is worse than an
+        # absent one, because it is counted as present.
+        "autopilot_enabled": state.autopilot_enabled,
+        "promise_active": state.promise_active,
+        "promised_at": state.promised_at,
+        "actions_today": state.actions_today,
+        "discount_exposure_mtd_paise": state.discount_exposure_mtd_paise,
     }
     base.update(overrides)
     return StoppingContext(**base)  # type: ignore[arg-type]

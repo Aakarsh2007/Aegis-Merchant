@@ -836,3 +836,24 @@ itself, because the alternative is finding out tomorrow when deliveries stop.
 **Also decided:** the task checks `/healthz` before starting and refuses if nothing answers.
 A tunnel to a dead port returns 502 for every delivery, which looks exactly like a signature
 failure and is not.
+
+## DEC-036 · 2026-08-30 · The policy endpoint tightens only
+
+**Phase:** 15 (audit)
+
+**Decision:** `POST /api/v1/policy` accepts a bound only if it is **stricter** than the current
+one. A request that would loosen any bound is refused with 409, and a mixed request is
+refused **entirely** rather than half-applied.
+
+**Rejected:** a symmetric endpoint. Tightening reduces what the agent may do and is safe to
+expose over an API. Loosening unlocks the firewall — raising a discount ceiling or a contact
+cap — and an endpoint that can do that is an endpoint worth attacking, and an endpoint a bad
+deploy can misuse. Loosening requires editing configuration and restarting, which is
+deliberately more friction than a POST.
+
+**Rejected:** partial application of a mixed request. Applying the tightening and skipping the
+loosening would leave the caller unsure which bounds are in force, and "some of your changes
+were applied" is the worst possible answer about a safety limit.
+
+**Cost of being wrong:** a merchant who genuinely wants a looser bound needs a restart. That
+is the correct amount of friction for the direction that costs money.

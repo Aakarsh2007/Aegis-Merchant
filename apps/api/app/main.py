@@ -24,6 +24,7 @@ from app.routers import approvals as approvals_router
 from app.routers import audit as audit_router
 from app.routers import briefing as briefing_router
 from app.routers import cases as cases_router
+from app.routers import control as control_router
 from app.routers import dlq as dlq_router
 from app.routers import metrics as metrics_router
 from app.routers import simulation as simulation_router
@@ -210,6 +211,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(stream_router.router)
     app.include_router(briefing_router.router)
     app.include_router(simulation_router.router)
+    app.include_router(control_router.router)
 
     @app.get("/healthz", tags=["health"], summary="Liveness probe")
     async def healthz() -> dict[str, Any]:

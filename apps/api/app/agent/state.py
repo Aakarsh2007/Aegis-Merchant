@@ -94,6 +94,26 @@ class RecoveryState:
     consent_marketing: bool = False
     consent_dnd: bool = False
     consent_opted_out: bool = False
+
+    # --- merchant-level facts (INC-022) ---------------------------------
+    #
+    # These four were missing, and their absence silently disabled three of
+    # the twelve stopping rules. `StoppingContext` supplied safe-looking
+    # defaults -- autopilot on, no promise, zero spend -- and nothing ever
+    # overrode them, so S-10, S-11 and S-12 evaluated against constants and
+    # could never fire.
+    #
+    # The rules were correct. The property tests proved they terminate. They
+    # were simply never fed, which is the INC-006 shape one level up: proven
+    # in isolation, disconnected in practice.
+    #: The merchant's kill switch. False halts everything for them.
+    autopilot_enabled: bool = True
+    #: An active promise to pay freezes outreach until promised_at + 24h.
+    promise_active: bool = False
+    promised_at: datetime | None = None
+    #: Merchant-wide spend guards, counted for today and month-to-date.
+    actions_today: int = 0
+    discount_exposure_mtd_paise: int = 0
     order_status: str | None = None
     rail_alternative: str | None = None
     rail_degraded: bool = False
