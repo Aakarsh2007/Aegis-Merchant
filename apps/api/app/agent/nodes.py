@@ -16,15 +16,14 @@ import time
 from dataclasses import replace
 from typing import Protocol
 
+from app.agent.playbooks import select_strategy, violations
 from app.agent.state import NodeTrace, RecoveryState
 from app.core.clock import Clock
 from app.db.enums import (
     CaseStatus,
-    Channel,
     ExperimentArm,
     FailureCategory,
     LLMTask,
-    MessageClass,
     PolicyVerdict,
     RecoveryStrategy,
 )
@@ -267,13 +266,11 @@ async def strategise_node(state: RecoveryState, deps: AgentDeps) -> RecoveryStat
     if diagnosis is None:
         proposal = RecoveryProposal(strategy=RecoveryStrategy.NO_ACTION)
     elif diagnosis.requires_reauth:
-        # Retrying a dead mandate cannot succeed and burns a re-presentation,
-        # so this is decided deterministically rather than asked about.
-        proposal = RecoveryProposal(
-            strategy=RecoveryStrategy.MANDATE_REAUTH,
-            message_class=MessageClass.TRANSACTIONAL,
-            rationale="mandate is not active; re-authorisation required",
-        )
+        # Retrying a dead mandate cannot succeed and burns a scheme
+        # re-presentation, so this is decided deterministically rather than
+        # asked about. Routed through the playbook module so there is one
+        # place that knows what a dead mandate implies.
+        proposal = _fallback_proposal(diagnosis, state)
     elif diagnosis.category is FailureCategory.RISK_BLOCKED:
         proposal = RecoveryProposal(
             strategy=RecoveryStrategy.NO_ACTION,
@@ -294,14 +291,39 @@ async def strategise_node(state: RecoveryState, deps: AgentDeps) -> RecoveryStat
         output = result.output
         consulted = result.source.value == "LIVE"
         if isinstance(output, ProposalOutput):
-            proposal = RecoveryProposal(
-                strategy=output.strategy,
-                discount_pct=output.discount_pct,
-                link_validity_minutes=output.link_validity_minutes,
-                channel=output.channel,
-                message_class=output.message_class,
-                rationale=output.rationale,
+            # The model may ARGUE for an action; it may not select one the
+            # playbook forbids. A plausible-sounding rationale is precisely
+            # what a model produces for a wrong action, so the check is on the
+            # action itself rather than on how well it was justified.
+            problems = violations(
+                state.playbook,
+                output.strategy,
+                output.discount_pct,
+                requires_reauth=diagnosis.requires_reauth,
             )
+            if problems:
+                proposal = _fallback_proposal(diagnosis, state)
+                proposal = RecoveryProposal(
+                    strategy=proposal.strategy,
+                    discount_pct=proposal.discount_pct,
+                    link_validity_minutes=proposal.link_validity_minutes,
+                    channel=proposal.channel,
+                    message_class=proposal.message_class,
+                    rationale=(
+                        f"model proposed {output.strategy.value}, rejected by the "
+                        f"{state.playbook.value} playbook ({problems[0]}); "
+                        f"using {proposal.strategy.value}"
+                    ),
+                )
+            else:
+                proposal = RecoveryProposal(
+                    strategy=output.strategy,
+                    discount_pct=output.discount_pct,
+                    link_validity_minutes=output.link_validity_minutes,
+                    channel=output.channel,
+                    message_class=output.message_class,
+                    rationale=output.rationale,
+                )
         else:
             proposal = _fallback_proposal(diagnosis, state)
     else:
@@ -326,18 +348,25 @@ async def strategise_node(state: RecoveryState, deps: AgentDeps) -> RecoveryStat
 
 
 def _fallback_proposal(diagnosis: object, state: RecoveryState) -> RecoveryProposal:
-    """Cheapest action that could work, at zero discount."""
-    same_rail = bool(getattr(diagnosis, "retry_same_rail", True))
+    """The playbook's own answer, at zero discount.
+
+    Playbook-aware since Phase 13. The previous version issued a fresh payment
+    link for everything, which is right for a failed checkout and a category
+    error for an overdue invoice or a live subscription mandate.
+    """
+    choice = select_strategy(
+        state.playbook,
+        category=getattr(diagnosis, "category", None),
+        requires_reauth=bool(getattr(diagnosis, "requires_reauth", False)),
+        retry_same_rail=bool(getattr(diagnosis, "retry_same_rail", True)),
+        rail_alternative=state.rail_alternative,
+    )
     return RecoveryProposal(
-        strategy=(
-            RecoveryStrategy.FRESH_LINK_SAME_RAIL
-            if same_rail or state.rail_alternative is None
-            else RecoveryStrategy.FRESH_LINK_ALT_RAIL
-        ),
+        strategy=choice.strategy,
         discount_pct=0.0,
-        channel=Channel.WHATSAPP,
-        message_class=MessageClass.TRANSACTIONAL,
-        rationale="deterministic: cheapest action, no discount",
+        channel=choice.channel,
+        message_class=choice.message_class,
+        rationale=f"deterministic: {choice.rationale}",
     )
 
 
@@ -406,10 +435,17 @@ async def policy_node(state: RecoveryState, deps: AgentDeps) -> RecoveryState:
 
 
 def _blocked_status(reasons: tuple[str, ...]) -> CaseStatus:
-    """A block is not one thing. A control-arm case is doing its job."""
+    """A block is not one thing. A control-arm case is doing its job.
+
+    The control branch returns OBSERVED_NO_ACTION, not RESOLVED_ORGANIC
+    (INC-018). The two are easy to conflate and mean opposite things to the
+    attribution layer: "we deliberately did nothing" versus "money arrived
+    without us". Returning the latter for a case that had not settled counted
+    every held case as a payment and inverted the measured lift.
+    """
     joined = " ".join(reasons).lower()
     if "control" in joined:
-        return CaseStatus.RESOLVED_ORGANIC
+        return CaseStatus.OBSERVED_NO_ACTION
     if "s-01" in joined or "resolved" in joined:
         return CaseStatus.RESOLVED_ORGANIC
     if "s-06" in joined or "window" in joined:

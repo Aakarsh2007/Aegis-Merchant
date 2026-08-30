@@ -761,3 +761,55 @@ degrades one card rather than blanking the page.
 
 **Cost of being wrong:** a visibly broken card instead of a plausibly wrong number. That is
 the correct direction.
+
+## DEC-033 · 2026-08-30 · The model may argue for an action; it may not choose one the playbook forbids
+
+**Phase:** 13
+
+**Decision:** `agent/playbooks.py::violations()` runs against the **LLM's** proposal as well as
+our own deterministic one. A forbidden strategy is replaced with the playbook's own choice,
+and the substitution is recorded in the rationale so the trace shows what the model wanted
+and why it was overruled.
+
+**Rejected:** trusting the proposal because its rationale reads well. A plausible-sounding
+justification is precisely what a model produces for a wrong action — that is the failure
+mode, not an aberration — so the check is on the *action*, never on how well it was argued
+for.
+
+**What it caught immediately.** The model proposed `FRESH_LINK_SAME_RAIL` for eight overdue
+B2B invoices. Defensible in isolation: a payment link does collect an invoice. Wrong in
+context: accounts payable need the invoice number, amount and due date restated so they can
+reconcile it, and "here is a fresh payment link" is consumer-checkout language. The first
+version of the forbidden set missed this — it blocked only `INCENTIVISED_LINK` — and the
+batch showed `RECEIVABLE → FRESH_LINK_SAME_RAIL ×8` in the routing table.
+
+**Cost of being wrong:** the agent is less able to be creative on strategy. That is the
+intended trade: strategy is where a wrong choice costs a scheme re-presentation or writes off
+a receivable, and neither is a decision worth delegating for the upside of novelty.
+
+---
+
+## DEC-034 · 2026-08-30 · The subscription split, and why it is the most expensive decision here
+
+**Phase:** 13
+
+**Decision:** a subscription failure routes on whether the **mandate is alive**, not on the
+amount or the customer:
+
+| Signal | Action | Why the other one is wrong |
+|---|---|---|
+| `INSUFFICIENT_FUNDS` — mandate alive | `MANDATE_RETRY` | A fresh link works *once* and converts a recurring customer into a one-off payment, losing every future collection |
+| `MANDATE_INVALID` / `requires_reauth` | `MANDATE_REAUTH` | Re-presenting cannot succeed and **burns a scheme re-presentation**, of which NPCI permits only a few before penalties |
+
+Both arrive as "subscription payment failed". Measured across the corpus the split is 13 / 11
+on 24 cases, so getting it wrong is not a corner case — it is roughly half the playbook.
+
+**Rejected:** treating the two alike and retrying everything. It is the cheaper
+implementation and it loses money in both directions at once.
+
+**Also decided:** `requires_reauth` overrides the category. If the classifier says the mandate
+is dead, nothing else about the failure matters, and a test asserts the two paths cannot be
+collapsed by a refactor — which every individual assertion would still pass.
+
+**Cost of being wrong:** a live mandate gets re-presented when a link would have converted
+sooner. Recoverable. The opposite error is not.

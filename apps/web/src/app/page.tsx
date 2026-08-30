@@ -19,8 +19,10 @@ import { ApprovalsQueue } from "@/components/ApprovalsQueue";
 import { AttributionPanel } from "@/components/AttributionPanel";
 import { AuditVerifier } from "@/components/AuditVerifier";
 import { CasesTable } from "@/components/CasesTable";
+import { ChaosPanel } from "@/components/ChaosPanel";
 import { CostPanel } from "@/components/CostPanel";
 import { MetricsBar } from "@/components/MetricsBar";
+import { MorningBriefing } from "@/components/MorningBriefing";
 import { PipelineStream } from "@/components/PipelineStream";
 import { StoppingRulesPanel } from "@/components/StoppingRulesPanel";
 
@@ -66,9 +68,15 @@ export default function Page() {
         </div>
       </header>
 
-      <Suspense fallback={<Skeleton label="metrics" />}>
-        <MetricsBar />
+      <Suspense fallback={<Skeleton label="briefing" />}>
+        <MorningBriefing />
       </Suspense>
+
+      <div className="mt-6">
+        <Suspense fallback={<Skeleton label="metrics" />}>
+          <MetricsBar />
+        </Suspense>
+      </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-4">
@@ -85,6 +93,7 @@ export default function Page() {
             <StoppingRulesPanel />
           </Suspense>
           <AuditVerifier />
+          <ChaosPanel />
         </div>
 
         <div className="flex min-h-[520px] flex-col gap-4">

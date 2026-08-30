@@ -167,6 +167,20 @@ export interface Approval {
   expired: boolean;
 }
 
+export interface Briefing {
+  greeting: string;
+  as_of_ist: string;
+  headline: Record<string, Figure>;
+  lines: string[];
+  restraint: {
+    total: number;
+    items: Array<{ rule: string; count: number; wording: string }>;
+    sentence: string;
+  };
+  caveats: string[];
+  narration: string;
+}
+
 export interface ChainVerification {
   valid: boolean;
   blocks: number;
@@ -233,6 +247,16 @@ export const api = {
   caseTrace: (id: string) => safeFetch<CaseTrace>(`/api/v1/cases/${id}`),
   approvals: () =>
     safeFetch<{ approvals: Approval[]; count: number }>("/api/v1/approvals"),
+  briefing: () => safeFetch<Briefing>("/api/v1/briefing/today"),
+  faults: () =>
+    safeFetch<{ active: string | null; enabled: boolean; faults: Array<{ fault: string; effect: string }> }>(
+      "/api/v1/simulation/faults",
+    ),
+  injectFault: (fault: string) =>
+    safeFetch<{ active: string | null; effect?: string; expected_behaviour?: string }>(
+      "/api/v1/simulation/inject",
+      { method: "POST", body: JSON.stringify({ fault }) },
+    ),
   verifyChain: () => safeFetch<ChainVerification>("/api/v1/audit/verify"),
   tamper: (blockIndex: number, mode: "payload" | "hash" | "timestamp") =>
     safeFetch<Record<string, unknown>>("/api/v1/audit/tamper", {

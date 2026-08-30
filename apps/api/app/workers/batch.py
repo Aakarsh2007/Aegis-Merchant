@@ -30,6 +30,8 @@ audit chain all run exactly as they would against live Razorpay traffic.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import random
 from dataclasses import dataclass
@@ -43,23 +45,29 @@ from app.agent.nodes import AgentDeps
 from app.agent.state import RecoveryState
 from app.core.clock import Clock
 from app.db.enums import (
+    ActionType,
+    ApprovalStatus,
     AttemptKind,
     CaseStatus,
+    EscalationRung,
     ExperimentArm,
     PaymentStatus,
     Playbook,
 )
-from app.db.ids import idempotency_hash
+from app.db.ids import idempotency_hash, new_id
 from app.db.models import (
+    ApprovalRequest,
     AuditBlock,
     Consent,
     Customer,
     ExperimentAssignment,
     PaymentAttempt,
+    RecoveryAction,
     RecoveryCase,
 )
 from app.services.experiments import assign_arm
 from app.services.metrics import SIMULATED_EVENT_PREFIX
+from app.services.scheduler import approval_expires_at
 from app.tools.audit import AuditChain
 
 log = logging.getLogger(__name__)
@@ -214,7 +222,7 @@ async def run_batch(
         # customer paid without us". Inferring `acted` from status therefore
         # gets control cases exactly backwards.
         acted = arm is ExperimentArm.TREATMENT and final.status is CaseStatus.MONITORING
-        by_status[final.status.value] = by_status.get(final.status.value, 0) + 1
+
         if arm is ExperimentArm.CONTROL:
             control += 1
         else:
@@ -247,13 +255,20 @@ async def run_batch(
                 # holdout exists to provide.
                 status = CaseStatus.RESOLVED_ORGANIC
         elif final.status is CaseStatus.RESOLVED_ORGANIC:
-            # Did not pay, but the graph left it RESOLVED_ORGANIC because it was
-            # held as control. The window closed with no payment: that is
-            # EXPIRED, and saying otherwise would assert a settlement that never
-            # happened.
+            # Belt and braces. The graph now returns OBSERVED_NO_ACTION for a
+            # control block (INC-018 fixed at source), so this branch should be
+            # unreachable -- but RESOLVED_ORGANIC on a case that did not pay
+            # would assert a settlement that never happened, and that is worth
+            # catching twice rather than trusting once.
             status = CaseStatus.EXPIRED
         else:
             status = final.status
+
+        # Counted from the status we actually WRITE, not the graph's
+        # provisional one. Reporting the pre-settlement status made the summary
+        # disagree with the database -- it showed 25 cases awaiting approval
+        # when 20 were persisted, because five had settled in between.
+        by_status[status.value] = by_status.get(status.value, 0) + 1
 
         async with factory() as session:
             session.add(
@@ -305,6 +320,84 @@ async def run_batch(
                     assigned_at=now,
                 )
             )
+            # A case in AWAITING_APPROVAL with no approval row is a case
+            # nobody can action: the queue would be empty while 25 cases sat
+            # blocked, and the dashboard would say "0 waiting on you" while
+            # the pipeline said otherwise.
+            if status is CaseStatus.AWAITING_APPROVAL:
+                # Prefer the clamped action the firewall produced. When policy
+                # escalated before minting a token there is no AppliedAction,
+                # and the reviewer sees the *proposal* instead -- which is
+                # still a specific action with specific numbers, and is what
+                # the hash pins. A case awaiting an approval nobody can grant
+                # is worse than either.
+                if final.policy_applied is not None:
+                    applied_payload = final.policy_applied.as_payload()
+                elif final.proposal is not None:
+                    applied_payload = {
+                        "source": "proposal (no capability token was minted)",
+                        "strategy": final.proposal.strategy.value,
+                        "discount_pct": final.proposal.discount_pct,
+                        "channel": final.proposal.channel.value,
+                        "message_class": final.proposal.message_class.value,
+                        "amount_paise": attempt.amount_paise,
+                    }
+                else:
+                    applied_payload = {
+                        "source": "no proposal",
+                        "amount_paise": attempt.amount_paise,
+                    }
+                payload = json.dumps(applied_payload, sort_keys=True, separators=(",", ":"))
+                session.add(
+                    ApprovalRequest(
+                        id=new_id("approval"),
+                        case_id=case_id,
+                        trigger_rung=(
+                            EscalationRung.A3_APPROVAL_DUAL
+                            if attempt.amount_paise >= 10_000_00
+                            else EscalationRung.A2_APPROVAL
+                        ),
+                        trigger_reason=(
+                            final.policy_block_reasons[0]
+                            if final.policy_block_reasons
+                            else "above the autonomous limit"
+                        )[:200],
+                        amount_paise=attempt.amount_paise,
+                        policy_applied_json=payload,
+                        policy_applied_hash=hashlib.sha256(payload.encode()).hexdigest(),
+                        status=ApprovalStatus.PENDING,
+                        expires_at=approval_expires_at(now, ttl_minutes=240),
+                        created_at=now,
+                    )
+                )
+
+            # Persist the action for treated cases. Without this the glass-box
+            # trace is empty and the chosen strategy is unverifiable -- and the
+            # strategy is the whole point of the playbook layer: whether a
+            # subscription got MANDATE_RETRY or MANDATE_REAUTH is the
+            # difference between a recovery and a burnt re-presentation.
+            if acted and final.proposal is not None:
+                applied = final.policy_applied
+                session.add(
+                    RecoveryAction(
+                        id=new_id("action"),
+                        case_id=case_id,
+                        attempt_no=final.attempt_no or 1,
+                        action_type=ActionType.CREATE_PAYMENT_LINK,
+                        strategy=final.proposal.strategy,
+                        escalation_rung=EscalationRung.B1_FIRST_TOUCH,
+                        message_class=final.proposal.message_class,
+                        discount_pct_applied=(
+                            applied.discount_pct if applied else final.proposal.discount_pct
+                        ),
+                        discount_amount_paise=(applied.discount_amount_paise if applied else 0),
+                        reference_id=final.reference_id,
+                        channel=final.proposal.channel,
+                        status="SIMULATED",
+                        executed_at=now,
+                    )
+                )
+
             await chain.append(
                 session,
                 event_name="case.recovered" if amount else "case.detected",
@@ -316,6 +409,7 @@ async def run_batch(
                     "status": status.value,
                     "amount_paise": attempt.amount_paise,
                     "recovered_paise": amount,
+                    "strategy": (final.proposal.strategy.value if final.proposal else None),
                     "verified_by": verified_by,
                     "simulated": True,
                 },

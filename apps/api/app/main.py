@@ -22,9 +22,11 @@ from app.deps import get_clock as _deps_get_clock
 from app.deps import get_db, get_provider
 from app.routers import approvals as approvals_router
 from app.routers import audit as audit_router
+from app.routers import briefing as briefing_router
 from app.routers import cases as cases_router
 from app.routers import dlq as dlq_router
 from app.routers import metrics as metrics_router
+from app.routers import simulation as simulation_router
 from app.routers import stream as stream_router
 from app.routers import webhooks
 from app.security.auth import auth_mode
@@ -181,6 +183,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(metrics_router.router)
     app.include_router(dlq_router.router)
     app.include_router(stream_router.router)
+    app.include_router(briefing_router.router)
+    app.include_router(simulation_router.router)
 
     @app.get("/healthz", tags=["health"], summary="Liveness probe")
     async def healthz() -> dict[str, Any]:

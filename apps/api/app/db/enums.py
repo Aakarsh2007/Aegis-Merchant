@@ -64,6 +64,15 @@ class CaseStatus(StrEnum):
     # --- terminal ---
     RECOVERED = "RECOVERED"
     RESOLVED_ORGANIC = "RESOLVED_ORGANIC"
+    #: Held as the control arm and never acted on, and it did not settle.
+    #:
+    #: Added after INC-018, where a control-arm block was recorded as
+    #: RESOLVED_ORGANIC to mean "the holdout is doing its job" while
+    #: attribution read the same value as "the customer paid without us". The
+    #: two meanings put control conversion at 89.7% and the measured lift at
+    #: -60.5%. RESOLVED_ORGANIC now means one thing -- money arrived, and not
+    #: because of us -- and this means the other.
+    OBSERVED_NO_ACTION = "OBSERVED_NO_ACTION"
     EXPIRED = "EXPIRED"
     SUPPRESSED = "SUPPRESSED"
     REJECTED = "REJECTED"
@@ -76,6 +85,7 @@ TERMINAL_STATUSES: frozenset[CaseStatus] = frozenset(
     {
         CaseStatus.RECOVERED,
         CaseStatus.RESOLVED_ORGANIC,
+        CaseStatus.OBSERVED_NO_ACTION,
         CaseStatus.EXPIRED,
         CaseStatus.SUPPRESSED,
         CaseStatus.REJECTED,

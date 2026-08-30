@@ -51,6 +51,7 @@
           "MONITORING",
           "RECOVERED",
           "RESOLVED_ORGANIC",
+          "OBSERVED_NO_ACTION",
           "EXPIRED",
           "SUPPRESSED",
           "REJECTED",
@@ -88,6 +89,39 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "InjectRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "fault": {
+            "enum": [
+              "provider_down",
+              "provider_slow",
+              "provider_duplicate",
+              "llm_quota_exhausted",
+              "clear"
+            ],
+            "title": "Fault",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "fault"
+        ],
+        "title": "InjectRequest",
         "type": "object"
       },
       "Playbook": {
@@ -471,6 +505,58 @@
         "summary": "Recompute the audit chain and report any divergence",
         "tags": [
           "audit"
+        ]
+      }
+    },
+    "/api/v1/briefing/today": {
+      "get": {
+        "description": "Everything a merchant needs before their first coffee.\n\nEvery figure carries a provenance badge, as everywhere else. The narrative\nlines are assembled from those same figures, so the prose and the tiles\ncannot disagree \u2014 a briefing that rounded differently from the dashboard\nwould undermine both.",
+        "operationId": "today_api_v1_briefing_today_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Today Api V1 Briefing Today Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The morning briefing",
+        "tags": [
+          "briefing"
         ]
       }
     },
@@ -1035,6 +1121,118 @@
         "summary": "Firing counts by rule id, including zeroes",
         "tags": [
           "metrics"
+        ]
+      }
+    },
+    "/api/v1/simulation/faults": {
+      "get": {
+        "operationId": "list_faults_api_v1_simulation_faults_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Faults Api V1 Simulation Faults Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Available faults and the current one",
+        "tags": [
+          "simulation"
+        ]
+      }
+    },
+    "/api/v1/simulation/inject": {
+      "post": {
+        "operationId": "inject_api_v1_simulation_inject_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Inject Api V1 Simulation Inject Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "[dev only] Inject a fault, or clear the active one",
+        "tags": [
+          "simulation"
         ]
       }
     },

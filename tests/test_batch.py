@@ -98,21 +98,47 @@ class TestTheControlArm:
         self, seeded_engine: AsyncEngine, clock: FakeClock, deps: AgentDeps
     ) -> None:
         """RESOLVED_ORGANIC must mean "settled without our involvement" and
-        nothing else. A control case whose window closed with no payment is
-        EXPIRED; saying otherwise asserts a settlement that never happened."""
+        nothing else.
+
+        A control case that did not pay is OBSERVED_NO_ACTION — we deliberately
+        did nothing and nothing happened. That is a different fact from "money
+        arrived without us", and conflating them is what inverted the lift.
+        """
         factory, _ = await _run(seeded_engine, clock, deps)
         async with factory() as session:
-            expired = await session.scalar(
+            observed = await session.scalar(
                 select(func.count(RecoveryCase.id))
                 .join(ExperimentAssignment, ExperimentAssignment.case_id == RecoveryCase.id)
                 .where(
                     ExperimentAssignment.arm == ExperimentArm.CONTROL,
-                    RecoveryCase.status == CaseStatus.EXPIRED,
+                    RecoveryCase.status == CaseStatus.OBSERVED_NO_ACTION,
                 )
             )
-        assert (expired or 0) > 0, (
-            "no control case expired unpaid — every one is being recorded as settled"
+        assert (observed or 0) > 0, (
+            "no control case is OBSERVED_NO_ACTION — every one is being recorded "
+            "as settled (INC-018)"
         )
+
+    @pytest.mark.asyncio
+    async def test_observed_and_organic_are_never_the_same_value(
+        self, seeded_engine: AsyncEngine, clock: FakeClock, deps: AgentDeps
+    ) -> None:
+        """The INC-018 fix at source: the two states must both occur and must
+        not be interchangeable. If a refactor collapsed them, this fails."""
+        assert CaseStatus.OBSERVED_NO_ACTION is not CaseStatus.RESOLVED_ORGANIC
+        factory, _ = await _run(seeded_engine, clock, deps)
+        async with factory() as session:
+            rows = dict(
+                (
+                    await session.execute(
+                        select(RecoveryCase.status, func.count(RecoveryCase.id)).group_by(
+                            RecoveryCase.status
+                        )
+                    )
+                ).all()
+            )
+        assert rows.get(CaseStatus.OBSERVED_NO_ACTION, 0) > 0
+        assert rows.get(CaseStatus.RESOLVED_ORGANIC, 0) > 0
 
     @pytest.mark.asyncio
     async def test_no_control_case_is_ever_recorded_as_recovered(
