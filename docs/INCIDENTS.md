@@ -902,3 +902,45 @@ a decision to disable the control. `StoppingContext` should arguably have requir
 fields with no default at all, so that forgetting one is a `TypeError` at construction rather
 than a rule that quietly never fires. Defaults are for values that are genuinely optional, and
 "is the kill switch on" is not optional.
+
+
+## INC-023 · The headline number depended on what time of day you ran it
+
+**Symptom:** immediately after fixing INC-022, the batch produced ₹85,958 instead of
+₹2,02,760, with **125 cases stopped by S-11** and **74 by S-09**. Every figure in the README
+was suddenly wrong.
+
+**First read:** the INC-022 fix had broken something. It had not. The rules were now *working*,
+and they immediately exposed that the batch's model of time was wrong in two ways.
+
+**Cause 1 — three months compressed into one instant.** The corpus spans 2026-05-31 to
+2026-09-01. The batch replayed all 210 cases against a single `now`, so all 171 treated
+actions counted against one day's `daily_action_budget` of 50. S-11 correctly stopped the
+125th onward. The bound was right; "today" was wrong.
+
+**Cause 2 — the batch read the wall clock.** It used `SystemClock`, so quiet hours were
+evaluated against *the hour the batch happened to be run*. Running it at 21:30 IST deferred 74
+cases. **The headline recovery figure moved depending on whether you demoed in the morning or
+the evening**, and the ₹2,02,760 quoted in the README had been produced by a daytime run.
+
+That is the worse of the two. A number that changes between a rehearsal and a demo is not a
+measurement, and nothing in the test suite could catch it — the tests inject a `FakeClock`, so
+they were immune to the exact bug that would bite in front of a judge.
+
+**Fix:** each case is now evaluated at **its own** timestamp — `attempted_at + 30 minutes`,
+which is also the honest model, since a failure is learned about from a webhook rather than
+instantly. Budgets are counted per `(merchant, simulated day)` and discount exposure per
+`(merchant, month)`. `AgentDeps` is rebuilt per case with a `FakeClock` rather than sharing a
+mutated one, because a shared clock would make the batch order-dependent in a way that is very
+hard to see.
+
+**Result:** ₹2,02,760 again, byte-identical across consecutive runs, and now identical at any
+hour. S-11 no longer misfires. S-09 fires **22** times — on cases whose payments genuinely
+happened at night, which is the rule doing real work on real timestamps rather than an
+artefact of when the demo was recorded.
+
+**What was learned:** injecting the clock everywhere in the *application* is worth nothing if
+the *entry point* still reads the wall clock. The lint rule forbids `datetime.now()` outside
+`SystemClock`; it cannot forbid handing `SystemClock` to something that should have been given
+a fixed anchor. And a test suite that always injects a fake clock is structurally unable to
+notice.

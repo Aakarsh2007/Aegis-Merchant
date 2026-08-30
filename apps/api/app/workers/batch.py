@@ -34,8 +34,9 @@ import hashlib
 import json
 import logging
 import random
+from collections import defaultdict
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -43,7 +44,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.agent.graph import run_case
 from app.agent.nodes import AgentDeps
 from app.agent.state import RecoveryState
-from app.core.clock import Clock
+from app.core.clock import Clock, FakeClock, to_ist
 from app.db.enums import (
     ActionType,
     ApprovalStatus,
@@ -145,6 +146,21 @@ class BatchResult:
         return "\n".join(lines)
 
 
+def _at(deps: AgentDeps, moment: datetime) -> AgentDeps:
+    """The same dependencies, with the clock moved to `moment`.
+
+    `AgentDeps` is a plain class rather than a dataclass, so this rebuilds it
+    explicitly. Written out rather than mutated because a shared, mutated clock
+    would make the batch order-dependent in a way that is very hard to see.
+    """
+    return AgentDeps(
+        clock=FakeClock(moment),
+        adapter=deps.adapter,
+        control_arm_fraction=deps.control_arm_fraction,
+        experiment_key=deps.experiment_key,
+    )
+
+
 async def _clear(session: AsyncSession) -> None:
     """Make the batch re-runnable.
 
@@ -196,8 +212,14 @@ async def run_batch(
 
     rng = random.Random(SEED)
     chain = AuditChain(clock)
-    actions_today = 0
-    discount_exposure_paise = 0
+    # Spend is counted per SIMULATED DAY, not per batch.
+    #
+    # The corpus spans three months. Replaying it against a single instant made
+    # a 50-actions-per-day budget stop 125 of 171 treated cases -- the rule was
+    # right and the time model was wrong. Keyed by (merchant, date) so each
+    # simulated day gets its own allowance, which is what the bound means.
+    actions_by_day: dict[tuple[str, date], int] = defaultdict(int)
+    discount_by_month: dict[tuple[str, str], int] = defaultdict(int)
     by_status: dict[str, int] = {}
     created = treated = control = settled = 0
     recovered_paise = 0
@@ -211,6 +233,19 @@ async def run_batch(
             break
         created += 1
         case_id = f"RC-{created:04d}"
+
+        # Each case is evaluated at ITS OWN time, not at wall-clock now.
+        #
+        # Using SystemClock made the batch depend on the hour it was run: at
+        # 21:30 IST quiet hours deferred 74 cases and the headline figure
+        # moved. A demo whose numbers change between morning and evening is not
+        # a demo. Detection lags the failure by 30 minutes, which is also the
+        # honest model -- we learn about a failure from a webhook, not
+        # instantly.
+        case_now = attempt.attempted_at + timedelta(minutes=30)
+        case_deps = _at(deps, case_now)
+        day_key = (attempt.merchant_id, to_ist(case_now).date())
+        month_key = (attempt.merchant_id, to_ist(case_now).strftime("%Y-%m"))
 
         state = RecoveryState(
             case_id=case_id,
@@ -241,13 +276,13 @@ async def run_batch(
             promise_active=case_id in promises,
             # Counted as the batch proceeds, so the budget guard sees the
             # spend this run has already committed rather than a stale total.
-            actions_today=actions_today,
-            discount_exposure_mtd_paise=discount_exposure_paise,
+            actions_today=actions_by_day[day_key],
+            discount_exposure_mtd_paise=discount_by_month[month_key],
             order_status="created",
-            window_expires_at=now + timedelta(hours=WINDOW_HOURS[playbook]),
+            window_expires_at=case_now + timedelta(hours=WINDOW_HOURS[playbook]),
         )
 
-        final = await run_case(state, deps)
+        final = await run_case(state, case_deps)
         arm = final.experiment_arm or ExperimentArm.TREATMENT
         # Derived from the ARM, not from the status alone (INC-018). The graph
         # marks a blocked control case RESOLVED_ORGANIC to mean "the holdout is
@@ -411,8 +446,8 @@ async def run_batch(
             # difference between a recovery and a burnt re-presentation.
             if acted and final.proposal is not None:
                 applied = final.policy_applied
-                actions_today += 1
-                discount_exposure_paise += applied.discount_amount_paise if applied else 0
+                actions_by_day[day_key] += 1
+                discount_by_month[month_key] += applied.discount_amount_paise if applied else 0
                 session.add(
                     RecoveryAction(
                         id=new_id("action"),
