@@ -629,3 +629,44 @@ exactly three tests.
 to produce. "Never drop a message" is a claim about four components, and it was only ever
 tested in one of them. The tests that found this are the ones that follow a thing through
 a system rather than asserting a function returns the right value.
+
+
+## INC-017 · Every SSE connection would have crashed, and no test would have known
+
+**Symptom:** `TypeError: unhashable type: '_Subscriber'` — raised on the *first* line of the
+first SSE test, before a single assertion ran.
+
+**What was wrong:** the subscriber record was a plain `@dataclass`. Python's dataclass
+defaults to `eq=True`, and defining `__eq__` sets `__hash__ = None`. The `EventBus` keeps
+subscribers in a `set`, so `set.add()` raised on every connection.
+
+**Severity, stated plainly:** `GET /api/v1/stream/events` would have returned 500 for every
+client, always. The live pipeline feed is roughly a third of the demo, and it was completely
+broken in a way that type-checking and linting both passed.
+
+**Why mypy and ruff missed it.** Nothing is type-incorrect: `set[_Subscriber]` is a
+well-formed type, and hashability is a runtime protocol, not a static one. `mypy --strict`
+was clean across 65 modules with this bug present. It is a good reminder of what a green
+type-check does and does not license.
+
+**How it was caught:** by writing tests for the bus at all. There was no clever technique —
+the tests simply exercised the object rather than the wire format. Had the SSE tests only
+asserted response headers, the mock would have passed and the endpoint would have 500'd in
+front of a judge.
+
+**Fix:** `@dataclass(eq=False)`, which restores identity-based equality and hashing. That is
+also the semantically correct choice independently of the crash: two subscribers with
+equally-full queues are not "the same subscriber", and identity is exactly the notion a
+connection registry wants.
+
+**Regression test:** the whole of `tests/test_stream.py` — every test that calls
+`bus.subscribe()` fails without the fix, which is fifteen of them.
+
+**A second thing the same session found:** driving the endpoint through `TestClient.stream()`
+*hung* rather than failed. The generator loops until `request.is_disconnected()`, which
+TestClient never sets, so the test ran until the 400-second timeout. A hanging test tells you
+nothing, so those tests now drive `_event_stream` directly with a stub request — which also
+tests our logic instead of the client library's streaming semantics.
+
+**What was learned:** `mypy --strict` clean and `ruff` clean is not evidence that an object
+works. Both tools were completely satisfied by a class that could not be put in a set.

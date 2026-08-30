@@ -9,14 +9,25 @@ Razorpay AI Buildathon 2026 · Track: **AI Revenue Recovery**
 
 [![CI](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml/badge.svg)](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml)
 
-> **Build status: Phase 1 of 15 complete** — injected clock, config, health endpoints,
-> CI, the 18-table schema, and the seeded 420-transaction corpus. The full
-> architecture, and the reasoning behind every choice in it, is in
+> **Build status: Phase 12a of 15 complete.** Built and tested: the injected clock,
+> the 18-table schema and seeded corpus, the signed-webhook boundary, the
+> deterministic classifier, twelve stopping rules with a property-based termination
+> proof, the policy firewall and capability token, the LLM adapter stack with a
+> committed response cache, the seven-node agent graph, the transactional outbox,
+> attribution with a holdout control arm, the SHA-256 audit chain and its public
+> verifier, bearer auth, HITL approvals, the template render boundary, and the REST +
+> SSE surface. Remaining: the Command Center UI (12b), the batch runner and chaos
+> suite (13), real inbound webhooks over a tunnel (14), and the eval harness and video
+> (15).
+>
+> The full architecture, and the reasoning behind every choice in it, is in
 > [`workflow.md`](workflow.md) — a build contract written before the first line of code.
 >
-> **No recovery figures are quoted yet, because nothing has run yet.** The agent lands in
-> Phases 4–9 and measurement in Phase 13. What exists today is the corpus below. Any rupee
-> figure in `workflow.md` is an illustrative placeholder until then, and is labelled as such.
+> **Every rupee figure below carries a provenance badge**, and the API enforces that
+> as a type rather than a convention: `RAZORPAY_VERIFIED` means a signed webhook
+> proves it, `SIMULATED` means real machinery over seeded inputs, `ESTIMATED` means a
+> projection. Nothing has run against live production traffic, and no figure claims
+> otherwise.
 
 ## The corpus, measured
 
@@ -184,21 +195,40 @@ money.**
 
 ```
 apps/api/app/
-  core/clock.py       injected Clock — the only sanctioned wall-clock read
-  config.py           every policy bound, as config rather than a literal
-  main.py             app factory, health endpoints
-  db/types.py         UtcDateTime — rejects naive datetimes at the DB boundary
-  db/enums.py         24 enum columns, each with a real CHECK constraint
-  db/models.py        the 18 tables
-  db/session.py       async engine + WAL/foreign-key/busy-timeout pragmas
-  db/seed.py          the 420-transaction GlowKart corpus
-apps/web/             Next.js Command Center            (Phase 12)
-data/revpilot.seed.db committed demo database — inspectable without our code
-tests/                unit, integration, eval, property suites
-docs/INCIDENTS.md     engineering journal — real breakages, wrong theories included
-docs/DECISIONS.md     decisions, including what we rejected
-workflow.md           the build contract
-tasks.py              every project command
+  core/clock.py            injected Clock — the only sanctioned wall-clock read
+  core/provenance.py       a rupee figure cannot exist without a badge and a basis
+  core/stats.py            Wilson intervals, shared by rail health and lift
+  config.py                every policy bound, as config rather than a literal
+  main.py                  app factory, auth posture, real health probes
+  db/types.py              UtcDateTime — rejects naive datetimes at the DB boundary
+  db/enums.py              24 enum columns, each with a real CHECK constraint
+  db/models.py             the 18 tables
+  db/session.py            async engine + WAL/foreign-key/busy-timeout pragmas
+  db/seed.py               the 420-transaction GlowKart corpus
+  agent/classifier.py      deterministic failure classifier; business source is absolute
+  agent/graph.py           the seven-node state machine — no LangGraph
+  guardrails/stopping_rules.py  twelve rules; termination proved by property test
+  guardrails/policy_engine.py   the firewall; the only place a token is minted
+  guardrails/token.py      HMAC capability token — no token, no side effect
+  guardrails/consent.py    template + slots render boundary; free text is impossible
+  llm/                     adapter, response cache, rate limit, prompts, routing
+  tools/outbox.py          two-phase execution intent
+  tools/audit.py           hash chain + verifier, limitations stated
+  workers/drainer.py       retry drainer + startup reconciler (crash recovery)
+  services/attribution.py  six conditions before a rupee is counted
+  services/experiments.py  deterministic, immutable arm assignment
+  services/scheduler.py    approval TTL sweeper + stale-deferral cancellation
+  services/metrics.py      tile queries; gross and net are never separated
+  security/auth.py         bearer auth; refuses to start unset in production
+  routers/                 webhooks, cases, metrics, approvals, audit, dlq, stream
+apps/web/openapi.json      the committed API contract the UI generates types from
+apps/web/                  Next.js Command Center                      (Phase 12b)
+data/revpilot.seed.db      committed demo database — inspectable without our code
+tests/                     unit, integration, eval, property suites
+docs/INCIDENTS.md          engineering journal — real breakages, wrong theories included
+docs/DECISIONS.md          decisions, including what we rejected
+workflow.md                the build contract
+tasks.py                   every project command
 ```
 
 ---

@@ -191,9 +191,28 @@ def chaos() -> int:
     return _pending("Phase 13")
 
 
-@task("verify-audit", "Recompute and verify the SHA-256 audit chain (Phase 10)")
+@task("verify-audit", "Recompute and verify the SHA-256 audit chain")
 def verify_audit() -> int:
-    return _pending("Phase 10")
+    """Verify the chain without starting the API.
+
+    A judge can check the committed database with the server stopped, which
+    removes "the running process is lying to you" as an explanation. Exits
+    non-zero on a broken chain, so it works in CI unparsed.
+    """
+    # Absolutised here: the subprocess runs with cwd=apps/api, so a path the
+    # user typed relative to the repo root would silently resolve elsewhere.
+    paths = [str(Path(arg).resolve()) for arg in sys.argv[2:]]
+    return run([PY, "-m", "app.tools.verify_cli", *paths], cwd=API)
+
+
+@task("openapi", "Export the OpenAPI schema the frontend generates types from")
+def openapi() -> int:
+    """Write apps/web/openapi.json.
+
+    Committed rather than fetched from a running server, so type generation
+    works offline and a contract change shows up as a reviewable diff.
+    """
+    return run([PY, "-m", "app.tools.export_openapi"], cwd=API)
 
 
 @task("capture-fixtures", "Record real Razorpay Test Mode responses as fixtures")

@@ -131,7 +131,7 @@ class TestTheDemo:
         )
 
     def test_blocks_are_readable(self, open_client: TestClient) -> None:
-        body = open_client.get("/api/v1/audit/blocks").json()
+        body = open_client.get("/api/v1/audit/ledger").json()
         assert len(body["blocks"]) == 5
         assert body["blocks"][0]["prev_hash"] == "0" * 64
 
@@ -217,7 +217,13 @@ class TestAuthPosture:
     def test_health_deep_reports_the_posture(self, open_client: TestClient) -> None:
         body = open_client.get("/api/v1/health/deep").json()
         assert body["auth"] == "disabled"
-        assert "audit" in body["checks"]["audit_chain"]
+        # Phase 12a turned this from a string naming the endpoint into a live
+        # probe that recomputes the chain. This client has a seeded chain, so
+        # the probe should find it valid.
+        chain = body["checks"]["audit_chain"]
+        assert chain["endpoint"] == "GET /api/v1/audit/verify"
+        assert chain["valid"] is True
+        assert chain["blocks"] == 5
 
     def test_production_without_a_token_refuses_to_start(self) -> None:
         """The one that matters.

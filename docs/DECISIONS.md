@@ -644,3 +644,73 @@ money we held a message for and then could not pursue — and folding it into a 
 **Cost of being wrong:** a message that could legitimately have been sent is cancelled if
 the window arithmetic is wrong. Bounded by tests at every hour of the day, and by the
 control case asserting a healthy deferral survives the same sweep.
+
+## DEC-028 · 2026-08-30 · Provenance is a type, not a UI convention
+
+**Phase:** 12a
+
+**Decision:** `core/provenance.py` defines `Figure` and `Count`, neither of which can be
+constructed without a `Provenance` and a non-empty `basis`. Every rupee figure the API emits
+is one of these.
+
+**Rejected:** the workflow's own framing, which called this a UI design rule. A convention is
+followed until the afternoon somebody adds a tile in a hurry, and the tile that gets added in
+a hurry is exactly the one that ends up on screen unqualified.
+
+**Also rejected:** a hand-maintained list of money fields in the test. It passes forever while
+going quietly out of date. The test now *walks the actual response body* looking for anything
+with a `paise` key and asserts a badge on each — so it fails when a tile is **added**, not
+when someone remembers to update a list. Verified by sabotage: injecting an unbadged tile
+fails the test naming the exact JSON path.
+
+**The number this exists to protect:** ₹2,02,760 gross next to ₹60,217 incremental. Both are
+true, they answer different questions, and a viewer who cannot tell which is which will take
+the larger one.
+
+**Cost of being wrong:** a little ceremony around every number. Cheap, and the alternative is
+the one mistake that would undermine every other claim in the project.
+
+---
+
+## DEC-029 · 2026-08-30 · A slow SSE subscriber loses events, not memory
+
+**Phase:** 12a
+
+**Decision:** each subscriber gets a 256-frame bounded queue. When it fills, the **oldest**
+frame is dropped and a `dropped` counter rides out with every subsequent frame.
+
+**Rejected:** an unbounded queue. A browser tab backgrounded for an hour is the normal case,
+not the edge case, and an unbounded queue behind it is an out-of-memory in a process that
+also moves money.
+
+**Rejected:** dropping the newest. A stale view of a case is worth less than the current one.
+
+**Rejected:** dropping silently. A client that has missed events and does not know it will
+show a confidently wrong picture; one that knows can re-fetch. The counter is the difference.
+
+**Also decided:** events are notifications, not state. Each carries an id and enough to say
+what changed; the client re-fetches from REST. A stream that shipped full state would become
+a second, subtly different source of truth for numbers `/metrics` already owns — and the two
+would drift.
+
+**Cost of being wrong:** single-process only, written down rather than discovered. With two
+workers a subscriber attached to worker A never sees worker B's events. The transactional
+outbox is what makes swapping in a real broker mechanical (ADL-003).
+
+---
+
+## DEC-030 · 2026-08-30 · The DLQ replays the original reference_id
+
+**Phase:** 12a
+
+**Decision:** `POST /dlq/{id}/replay` re-queues the **existing** outbox row with its original
+`reference_id`, and refuses a second replay with 409.
+
+**Rejected:** minting a fresh reference on replay. It looks equivalent and is the bug: it
+converts *"retry this action"* into *"perform this action again"*. Reusing the original means
+Razorpay's own uniqueness constraint rejects a replay of something that actually succeeded,
+so the provider — not our bookkeeping — is what prevents the double charge.
+
+**Cost of being wrong:** a genuinely-failed action whose reference was somehow consumed
+cannot be retried through this path and needs an operator. That is the correct direction to
+fail for an endpoint that can move money twice.

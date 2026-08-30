@@ -9,19 +9,27 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.core.clock import Clock, SystemClock, iso_ist
 from app.deps import get_clock as _deps_get_clock
-from app.deps import get_provider
+from app.deps import get_db, get_provider
 from app.routers import approvals as approvals_router
 from app.routers import audit as audit_router
+from app.routers import cases as cases_router
+from app.routers import dlq as dlq_router
+from app.routers import metrics as metrics_router
+from app.routers import stream as stream_router
 from app.routers import webhooks
 from app.security.auth import auth_mode
+from app.services.metrics import queue_depths
+from app.tools.audit import AuditChain
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +52,70 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.clock = _clock
     app.state.started_at = _clock.now_utc()
     yield
+
+
+async def _run_checks(session: AsyncSession, clock: Clock) -> dict[str, Any]:
+    """Real probes, replacing the Phase 0 placeholders.
+
+    Each check is individually guarded: a probe that raises must degrade *that
+    check* to an error string rather than 500 the whole endpoint. A health
+    endpoint that dies when one dependency is sick is useless at exactly the
+    moment it is needed.
+
+    The database check writes nothing. It confirms the connection works and
+    that WAL is on, because most of the concurrency design assumes WAL and a
+    database silently running in journal mode would be a slow, confusing
+    failure rather than a loud one.
+    """
+    checks: dict[str, Any] = {}
+
+    try:
+        journal = await session.scalar(text("PRAGMA journal_mode"))
+        checks["database"] = {
+            "ok": True,
+            "journal_mode": str(journal),
+            "wal": str(journal).lower() == "wal",
+        }
+    except Exception as exc:  # pragma: no cover - defensive
+        checks["database"] = {"ok": False, "error": str(exc)[:200]}
+
+    try:
+        depths = await queue_depths(session)
+        checks["outbox_depth"] = depths["outbox_pending"]
+        checks["outbox_sending"] = depths["outbox_sending"]
+        checks["dlq_depth"] = depths["dlq_pending"]
+    except Exception as exc:  # pragma: no cover - defensive
+        checks["outbox_depth"] = f"error: {exc}"
+        checks["dlq_depth"] = f"error: {exc}"
+
+    try:
+        verification = await AuditChain(clock).verify(session)
+        checks["audit_chain"] = {
+            "valid": verification.valid,
+            "blocks": verification.blocks,
+            "head_hash": verification.head_hash,
+            "endpoint": "GET /api/v1/audit/verify",
+        }
+    except Exception as exc:
+        # Same keys as the success branch. A probe whose failure shape differs
+        # from its success shape forces every consumer to handle two schemas,
+        # and the one that forgets breaks precisely when something is already
+        # wrong. `valid: false` with the reason is the honest answer on a
+        # database that has not been initialised.
+        checks["audit_chain"] = {
+            "valid": False,
+            "blocks": 0,
+            "head_hash": None,
+            "endpoint": "GET /api/v1/audit/verify",
+            "error": str(exc)[:200],
+        }
+
+    # The scheduler and drainer are started by Phase 13's runner. Reporting
+    # "not_running" is the honest answer today: claiming a sweeper is alive
+    # when nothing starts it is exactly the lie this endpoint must not tell.
+    checks["scheduler"] = "not_running: started by the batch runner (Phase 13)"
+    checks["sse_subscribers"] = stream_router.bus.subscriber_count
+    return checks
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -105,13 +177,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(webhooks.router)
     app.include_router(audit_router.router)
     app.include_router(approvals_router.router)
+    app.include_router(cases_router.router)
+    app.include_router(metrics_router.router)
+    app.include_router(dlq_router.router)
+    app.include_router(stream_router.router)
 
     @app.get("/healthz", tags=["health"], summary="Liveness probe")
     async def healthz() -> dict[str, Any]:
         return {"status": "ok", "service": "revpilot-api", "version": __version__}
 
     @app.get("/api/v1/health/deep", tags=["health"], summary="Dependency report")
-    async def health_deep() -> dict[str, Any]:
+    async def health_deep(
+        session: Annotated[AsyncSession, Depends(get_db)],
+    ) -> dict[str, Any]:
         """Full dependency report.
 
         ``llm_adapter: "deterministic"`` is how a judge with no API key
@@ -133,16 +211,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "llm_model": settings.gemini_model if settings.llm_provider == "gemini" else None,
             "simulation_allowed": settings.simulation_allowed,
             "auth": auth_mode(settings),
-            "checks": {
-                # Populated by their owning phases; declared here so the shape
-                # of this endpoint is stable from Phase 0 onward.
-                "database": "not_implemented",
-                "audit_chain": "implemented: GET /api/v1/audit/verify",
-                "outbox_depth": "not_implemented",
-                "dlq_depth": "not_implemented",
-                "scheduler": "not_implemented",
-                "llm_quota_remaining": "not_implemented",
-            },
+            "checks": await _run_checks(session, clock),
             "policy": {
                 "max_autonomous_amount_paise": settings.max_autonomous_amount_paise,
                 "max_discount_pct": settings.max_discount_pct,

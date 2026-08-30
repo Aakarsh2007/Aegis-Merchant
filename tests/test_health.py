@@ -56,14 +56,37 @@ class TestDeepHealth:
         one is not, and this test only guards the direction that matters.
         """
         checks = client.get("/api/v1/health/deep").json()["checks"]
-        for key in ("database", "outbox_depth", "dlq_depth", "scheduler"):
-            assert checks[key] == "not_implemented"
+        # Only the scheduler is left. Phase 12a replaced the database, outbox
+        # and DLQ placeholders with real probes; each is asserted positively
+        # below or in tests/test_api_surface.py.
+        assert "not_running" in checks["scheduler"]
 
     def test_audit_chain_is_reported_as_built(self, client: TestClient) -> None:
-        """Phase 10 built it, so the endpoint must now say where to check it."""
+        """Phase 10 built it; Phase 12a turned the string into a real probe.
+
+        The check now recomputes the chain rather than naming the endpoint
+        that would, so the assertion moved from "says where to look" to
+        "reports what it found".
+        """
         checks = client.get("/api/v1/health/deep").json()["checks"]
-        assert checks["audit_chain"] != "not_implemented"
-        assert "/api/v1/audit/verify" in checks["audit_chain"]
+        chain = checks["audit_chain"]
+        assert isinstance(chain, dict), "audit_chain is a live probe, not a placeholder string"
+        assert chain["endpoint"] == "GET /api/v1/audit/verify"
+        assert "valid" in chain
+        # Validity is NOT asserted here. This client has no database fixture,
+        # so it runs against whatever `DATABASE_URL` points at -- often an
+        # uninitialised file on a fresh checkout, where the honest answer is
+        # `valid: false` with an error rather than a crash. That degradation is
+        # the behaviour being checked; validity against a real chain is
+        # asserted in tests/test_api_surface.py over the seeded corpus.
+
+    def test_a_failing_probe_degrades_instead_of_500ing(self, client: TestClient) -> None:
+        """A health endpoint that dies when one dependency is sick is useless
+        at exactly the moment it is needed."""
+        response = client.get("/api/v1/health/deep")
+        assert response.status_code == 200
+        checks = response.json()["checks"]
+        assert set(checks) >= {"database", "outbox_depth", "dlq_depth", "audit_chain", "scheduler"}
 
     def test_auth_posture_is_declared(self, client: TestClient) -> None:
         """An open API that looks identical to a secured one is the failure

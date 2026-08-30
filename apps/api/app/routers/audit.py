@@ -60,10 +60,10 @@ async def verify_chain(
 
 
 @router.get(
-    "/blocks",
+    "/ledger",
     summary="Read the ledger",
 )
-async def list_blocks(
+async def list_ledger(
     session: Annotated[AsyncSession, Depends(get_db)],
     _principal: Annotated[Principal, Depends(require_api_token)],
     limit: int = 50,
