@@ -30,6 +30,9 @@ interface AttackResult {
   attack: string;
   asked_for: string;
   mechanism: string;
+  /** What happened to the REQUEST. Not the policy verdict -- see below. */
+  attack_outcome: string;
+  attack_outcome_detail: string;
   verdict: string;
   may_execute: boolean;
   capability_token_minted: boolean;
@@ -53,10 +56,22 @@ const LABELS: Record<string, string> = {
   act_with_autopilot_off: "Act with the kill switch off",
 };
 
-/** PASSED with no clamps is the only green outcome. */
+/**
+ * Coloured by what happened to the ATTACK, not by the policy verdict.
+ *
+ * INC-033: this keyed off `verdict`, so `marketing_to_dnd` rendered as the
+ * green "allowed" tone with the word PASSED -- on a panel whose entire purpose
+ * is showing that dangerous requests do not get through. The system was right
+ * (the message class was clamped MARKETING -> TRANSACTIONAL); the label was
+ * telling a judge the opposite.
+ *
+ * `honest_baseline` is the one row that should be green. A firewall that
+ * refused all five would prove nothing, so one legitimate action passing is
+ * part of the demonstration rather than a gap in it.
+ */
 function tone(r: AttackResult): "allowed" | "reduced" | "refused" {
-  if (r.verdict === "PASSED" && r.clamps.length === 0) return "allowed";
-  if (r.may_execute) return "reduced";
+  if (r.attack_outcome === "ALLOWED_AS_ASKED") return "allowed";
+  if (r.attack_outcome === "NEUTRALISED") return "reduced";
   return "refused";
 }
 
@@ -154,7 +169,10 @@ export function AdversarialPanel() {
                             : "bg-brand-500/20 text-brand-400"
                       }`}
                     >
-                      {result.verdict}
+                      {result.attack_outcome}
+                    </span>
+                    <span className="numeric text-[10px] text-paper-500">
+                      policy verdict: {result.verdict}
                     </span>
                     <span className="text-[10px] text-paper-500">
                       {result.mechanism}

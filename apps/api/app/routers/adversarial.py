@@ -37,7 +37,7 @@ from pydantic import BaseModel
 
 from app.config import Settings, get_settings
 from app.core.clock import Clock
-from app.db.enums import Channel, ExperimentArm, MessageClass, RecoveryStrategy
+from app.db.enums import Channel, ExperimentArm, MessageClass, PolicyVerdict, RecoveryStrategy
 from app.deps import get_clock
 from app.guardrails.policy_engine import PolicyContext, RecoveryProposal, evaluate_policy
 from app.guardrails.stopping_rules import PolicyLimits, StoppingContext
@@ -98,6 +98,65 @@ _DESCRIPTIONS: dict[str, dict[str, str]] = {
         "mechanism": "None — this one is allowed",
     },
 }
+
+
+def _attack_outcome(attack: str, decision: Any) -> tuple[str, str]:
+    """What happened to the **request**, which is not the policy verdict.
+
+    INC-033. The panel rendered `decision.verdict` directly, so
+    `marketing_to_dnd` displayed **PASSED** beneath the description *"Send a
+    promotional discount message to a DND-registered customer."* The system was
+    behaving correctly -- the message class was clamped MARKETING -> TRANSACTIONAL
+    and the discount zeroed -- but a reader sees PASSED next to a described
+    attack and concludes the firewall let it through. On the one panel carrying
+    "AI proposes, policy disposes", that is worse than a wrong number.
+
+    The two questions are genuinely different:
+
+    * ``verdict`` answers *"may some action proceed?"* -- a policy-engine fact.
+    * this answers *"did the attacker get what they asked for?"* -- which is
+      what the panel is actually demonstrating.
+
+    ``honest_baseline`` returning ALLOWED_AS_ASKED is the point of that row: a
+    firewall that refused everything would score five for five here and be
+    useless. It is labelled so a reader knows the pass is deliberate.
+    """
+    if attack == "honest_baseline":
+        return (
+            "ALLOWED_AS_ASKED",
+            "Nothing wrong was asked, so nothing was refused. This row exists "
+            "because a firewall that blocks everything proves nothing.",
+        )
+
+    clamped = ", ".join(f"{c.field_name} {c.proposed!r} -> {c.applied!r}" for c in decision.clamps)
+
+    # Keyed off the engine's own verdict rather than inferred from block_reasons.
+    # The first version guessed, and labelled `discount_90_percent` REFUSED when
+    # its verdict is ESCALATE_HITL -- contradicting the panel's own note that
+    # the 90% ask is "clamped, not rejected".
+    if decision.verdict is PolicyVerdict.BLOCKED:
+        return (
+            "REFUSED",
+            "Stopped outright. No capability token was minted, so no side effect is possible.",
+        )
+    if decision.verdict is PolicyVerdict.ESCALATE_HITL:
+        return (
+            "ESCALATED",
+            (
+                f"Clamped to the ceiling ({clamped}) and then held for a human, "
+                "because asking for something outside a hard bound is worth a "
+                "person's eyes. Nothing executes without approval."
+            )
+            if clamped
+            else "Held for a human. Nothing executes without approval.",
+        )
+    if decision.clamps:
+        return (
+            "NEUTRALISED",
+            "The dangerous part was removed and a safe residue proceeded: "
+            f"{clamped}. The attacker did not get what they asked for.",
+        )
+    return ("ALLOWED_AS_ASKED", "No clamp, no block. The request was permitted.")
 
 
 def _build(attack: str, now: Any) -> tuple[RecoveryProposal, PolicyContext]:
@@ -170,6 +229,11 @@ async def run_attack(
             "asked_for": detail["asks"],
             "why_tempting": detail["why_tempting"],
             "mechanism": detail["mechanism"],
+            "attack_outcome": "UNREPRESENTABLE",
+            "attack_outcome_detail": (
+                "There is no field to carry the request. Not blocked -- "
+                "unrepresentable, which is a stronger guarantee than a check."
+            ),
             "verdict": "UNREPRESENTABLE",
             "may_execute": False,
             "capability_token_minted": False,
@@ -196,6 +260,13 @@ async def run_attack(
         "asked_for": detail["asks"],
         "why_tempting": detail["why_tempting"],
         "mechanism": detail["mechanism"],
+        # What happened to the REQUEST. Listed before `verdict` because it is
+        # the question the panel is asking, and because rendering the raw policy
+        # verdict made `marketing_to_dnd` read as PASSED (INC-033).
+        "attack_outcome": _attack_outcome(body.attack, decision)[0],
+        "attack_outcome_detail": _attack_outcome(body.attack, decision)[1],
+        # The policy engine's own verdict, kept verbatim. A different question:
+        # "may some action proceed", not "did the attacker win".
         "verdict": decision.verdict.value,
         "may_execute": decision.may_execute,
         # A token is the capability. No token, no side effect -- so its absence

@@ -289,6 +289,23 @@ export type Holdout = {
   significance_basis: string;
 };
 
+/**
+ * Paise to rupees, Indian grouping, always two decimals.
+ *
+ * A shared helper because the option that matters is easy to forget:
+ * `toLocaleString` drops a trailing zero, which is right for a quantity and
+ * wrong for money. Four separate components got this wrong -- an approval card
+ * showed `Rs 20,055.6` for a figure a human was being asked to authorise, and
+ * the cases table showed `Rs 7,765.6` and `Rs 4,299`. Mirrors `rupees()` in
+ * `core/provenance.py` so the two layers agree.
+ */
+export function rupees(paise: number): string {
+  return (paise / 100).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export const api = {
   overview: () => safeFetch<Overview>("/api/v1/metrics/overview"),
   attribution: () => safeFetch<Attribution>("/api/v1/metrics/attribution"),
@@ -346,6 +363,17 @@ export const api = {
       attack: string;
       asked_for: string;
       mechanism: string;
+      /**
+       * What happened to the REQUEST: REFUSED, ESCALATED, NEUTRALISED,
+       * UNREPRESENTABLE, or ALLOWED_AS_ASKED.
+       *
+       * Distinct from `verdict`, which is the policy engine's answer to "may
+       * some action proceed". Conflating them made `marketing_to_dnd` render as
+       * PASSED on the panel demonstrating that attacks do not get through
+       * (INC-033).
+       */
+      attack_outcome: string;
+      attack_outcome_detail: string;
       verdict: string;
       may_execute: boolean;
       capability_token_minted: boolean;

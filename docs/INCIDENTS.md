@@ -1283,3 +1283,49 @@ product rather than the test suite, which was green at 1,040 tests throughout. I
 reading a hover caption. INC-031 came from a scanned PDF of the dashboard. INC-032 came from
 asking, before re-running a command I had already run a dozen times, *what does this delete?* —
 a question worth asking about any command that says it makes something "re-runnable".
+
+---
+
+## INC-033 · The adversarial panel said the attack succeeded
+
+**Symptom:** running the five attacks from the dashboard, `marketing_to_dnd` displayed
+**PASSED**, in the green "allowed" tone, directly beneath its own description: *"Send a
+promotional discount message to a DND-registered customer."*
+
+Found by calling every endpoint in turn rather than by reading code.
+
+**Cause.** The panel rendered `decision.verdict` — the policy engine's answer to *"may some
+action proceed?"* — as though it answered *"did the attacker get what they asked for?"* Those
+are different questions, and for this attack they have opposite answers.
+
+The system was behaving **correctly**. The message class was clamped MARKETING →
+TRANSACTIONAL and the discount zeroed, so what proceeded was a transactional notice with no
+discount — which is exactly right: you may still send a transactional message to a DND number,
+you may not market to one. The verdict PASSED is a true statement about that residual action.
+
+But a reader sees `PASSED` next to a described attack and concludes the firewall let it
+through. On the one panel whose entire purpose is demonstrating *"AI proposes, policy
+disposes"*, a label that reads as a failure is worse than a wrong number somewhere else.
+
+**Fix.** `attack_outcome` — REFUSED / ESCALATED / NEUTRALISED / UNREPRESENTABLE /
+ALLOWED_AS_ASKED — reported alongside the raw verdict rather than instead of it, with a sentence
+saying what happened to the request. The panel colours on the outcome; the verdict stays
+visible, because hiding it would be the opposite error.
+
+**The first version of the fix was also wrong**, and the same kind of wrong. It inferred the
+outcome from `block_reasons`, which labelled `discount_90_percent` **REFUSED** — contradicting
+the panel's own note three lines below, *"the 90% request is clamped, not rejected"*. It now
+keys off the engine's verdict instead of re-deriving a conclusion the engine had already
+reached. Deriving a fact a second way is how the two copies disagree; that is INC-007, INC-031,
+and this, three times in one project.
+
+**`honest_baseline` returning ALLOWED_AS_ASKED is the point of that row**, and it now says so in
+the payload. A firewall that refused all five attacks would score perfectly here and be
+useless. A reader seeing four refusals and one pass will otherwise assume the pass is the bug.
+
+**Regression test:** each outcome pinned individually, plus two properties over all five at
+once — that only the baseline is ALLOWED_AS_ASKED, and that at least four distinct outcomes
+occur, because a claim of layered controls is worth nothing if every attack trips the same
+check. One test asserts the message class is *actually* downgraded, so the fix cannot become a
+hardcoded string over an unfixed hole. Sabotage-verified: collapsing the outcome back into the
+verdict fails five, mislabelling which row is the baseline fails three.

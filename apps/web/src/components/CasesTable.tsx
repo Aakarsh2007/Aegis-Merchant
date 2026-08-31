@@ -12,7 +12,7 @@
  * treated cases is what makes the holdout legible.
  */
 import Link from "next/link";
-import { api, type CaseSummary } from "@/lib/api";
+import { api, rupees, type CaseSummary } from "@/lib/api";
 import { FetchError } from "./Provenance";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -62,7 +62,7 @@ function Row({ row }: { row: CaseSummary }) {
         </Link>
       </td>
       <td className="numeric px-2 py-2 text-right text-[11px] text-paper-100">
-        {(row.amount_paise / 100).toLocaleString("en-IN")}
+        {rupees(row.amount_paise)}
       </td>
       <td className="px-2 py-2">
         <span

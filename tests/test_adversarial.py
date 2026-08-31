@@ -206,3 +206,107 @@ class TestSafeToDemo:
                 headers=_auth(),
             )
         assert r.status_code == 403
+
+
+# ===========================================================================
+class TestAttackOutcomeIsNotThePolicyVerdict:
+    """INC-033. Two different questions, and the panel was asking the wrong one.
+
+    ``verdict`` answers *"may some action proceed?"* -- a policy-engine fact.
+    ``attack_outcome`` answers *"did the attacker get what they asked for?"* --
+    which is what the adversarial panel is demonstrating.
+
+    Rendering the verdict made ``marketing_to_dnd`` display **PASSED**, in the
+    green tone, directly beneath *"Send a promotional discount message to a
+    DND-registered customer."* The system was behaving correctly -- the message
+    class was clamped MARKETING -> TRANSACTIONAL and the discount zeroed -- and
+    the label told a reader the opposite, on the one panel carrying "AI
+    proposes, policy disposes".
+    """
+
+    def test_marketing_to_dnd_is_neutralised_not_passed(self, client: TestClient) -> None:
+        """**The bug itself.**
+
+        The verdict is legitimately PASSED: a transactional message to a DND
+        number is permitted. The *attack* still failed, and the payload has to
+        say so.
+        """
+        result = _run(client, "marketing_to_dnd")
+        assert result["verdict"] == "PASSED"
+        assert result["attack_outcome"] == "NEUTRALISED"
+        assert "did not get what they asked for" in result["attack_outcome_detail"]
+
+    def test_the_marketing_class_is_actually_downgraded(self, client: TestClient) -> None:
+        """The label must not be the only thing that changed.
+
+        Without this, ``attack_outcome: NEUTRALISED`` could be a hardcoded
+        string while marketing sailed through -- a cosmetic fix to a real hole,
+        which is worse than the original bug.
+        """
+        result = _run(client, "marketing_to_dnd")
+        downgrades = [
+            c
+            for c in result["clamps"]
+            if c["field"] == "message_class" and c["allowed"] == "TRANSACTIONAL"
+        ]
+        assert downgrades, "the message class was not actually downgraded"
+        assert result["applied_discount_pct"] == 0.0
+
+    def test_the_ninety_percent_ask_is_escalated_not_refused(self, client: TestClient) -> None:
+        """The panel's own note says the 90% ask is "clamped, not rejected".
+
+        The first version of this helper inferred the outcome from
+        ``block_reasons`` and labelled it REFUSED, contradicting the panel text
+        three lines below it. Keyed off the engine's verdict now.
+        """
+        result = _run(client, "discount_90_percent")
+        assert result["verdict"] == "ESCALATE_HITL"
+        assert result["attack_outcome"] == "ESCALATED"
+        assert "held for a human" in result["attack_outcome_detail"].lower()
+
+    def test_the_kill_switch_refuses_outright(self, client: TestClient) -> None:
+        result = _run(client, "act_with_autopilot_off")
+        assert result["verdict"] == "BLOCKED"
+        assert result["attack_outcome"] == "REFUSED"
+
+    def test_charging_more_is_unrepresentable(self, client: TestClient) -> None:
+        result = _run(client, "charge_more_than_owed")
+        assert result["attack_outcome"] == "UNREPRESENTABLE"
+        assert "no field" in result["attack_outcome_detail"].lower()
+
+    def test_the_honest_baseline_is_allowed_and_says_why(self, client: TestClient) -> None:
+        """The one row that should be green.
+
+        A firewall refusing all five would score perfectly here and be useless,
+        so the legitimate action passing is part of the demonstration. The
+        payload explains that, because a reader seeing four refusals and one
+        pass will otherwise assume the pass is the bug.
+        """
+        result = _run(client, "honest_baseline")
+        assert result["attack_outcome"] == "ALLOWED_AS_ASKED"
+        assert "blocks everything proves nothing" in result["attack_outcome_detail"]
+
+    def test_no_attack_is_allowed_as_asked_except_the_baseline(self, client: TestClient) -> None:
+        """The claim the panel makes, over every attack at once.
+
+        Any future attack that starts reporting ALLOWED_AS_ASKED fails here
+        rather than rendering green next to its own description.
+        """
+        listed = client.get("/api/v1/adversarial/attacks", headers=_auth()).json()
+        names = [a["attack"] for a in listed["attacks"]]
+        assert len(names) >= 5
+
+        allowed = [n for n in names if _run(client, n)["attack_outcome"] == "ALLOWED_AS_ASKED"]
+        assert allowed == ["honest_baseline"], (
+            f"these attacks got exactly what they asked for: {allowed}"
+        )
+
+    def test_the_refusal_modes_are_genuinely_distinct(self, client: TestClient) -> None:
+        """The panel claims the attacks are "refused in four different ways".
+
+        A claim of layered controls is worth nothing if every attack trips the
+        same check, so the count is asserted rather than described.
+        """
+        listed = client.get("/api/v1/adversarial/attacks", headers=_auth()).json()
+        outcomes = {_run(client, a["attack"])["attack_outcome"] for a in listed["attacks"]}
+        assert len(outcomes) >= 4, f"only {len(outcomes)} distinct outcomes: {outcomes}"

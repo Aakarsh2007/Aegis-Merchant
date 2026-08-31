@@ -373,8 +373,12 @@ async def cost_report(session: AsyncSession) -> CostReport:
             provenance=Provenance.ESTIMATED,
             basis=(
                 f"{input_tokens} input + {output_tokens} output tokens at published paid "
-                f"rates (Rs {_INR_PER_MILLION_INPUT_TOKENS}/Rs "
-                f"{_INR_PER_MILLION_OUTPUT_TOKENS} per million); a price list, not a bill"
+                # :.2f, not the bare float. These rendered as `Rs 7.0` and
+                # `Rs 28.0`, which breaks the project's own rule that money
+                # carries two decimals -- the same defect as the `Rs 20,055.6`
+                # in the approvals queue, two files over.
+                f"rates (Rs {_INR_PER_MILLION_INPUT_TOKENS:.2f}/Rs "
+                f"{_INR_PER_MILLION_OUTPUT_TOKENS:.2f} per million); a price list, not a bill"
             ),
         ),
         cache_hit_rate=(cached / total) if total else 0.0,

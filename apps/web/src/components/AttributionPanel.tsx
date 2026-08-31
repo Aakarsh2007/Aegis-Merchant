@@ -13,7 +13,7 @@
  *   hackathon-sized batch the honest answer is usually "not significant", and
  *   an unqualified 6% on a dashboard reads as a result rather than as noise.
  */
-import { api, percent, type Attribution } from "@/lib/api";
+import { api, percent, rupees, type Attribution } from "@/lib/api";
 import { FetchError, ProvenanceBadge } from "./Provenance";
 
 function ArmRow({
@@ -99,13 +99,13 @@ export async function AttributionPanel() {
         <div className="flex items-baseline justify-between">
           <dt className="text-xs text-paper-500">Gross recovered</dt>
           <dd className="numeric text-sm text-paper-300">
-            Rs {(a.gross_recovered_paise / 100).toLocaleString("en-IN")}
+            Rs {rupees(a.gross_recovered_paise)}
           </dd>
         </div>
         <div className="flex items-baseline justify-between">
           <dt className="text-xs font-medium text-brand-400">Net incremental</dt>
           <dd className="numeric text-sm font-semibold text-brand-400">
-            Rs {(a.net_incremental_paise / 100).toLocaleString("en-IN")}
+            Rs {rupees(a.net_incremental_paise)}
           </dd>
         </div>
       </dl>

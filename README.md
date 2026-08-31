@@ -31,7 +31,7 @@ things that work. `python tasks.py power` prints the arithmetic.
 python tasks.py demo        # no credentials, no Docker, ~40 seconds
 ```
 
-1,063 tests · `mypy --strict` clean · 32 documented incidents · one command to run.
+1,089 tests · `mypy --strict` clean · 33 documented incidents · one command to run.
 
 > **On a fresh clone the verified tile reads ₹0.00, and that is correct.** Nothing has been
 > proven on *your* machine yet. The two recoveries above happened here, on 31 August 2026, with

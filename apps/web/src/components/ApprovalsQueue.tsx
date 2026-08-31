@@ -10,7 +10,7 @@
  * them would make the queue look healthier than it is, and "something aged out
  * unactioned" is a signal a reviewer needs about their own response time.
  */
-import { api, type Approval } from "@/lib/api";
+import { api, rupees, type Approval } from "@/lib/api";
 import { FetchError } from "./Provenance";
 
 function remaining(seconds: number): string {
@@ -45,11 +45,7 @@ function ApprovalRow({ approval }: { approval: Approval }) {
             by default, which is correct for a quantity and wrong for money --
             and this figure sits on a card asking a human to authorise it.
           */}
-          Rs{" "}
-          {(approval.amount_paise / 100).toLocaleString("en-IN", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
+          Rs {rupees(approval.amount_paise)}
         </span>
         <span
           className={`text-[10px] font-medium ${
