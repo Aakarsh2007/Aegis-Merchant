@@ -13,6 +13,34 @@
 import { api, rupees, type Approval } from "@/lib/api";
 import { FetchError } from "./Provenance";
 
+/**
+ * What a reviewer actually decides on.
+ *
+ * Chosen, not sampled: the action, the money it moves, the discount it spends,
+ * and the channel it uses. `link_expiry_minutes` and `attempt_no` are real data
+ * and belong in the full payload, not competing for attention with the strategy.
+ */
+const PRIMARY_FIELDS: Array<{
+  key: string;
+  label: string;
+  render?: (v: unknown) => string;
+}> = [
+  { key: "strategy", label: "action" },
+  {
+    key: "charge_amount_paise",
+    label: "charges",
+    render: (v) => (typeof v === "number" ? `Rs ${rupees(v)}` : String(v)),
+  },
+  {
+    key: "discount_pct",
+    label: "discount",
+    render: (v) => (typeof v === "number" ? `${v}%` : String(v)),
+  },
+  { key: "channel", label: "channel" },
+  { key: "message_class", label: "message class" },
+  { key: "escalation_rung", label: "authority" },
+];
+
 function remaining(seconds: number): string {
   if (seconds <= 0) return "expired";
   const hours = Math.floor(seconds / 3600);
@@ -61,15 +89,50 @@ function ApprovalRow({ approval }: { approval: Approval }) {
         {approval.case_id} · rung {approval.trigger_rung}
       </p>
 
+      {/*
+        The decision-relevant fields first, then everything else behind a
+        disclosure.
+        
+        Every field used to render flat, for every card. Nineteen approvals
+        produced four pages of undifferentiated key-value text in which the
+        three facts a reviewer actually decides on -- what action, how much
+        discount, to which channel -- were indistinguishable from
+        `link_expiry_minutes`. A queue nobody can read gets approved without
+        being read, and then the hash gate is protecting a decision that was
+        never really made.
+        
+        The full payload stays reachable, because it is what the hash pins and
+        hiding it would weaken the guarantee the panel exists to demonstrate.
+      */}
       {Object.keys(applied).length > 0 ? (
-        <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-ink-800 pt-2 text-[10px]">
-          {Object.entries(applied).map(([key, value]) => (
-            <div key={key} className="flex gap-1.5">
-              <dt className="text-paper-500">{key.replace(/_/g, " ")}</dt>
-              <dd className="numeric text-paper-300">{String(value)}</dd>
-            </div>
-          ))}
-        </dl>
+        <>
+          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-ink-800 pt-2 text-[10px] sm:grid-cols-3">
+            {PRIMARY_FIELDS.filter((f) => applied[f.key] !== undefined).map((f) => (
+              <div key={f.key}>
+                <dt className="text-paper-500">{f.label}</dt>
+                <dd className="numeric text-paper-100">
+                  {f.render
+                    ? f.render(applied[f.key])
+                    : String(applied[f.key] ?? "—")}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <details className="mt-2">
+            <summary className="cursor-pointer text-[10px] text-paper-500 hover:text-paper-300">
+              the exact payload the hash pins ({Object.keys(applied).length}{" "}
+              fields)
+            </summary>
+            <dl className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[10px]">
+              {Object.entries(applied).map(([key, value]) => (
+                <div key={key} className="flex gap-1.5">
+                  <dt className="text-paper-500">{key.replace(/_/g, " ")}</dt>
+                  <dd className="numeric text-paper-300">{String(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+        </>
       ) : null}
 
       {/*

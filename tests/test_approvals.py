@@ -16,6 +16,7 @@ import hashlib
 import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -538,3 +539,54 @@ class TestStaleDeferrals:
             names = [b.event_name for b in (await s.execute(select(AuditBlock))).scalars().all()]
             assert "outbox.deferral_cancelled" in names
             assert (await chain.verify(s)).valid
+
+
+# ===========================================================================
+class TestTheResponseSaysWhatDidNotHappen:
+    """INC-034. Approving records an authorisation and dispatches nothing.
+
+    Found by exercising the endpoint rather than reading it: the flow returns
+    200, moves the case to STRATEGY_FORMED, writes an audit block -- and nothing
+    in this build consumes STRATEGY_FORMED. A reviewer who clicks approve and
+    sees success reasonably assumes a message went to a customer.
+
+    Not dispatching is the right behaviour: the seeded corpus has no real
+    customers, and firing a provider call at a fabricated one would be worse
+    than doing nothing. The defect was saying nothing about it.
+    """
+
+    def test_approving_reports_that_nothing_was_dispatched(self, ctx: Any) -> None:
+        client, _, _ = ctx
+        body = _action(client).json()
+        assert body["dispatched"] is False
+        assert "Nothing was dispatched" in body["what_happens_next"]
+        # And it points at the path that DOES reach Razorpay, so the reader is
+        # not left thinking the system cannot dispatch at all.
+        assert "Test Mode" in body["what_happens_next"]
+
+    def test_rejecting_also_says_nothing_was_dispatched(self, ctx: Any) -> None:
+        client, _, _ = ctx
+        body = _action(client, action="reject").json()
+        assert body["dispatched"] is False
+        assert "REJECTED" in body["what_happens_next"]
+
+    def test_no_worker_consumes_strategy_formed(self) -> None:
+        """Pins the claim the message makes.
+
+        If someone later adds an executor this fails -- and the message becomes
+        wrong at the same moment, which is exactly when it should be updated.
+        Asserted over the source because there is no runtime way to prove the
+        absence of a consumer.
+        """
+        root = Path(__file__).resolve().parents[1] / "apps" / "api" / "app"
+        consumers = [
+            str(path.relative_to(root))
+            for path in root.rglob("*.py")
+            if path.name not in {"enums.py", "approvals.py", "nodes.py"}
+            and "STRATEGY_FORMED" in path.read_text(encoding="utf-8")
+        ]
+        assert not consumers, (
+            f"something now reads STRATEGY_FORMED: {consumers}. The approval "
+            "response tells reviewers nothing is dispatched -- update that "
+            "message, or this test is the lie."
+        )

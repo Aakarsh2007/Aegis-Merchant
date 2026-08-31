@@ -1033,3 +1033,33 @@ a reader can check. The new block says so explicitly.
 able to see that their real evidence survived a routine command — a guarantee nobody observes
 is indistinguishable from an absent one, which is the argument this project makes about
 verifiers and brakes and applies here too.
+
+---
+
+## DEC-042 · 2026-09-01 · Say what a control did NOT do, in the payload
+
+**Context.** Three separate defects in one audit round shared a shape: the system behaved
+correctly and the interface implied something else.
+
+* `marketing_to_dnd` displayed **PASSED** for an attack that was neutralised (INC-033).
+* Approving a recovery returned **200** and dispatched nothing (INC-034).
+* The auth-mode banner could not render, and its absence read as "auth is on" (INC-035).
+
+**Decision.** Where a control's correct behaviour could be misread as its failure — or its
+absence as its success — the payload states the negative explicitly. `dispatched: false`,
+`attack_outcome: NEUTRALISED`, `significance: null`, `eta: null`, `"Nothing was dispatched"`.
+
+**Rejected:** leaving it to captions and documentation. A caption is a different artefact from
+the response, drifts from it, and is the first thing a reader skips. Three of these bugs were
+*already* documented correctly somewhere — in a docstring, a startup log, a decision record —
+and the interface still misled.
+
+**Rejected:** hiding the raw value once a clearer one exists. `attack_outcome` sits *beside*
+`verdict` rather than replacing it, and the full policy payload stays reachable behind a
+disclosure in the approvals queue. Replacing a precise field with a friendlier one is how an
+interface becomes unfalsifiable, which is the opposite of what these panels are for.
+
+**The general rule this project keeps rediscovering:** a guarantee nobody can observe is
+indistinguishable from an absent one. It was written down for the audit verifier, for the
+stopping rules that list their zeroes, and for the control arm. It applies equally to a
+dispatch that did not happen and a header that cannot be read.

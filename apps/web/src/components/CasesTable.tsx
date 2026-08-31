@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * The case list, with the diagnosis *source* shown (§19.2).
  *
@@ -12,6 +14,7 @@
  * treated cases is what makes the holdout legible.
  */
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { api, rupees, type CaseSummary } from "@/lib/api";
 import { FetchError } from "./Provenance";
 
@@ -105,22 +108,107 @@ function Row({ row }: { row: CaseSummary }) {
   );
 }
 
-export async function CasesTable({ query = "?limit=25" }: { query?: string }) {
-  const result = await api.cases(query);
-  if (!result.ok) {
-    return <FetchError what="Cases" error={result.error} />;
+/**
+ * The filters, and why `arm` is the one that matters.
+ *
+ * `/api/v1/cases` has supported `?arm=CONTROL` from the start, with a docstring
+ * saying it exists so "a judge can ask for ?arm=CONTROL and see cases we
+ * deliberately did not act on. A control arm nobody can inspect is
+ * indistinguishable from one that does not exist."
+ *
+ * The dashboard never exposed it. So the capability built specifically for a
+ * judge was reachable only by hand-editing a URL, and the holdout -- the
+ * mechanism every rupee of the incremental figure rests on -- could be read
+ * about but not checked. That is the same defect as an unverifiable audit
+ * chain, in the panel below it.
+ */
+const FILTERS: Array<{ label: string; query: string; hint: string }> = [
+  { label: "All", query: "?limit=25", hint: "First 25 of the corpus" },
+  {
+    label: "Held as control",
+    query: "?arm=CONTROL&limit=50",
+    hint: "Deliberately never contacted — this is the counterfactual",
+  },
+  {
+    label: "Treated",
+    query: "?arm=TREATMENT&limit=25",
+    hint: "The agent acted on these",
+  },
+  {
+    label: "Recovered",
+    query: "?status=RECOVERED&limit=50",
+    hint: "Settled — check the SOURCE column for who diagnosed them",
+  },
+  {
+    label: "Awaiting a human",
+    query: "?status=AWAITING_APPROVAL&limit=50",
+    hint: "Above the autonomous limit",
+  },
+];
+
+export function CasesTable() {
+  const [active, setActive] = useState(0);
+  // `loadedFor` rather than a separate `busy` flag: loading is *derived* from
+  // "the data I hold is not for the filter I am showing", so there is no
+  // setState in the effect body -- which the lint rule correctly objects to,
+  // because it causes a cascading render on every filter click.
+  const [loaded, setLoaded] = useState<{
+    index: number;
+    cases: CaseSummary[];
+    total: number;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const busy = loaded?.index !== active;
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const result = await api.cases(FILTERS[active].query);
+      if (cancelled) return;
+      if (result.ok) {
+        setLoaded({ index: active, ...result.data });
+        setError(null);
+      } else {
+        setError(result.error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [active]);
+
+  if (error) {
+    return <FetchError what="Cases" error={error} />;
   }
-  const { cases, total } = result.data;
+  const cases = loaded?.cases ?? [];
+  const total = loaded?.total ?? 0;
 
   return (
     <section className="rounded-xl border border-ink-700 bg-ink-900/60 p-4">
-      <header className="flex items-start justify-between gap-2">
+      <header className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-paper-50">Cases</h2>
           <p className="mt-0.5 text-[11px] text-paper-500">
-            Showing {cases.length} of {total} · the SOURCE column says whether a
-            rule or a model decided
+            {busy
+              ? "loading…"
+              : `Showing ${cases.length} of ${total} · ${FILTERS[active].hint}`}
           </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {FILTERS.map((f, i) => (
+            <button
+              key={f.label}
+              type="button"
+              onClick={() => setActive(i)}
+              className={`rounded-lg border px-2 py-1 text-[10px] font-medium transition ${
+                i === active
+                  ? "border-brand-500/50 bg-brand-500/15 text-paper-50"
+                  : "border-ink-700 bg-ink-800/60 text-paper-400 hover:bg-ink-700"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </header>
 

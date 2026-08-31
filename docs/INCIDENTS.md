@@ -1329,3 +1329,95 @@ occur, because a claim of layered controls is worth nothing if every attack trip
 check. One test asserts the message class is *actually* downgraded, so the fix cannot become a
 hardcoded string over an unfixed hole. Sabotage-verified: collapsing the outcome back into the
 verdict fails five, mislabelling which row is the baseline fails three.
+
+---
+
+## INC-034 · Approve returned 200 and dispatched nothing
+
+**Symptom:** approving a ₹12,848 recovery returns `200 {"status": "APPROVED"}`. The case moves to
+`STRATEGY_FORMED`. An audit block is written. **Nothing is dispatched, and nothing said so.**
+
+Found by exercising the endpoint rather than reading it.
+
+**Cause.** Nothing in the codebase consumes `STRATEGY_FORMED`. There is no worker that executes
+an approved action, and the response gave no hint of it — so a reviewer who clicked approve and
+saw success would reasonably conclude a message had gone to a customer.
+
+**Not dispatching is the correct behaviour.** The seeded corpus contains fabricated customers,
+and firing a real provider call at one would be considerably worse than doing nothing. The
+defect was silence about it: the human-in-the-loop reads as decorative if approval visibly
+achieves nothing, and reads as *dishonest* if it implies something it did not do.
+
+**Fix.** The response carries `dispatched: false` and a `what_happens_next` sentence saying the
+authorisation was recorded and hash-pinned, that nothing was sent, why, and where to watch a
+real dispatch instead (the Test Mode panel, which does call Razorpay).
+
+**Regression test** includes `test_no_worker_consumes_strategy_formed`, which walks the source
+and fails if anything starts reading that status. If someone adds an executor, the message
+becomes wrong at the same moment the test breaks — which is exactly when it should be updated.
+
+---
+
+## INC-035 · A security banner that could not appear
+
+**Symptom:** none visible, which is the problem. The dashboard rendered nothing about
+authentication being disabled, and the absence read as "auth is on".
+
+**Cause, in two parts.**
+
+**Part one:** nothing rendered the auth posture at all. The API already knew — it sets
+`X-Auth-Mode: disabled` on every response, warns at startup, and records
+`unauthenticated_principal: true` in the audit block for every action taken that way. None of it
+reached the screen. So a judge could approve a ₹12,848 recovery, see it succeed, and never learn
+the ledger had attributed their decision to `anonymous(unauthenticated)`. For a project whose
+claim is that every action is attributable, the actor field was silently empty on the one screen
+where a human exercises authority.
+
+**Part two, and the more interesting half.** Having written the banner, it would have *silently
+never rendered*. CORS exposes only a safe-list of response headers to JavaScript —
+`Cache-Control`, `Content-Language`, `Content-Type`, `Expires`, `Last-Modified`, `Pragma` —
+unless the server names more in `Access-Control-Expose-Headers`. The config had
+`allow_headers=["*"]`, which looks like it covers this and does not: that governs which
+**request** headers a browser may send, not which **response** headers script may read. Two
+similarly-named settings pointing in opposite directions.
+
+`headers.get("x-auth-mode")` returns `null` rather than throwing, so the component would have
+set mode to "unknown" and rendered nothing, forever, with no error anywhere. **A security notice
+that cannot appear is worse than no notice, because its absence is read as reassurance.**
+
+Caught by checking the headers a *browser* would receive rather than the ones curl prints.
+
+**INC-035b, found by the test written for 035a.** The header was missing from 500 responses
+entirely: the middleware returned early when a handler raised. The startup log promised "every
+response is marked X-Auth-Mode: disabled", and that was false for precisely the responses a
+client probing the API is most likely to see. The exception path now sets it and re-raises.
+
+**Regression test** asserts the header is *exposed*, not merely sent; asserts the origin is
+allowed, so the exposure check cannot pass vacuously against a CORS-less app; and states as an
+assertion that `X-Auth-Mode` is not itself safe-listed, so the whole file cannot quietly become
+a tautology. Sabotage-verified both ways.
+
+---
+
+## INC-036 · The holdout could be read about but not inspected
+
+**Symptom:** `/api/v1/cases?arm=CONTROL` had existed from the beginning, with a docstring
+stating its purpose plainly: *"`arm` is filterable specifically so a judge can ask for
+`?arm=CONTROL` and see cases we deliberately did not act on. A control arm nobody can inspect is
+indistinguishable from one that does not exist."*
+
+**The dashboard never exposed the filter.** The cases table was hardcoded to `?limit=25`.
+
+So the capability built specifically for a judge was reachable only by hand-editing a URL, and
+the holdout — the mechanism every rupee of the incremental figure rests on — could be described
+but not checked. That is the same defect as an audit chain nobody can verify, two panels down
+from the audit verifier that exists precisely to avoid it.
+
+**Fix.** Five filters on the table: All, Held as control, Treated, Recovered, Awaiting a human.
+Each carries a one-line hint saying what the selection means, because "CONTROL" alone does not
+tell a reader that these are the cases the agent was forbidden from touching.
+
+**A note on the implementation.** Making the table interactive required a client component, and
+the first version called `setState` synchronously in an effect body — which the lint rule caught,
+correctly: it causes a cascading render on every filter click. Loading is now *derived*
+(`loaded?.index !== active`) rather than tracked in a second piece of state.

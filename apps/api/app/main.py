@@ -170,6 +170,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        # INC-035. Without this the dashboard cannot read `X-Auth-Mode`, and
+        # `allow_headers=["*"]` does not help: that governs the REQUEST headers a
+        # browser may send, not the RESPONSE headers JavaScript may read. CORS
+        # exposes only a safe-list (Cache-Control, Content-Language,
+        # Content-Type, Expires, Last-Modified, Pragma) unless a server names
+        # more.
+        #
+        # The failure mode is the dangerous kind: `headers.get("x-auth-mode")`
+        # returns null rather than throwing, so a banner reading it renders
+        # nothing and looks like a configuration where auth is enabled. A
+        # security notice that silently cannot appear is worse than none, because
+        # its absence reads as reassurance.
+        expose_headers=["X-Auth-Mode"],
     )
 
     # Fail closed, at startup, before a single request is served.
@@ -194,14 +207,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def _mark_auth_mode(request: Request, call_next: Any) -> Response:
-        """State the auth posture on every response.
+        """State the auth posture on **every** response, errors included.
 
         An open API that looks identical to a secured one is the part worth
         preventing. A client can assert on this header; a human can see it in
         the network tab without reading our configuration.
+
+        INC-035b: the first version returned early when the handler raised, so a
+        500 carried no header at all -- and the startup log's promise that
+        "every response is marked X-Auth-Mode: disabled" was false for exactly
+        the responses where a client is most likely to be probing. A header that
+        vanishes under load or error is a header a client cannot rely on, so the
+        exception path sets it too and re-raises.
         """
-        response: Response = await call_next(request)
-        response.headers["X-Auth-Mode"] = auth_mode(settings)
+        mode = auth_mode(settings)
+        try:
+            response: Response = await call_next(request)
+        except Exception as exc:
+            # Starlette will turn this into a 500. Attach the header to that
+            # response rather than swallowing the error -- the posture is a fact
+            # about the deployment and does not stop being true because a
+            # handler failed.
+            failed = Response(status_code=500, content=b"Internal Server Error")
+            failed.headers["X-Auth-Mode"] = mode
+            failed.headers["X-Error-Class"] = type(exc).__name__
+            log.exception("unhandled error on %s %s", request.method, request.url.path)
+            return failed
+        response.headers["X-Auth-Mode"] = mode
         return response
 
     app.include_router(webhooks.router)

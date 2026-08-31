@@ -19,6 +19,7 @@ import { ApprovalsQueue } from "@/components/ApprovalsQueue";
 import { AttributionPanel } from "@/components/AttributionPanel";
 import { AuditVerifier } from "@/components/AuditVerifier";
 import { AdversarialPanel } from "@/components/AdversarialPanel";
+import { AuthModeBanner } from "@/components/AuthModeBanner";
 import { CausalGap } from "@/components/CausalGap";
 import { CasesTable } from "@/components/CasesTable";
 import { ChaosPanel } from "@/components/ChaosPanel";
@@ -73,6 +74,10 @@ export default function Page() {
           <p className="text-sm font-medium text-paper-100">GlowKart</p>
         </div>
       </header>
+
+      {/* Stated before anything else, because it changes how every action on
+           this page should be read. */}
+      <AuthModeBanner />
 
       <StartHere />
 
@@ -144,9 +149,7 @@ export default function Page() {
 
       {/* 7. Follow one case end to end. */}
       <div className="mt-6">
-        <Suspense fallback={<Skeleton label="cases" />}>
-          <CasesTable />
-        </Suspense>
+        <CasesTable />
       </div>
 
       <div className="mt-4">

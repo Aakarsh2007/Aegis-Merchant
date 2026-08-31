@@ -194,4 +194,24 @@ async def action_approval(
         "reviewed_by": approval.reviewed_by,
         "reviewed_at": now.isoformat(),
         "case_status": case.status.value if case else None,
+        # Stated because it would otherwise be inferred, and inferred wrongly.
+        # Approving records an authorisation and moves the case to
+        # STRATEGY_FORMED. **Nothing in this build then executes it** -- there is
+        # no continuous worker consuming STRATEGY_FORMED, by design: dispatching
+        # a real provider call for a seeded demo customer would be worse than
+        # doing nothing. A reviewer who clicked approve and saw 200 would
+        # reasonably assume a message went out, so the response says plainly
+        # that one did not.
+        "what_happens_next": (
+            "The authorisation is recorded and hash-pinned in the audit ledger; "
+            "the case moved to STRATEGY_FORMED. Nothing was dispatched: this "
+            "build has no worker that executes approved actions, because the "
+            "seeded corpus has no real customers to contact. In a deployment "
+            "the outbox drainer would pick this up. To watch a real dispatch "
+            "end to end, use the Test Mode panel -- that path calls Razorpay."
+            if approved
+            else "The case is closed as REJECTED. Nothing was dispatched, and "
+            "the rejection is recorded in the audit ledger."
+        ),
+        "dispatched": False,
     }
