@@ -55,6 +55,7 @@ from app.db.enums import (
     PaymentStatus,
     Playbook,
     PromiseStatus,
+    RecoveryVerifier,
 )
 from app.db.ids import idempotency_hash, new_id
 from app.db.models import (
@@ -118,12 +119,27 @@ class BatchResult:
     control: int
     settled: int
     simulated_recovered_paise: int
+    #: Razorpay-verified cases the reset refused to delete (INC-032). Reported
+    #: rather than merely logged: the whole point is that the operator can see
+    #: their real evidence survived a routine command.
+    carried_over: tuple[str, ...] = ()
 
     def render(self) -> str:
         lines = [
             "=" * 70,
             f"BATCH COMPLETE -- {self.cases_created} cases",
             "=" * 70,
+            *(
+                [
+                    f"  PRESERVED {len(self.carried_over)} Razorpay-verified case(s): "
+                    f"{', '.join(self.carried_over)}",
+                    "    A payment Razorpay confirmed is not the batch's to delete",
+                    "    (INC-032). Everything else was reset.",
+                    "",
+                ]
+                if self.carried_over
+                else []
+            ),
             "",
             "  case outcomes:",
         ]
@@ -163,16 +179,106 @@ def _at(deps: AgentDeps, moment: datetime) -> AgentDeps:
 
 
 async def _clear(session: AsyncSession) -> None:
-    """Make the batch re-runnable.
+    """Make the batch re-runnable, without destroying real evidence.
 
-    Deletes cases, assignments and audit blocks — not the corpus. A judge who
-    runs it twice should see the same numbers, not doubled ones.
+    Deletes the cases this batch created — not the corpus, and **never a case
+    Razorpay itself proved**.
+
+    INC-032. This used to be an unfiltered ``delete(RecoveryCase)``, so
+    ``python tasks.py batch`` — and therefore ``demo`` — silently destroyed
+    every RAZORPAY_VERIFIED recovery in the database. That is not theoretical:
+    it is how the first live Test Mode verification of this project was lost,
+    and it would happen to anyone who ran the demo after making a real payment.
+    The one figure in this system meant to be beyond argument was being deleted
+    by a routine command.
+
+    The rule is simple and worth stating as an invariant: **the batch owns
+    simulated data and may clear it; a payment Razorpay confirmed is not the
+    batch's to delete.**
+
+    The audit chain is still rebuilt from scratch, because the blocks are a
+    hash chain ordered by ``block_index`` and deleting an interleaved subset
+    would leave gaps and broken links — a chain that fails verification for a
+    reason that has nothing to do with tampering. Each preserved case therefore
+    gets a fresh block recording that it was carried over, so its presence is
+    accounted for in the new chain rather than appearing from nowhere.
     """
-    await session.execute(delete(LLMCall))
+    preserved = (
+        (
+            await session.execute(
+                select(RecoveryCase).where(
+                    RecoveryCase.recovery_verified_via.in_(
+                        [RecoveryVerifier.WEBHOOK, RecoveryVerifier.API_RECONCILIATION]
+                    )
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    keep_ids = {case.id for case in preserved}
+
+    await session.execute(
+        delete(LLMCall).where(~LLMCall.case_id.in_(keep_ids)) if keep_ids else delete(LLMCall)
+    )
     await session.execute(delete(AuditBlock))
-    await session.execute(delete(ExperimentAssignment))
-    await session.execute(delete(RecoveryCase))
+    await session.execute(
+        delete(ExperimentAssignment).where(~ExperimentAssignment.case_id.in_(keep_ids))
+        if keep_ids
+        else delete(ExperimentAssignment)
+    )
+    await session.execute(
+        delete(RecoveryCase).where(~RecoveryCase.id.in_(keep_ids))
+        if keep_ids
+        else delete(RecoveryCase)
+    )
     await session.commit()
+    return None
+
+
+async def _record_carried_over(session: AsyncSession, *, clock: Clock) -> list[str]:
+    """Give each preserved case a block in the rebuilt chain.
+
+    Without this a RAZORPAY_VERIFIED case would exist with no audit history at
+    all after a batch run -- present in the totals, absent from the ledger,
+    which is precisely the shape an auditor should be suspicious of.
+    """
+    preserved = (
+        (
+            await session.execute(
+                select(RecoveryCase).where(
+                    RecoveryCase.recovery_verified_via.in_(
+                        [RecoveryVerifier.WEBHOOK, RecoveryVerifier.API_RECONCILIATION]
+                    )
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    chain = AuditChain(clock)
+    for case in preserved:
+        await chain.append(
+            session,
+            event_name="case.carried_over",
+            actor="batch:reset",
+            payload={
+                "case_id": case.id,
+                "recovered_amount_paise": case.recovered_amount_paise,
+                "recovery_verified_by": case.recovery_verified_by,
+                "recovery_verified_via": (
+                    case.recovery_verified_via.value if case.recovery_verified_via else None
+                ),
+                "note": (
+                    "Razorpay proved this payment, so the batch reset preserved the "
+                    "case. Its original blocks were in the previous chain; this block "
+                    "records the carry-over in the rebuilt one (INC-032)."
+                ),
+            },
+            case_id=case.id,
+        )
+    await session.commit()
+    return [case.id for case in preserved]
 
 
 async def run_batch(
@@ -185,6 +291,7 @@ async def run_batch(
     """Put the corpus through the agent."""
     async with factory() as session:
         await _clear(session)
+        carried = await _record_carried_over(session, clock=clock)
         # Merchant-level facts, loaded once. Without these the stopping context
         # falls back to dataclass defaults and S-10/S-11/S-12 cannot fire
         # (INC-022) -- the rules would be present, proven, and never consulted.
@@ -362,6 +469,7 @@ async def run_batch(
                     attempt_no=final.attempt_no,
                     recovered_amount_paise=amount,
                     recovery_verified_by=verified_by,
+                    recovery_verified_via=(RecoveryVerifier.SIMULATOR if verified_by else None),
                     idempotency_hash=idempotency_hash(
                         attempt.merchant_id, str(attempt.id), playbook.value
                     ),
@@ -447,9 +555,23 @@ async def run_batch(
                     ApprovalRequest(
                         id=new_id("approval"),
                         case_id=case_id,
+                        # INC-031: this used to recompute the rung from its own
+                        # hardcoded Rs 10,000 threshold, while `trigger_reason`
+                        # carried the policy firewall's actual decision. The two
+                        # disagreed on the same card -- "rung A3_APPROVAL_DUAL"
+                        # above a reason reading "requires approval at rung
+                        # A2_APPROVAL" -- and the batch's answer was the wrong
+                        # one, because escalation is the firewall's decision and
+                        # a second implementation of it is a second source of
+                        # truth (the INC-007 shape).
+                        #
+                        # Over-escalating is not a safe default here: it would
+                        # make a merchant demand two signatures where policy
+                        # requires one, and a queue that cries wolf gets
+                        # rubber-stamped.
                         trigger_rung=(
-                            EscalationRung.A3_APPROVAL_DUAL
-                            if attempt.amount_paise >= 10_000_00
+                            final.policy_applied.escalation_rung
+                            if final.policy_applied is not None
                             else EscalationRung.A2_APPROVAL
                         ),
                         trigger_reason=(
@@ -521,4 +643,5 @@ async def run_batch(
         control=control,
         settled=settled,
         simulated_recovered_paise=recovered_paise,
+        carried_over=tuple(carried),
     )

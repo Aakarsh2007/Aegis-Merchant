@@ -42,7 +42,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.clock import Clock
-from app.db.enums import CaseStatus
+from app.db.enums import CaseStatus, RecoveryVerifier
 from app.db.models import Outbox, RecoveryAction, RecoveryCase, WebhookEvent
 from app.ingest.normalise import normalise
 from app.services.attribution import SETTLING_EVENTS, attribute
@@ -205,6 +205,7 @@ async def process_settlement(
             # lands in the RAZORPAY_VERIFIED column -- the only figure in this
             # project that constitutes proof of an actual recovery.
             case.recovery_verified_by = event_id
+            case.recovery_verified_via = RecoveryVerifier.WEBHOOK
             case.resolved_at = clock.now_utc()
 
             await AuditChain(clock).append(

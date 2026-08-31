@@ -30,6 +30,7 @@ from app.db.enums import (
     ExperimentArm,
     LLMSource,
     OutboxStatus,
+    RecoveryVerifier,
     StoppingRule,
 )
 from app.db.models import (
@@ -98,9 +99,16 @@ async def overview(session: AsyncSession, *, clock: Clock) -> OverviewReport:
 
     ``gross_recovered`` is RAZORPAY_VERIFIED because the schema will not let it
     be anything else: ``recovery_requires_proof`` is a CHECK constraint, so a
-    recovered amount cannot exist in the database without a webhook event id
-    that verified it. The badge is not a claim we make about the number, it is
-    a claim the database already enforces.
+    recovered amount cannot exist in the database without an id that verified
+    it. The badge is not a claim we make about the number, it is a claim the
+    database already enforces.
+
+    That id is **not always a webhook event id**, and this docstring used to say
+    it was. A recovery proven by ``workers/reconcile`` carries a payment or
+    payment-link id from a direct API read. ``recovery_verified_via`` records
+    which, and the basis string reports the split rather than asserting a
+    webhook -- the first live recovery of 2026-08-31 was a poll, because the
+    webhook was lost to a dead tunnel.
     """
     open_statuses = [s for s in CaseStatus if s not in TERMINAL_STATUSES]
 
@@ -118,14 +126,42 @@ async def overview(session: AsyncSession, *, clock: Clock) -> OverviewReport:
     ) or 0
     # Split by who proved it. A real Razorpay event id and a simulator's id
     # are different claims and cannot share a tile.
+    # Filtered on the typed column, with the id-prefix check retained as a
+    # belt-and-braces second condition rather than as the primary test. Either
+    # alone is enough to exclude a simulated row; requiring BOTH means a bug in
+    # one cannot promote seeded outcomes onto the verified tile.
     verified_paise = (
         await session.scalar(
             select(func.coalesce(func.sum(RecoveryCase.recovered_amount_paise), 0)).where(
                 RecoveryCase.recovery_verified_by.is_not(None),
+                RecoveryCase.recovery_verified_via.in_(
+                    [RecoveryVerifier.WEBHOOK, RecoveryVerifier.API_RECONCILIATION]
+                ),
                 ~RecoveryCase.recovery_verified_by.startswith(SIMULATED_EVENT_PREFIX),
             )
         )
     ) or 0
+    # How it was proven, per mechanism, so the basis can name what actually
+    # happened instead of asserting a webhook every time.
+    by_verifier = {
+        verifier: int(count or 0)
+        for verifier, count in (
+            await session.execute(
+                select(
+                    RecoveryCase.recovery_verified_via,
+                    func.count(RecoveryCase.id),
+                )
+                .where(
+                    RecoveryCase.recovery_verified_via.in_(
+                        [RecoveryVerifier.WEBHOOK, RecoveryVerifier.API_RECONCILIATION]
+                    )
+                )
+                .group_by(RecoveryCase.recovery_verified_via)
+            )
+        ).all()
+    }
+    webhook_count = by_verifier.get(RecoveryVerifier.WEBHOOK, 0)
+    poll_count = by_verifier.get(RecoveryVerifier.API_RECONCILIATION, 0)
     simulated_paise = (
         await session.scalar(
             select(func.coalesce(func.sum(RecoveryCase.recovered_amount_paise), 0)).where(
@@ -178,10 +214,20 @@ async def overview(session: AsyncSession, *, clock: Clock) -> OverviewReport:
             paise=int(verified_paise),
             provenance=Provenance.RAZORPAY_VERIFIED,
             basis=(
-                "sum of recovered_amount over cases proven by a REAL signed Razorpay "
-                "webhook; the recovery_requires_proof CHECK makes an unverified "
-                "recovery unrepresentable. A non-zero figure here has been proven "
-                "by a real signed webhook; zero means nothing has yet been."
+                (
+                    f"proven by Razorpay itself: {webhook_count} by signed webhook, "
+                    f"{poll_count} by direct API reconciliation. Both are Razorpay "
+                    "asserting the payment -- a poll needs no public URL, which is "
+                    "why a lost webhook cannot cost a real recovery (DEC-037). The "
+                    "recovery_requires_proof CHECK makes an unverified recovery "
+                    "unrepresentable."
+                )
+                if (webhook_count or poll_count)
+                else (
+                    "nothing has been proven by Razorpay yet, so this is zero. It "
+                    "counts only cases Razorpay itself confirmed, by signed webhook "
+                    "or by direct API reconciliation."
+                )
             ),
         ),
         gross_simulated=Figure(
@@ -309,8 +355,18 @@ async def cost_report(session: AsyncSession) -> CostReport:
         output_tokens=output_tokens,
         actual_spend=Figure(
             paise=0,
-            provenance=Provenance.RAZORPAY_VERIFIED,
-            basis="Gemini free tier and a committed response cache; nothing was billed",
+            # NOT RAZORPAY_VERIFIED. Razorpay has no view on what we spent with
+            # Google, and the badge means "a signed webhook proves this". The
+            # old code reasoned that zero is exactly what was spent and so
+            # deserved the strongest badge -- true about the number, wrong about
+            # the badge, which names a source rather than a confidence level.
+            # Spending it here devalues it on the tiles where it is load-bearing.
+            provenance=Provenance.SIMULATED,
+            basis=(
+                "counted from our own llm_calls ledger: Gemini free tier plus a "
+                "committed response cache, so nothing was billed. Razorpay is "
+                "not involved in this figure and does not verify it."
+            ),
         ),
         projected_spend=Figure(
             paise=round(projected_inr * 100),

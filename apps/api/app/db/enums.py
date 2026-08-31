@@ -163,6 +163,35 @@ class FailureCategory(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class RecoveryVerifier(StrEnum):
+    """**How** a recovery was proven. Not the same question as *whether*.
+
+    Added because the dashboard's basis text claimed every RAZORPAY_VERIFIED
+    rupee was "proven by a REAL signed Razorpay webhook", and the first live
+    recovery of the day was proven by a **poll** -- the webhook was lost to a
+    dead tunnel and `workers/reconcile` picked it up. Both are Razorpay
+    asserting the payment, so the badge was right; the basis named a mechanism
+    that did not happen, which is the kind of small falsehood this project
+    cannot afford on its most load-bearing tile.
+
+    It also replaces a string convention with a type. The real/simulated split
+    was decided by sniffing an id prefix (`sim_evt_`), and the comment above
+    that constant admitted the hazard: *"a simulator that wrote a
+    realistic-looking one would silently promote seeded outcomes to
+    RAZORPAY_VERIFIED"*. A column cannot be spoofed by choosing a convincing
+    id.
+    """
+
+    #: A signed webhook arrived and its HMAC verified. The strongest claim.
+    WEBHOOK = "WEBHOOK"
+    #: We asked Razorpay's API directly, because no webhook arrived. Equally
+    #: Razorpay's assertion, and it needs no public URL -- which is why a lost
+    #: webhook cannot cost a real recovery (DEC-037).
+    API_RECONCILIATION = "API_RECONCILIATION"
+    #: The batch simulator. Never RAZORPAY_VERIFIED, at any id.
+    SIMULATOR = "SIMULATOR"
+
+
 class DiagnosisSource(StrEnum):
     """Whether a diagnosis came from the model or the rule table. Surfaced in
     the UI: a deterministic fallback is never presented as model reasoning."""

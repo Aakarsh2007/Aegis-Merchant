@@ -55,6 +55,7 @@ from app.db.enums import (
     Playbook,
     PromiseStatus,
     RecoveryStrategy,
+    RecoveryVerifier,
     StoppingRule,
 )
 from app.db.types import PaiseInt, UtcDateTime
@@ -401,6 +402,11 @@ class RecoveryCase(Base):
     #: The webhook event_id that proved the recovery. Null means unproven, and
     #: an unproven case is never counted (§14.1).
     recovery_verified_by: Mapped[str | None] = mapped_column(String(80))
+    #: How it was proven -- webhook, API poll, or the simulator. See
+    #: :class:`RecoveryVerifier`. Nullable only for unrecovered cases.
+    recovery_verified_via: Mapped[RecoveryVerifier | None] = mapped_column(
+        _enum(RecoveryVerifier, "recovery_verifier")
+    )
     #: The reference on the merchant's OWN checkout link for a control-arm case.
     #:
     #: Not an action of ours, and deliberately not an ``Outbox`` row: a control

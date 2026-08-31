@@ -289,9 +289,33 @@ def _sanitise_expiry(proposed: int, limits: PolicyLimitsFull, clamps: list[Clamp
 
 
 def _escalation_rung(
-    amount_paise: int, discount_pct: float, limits: PolicyLimitsFull, clamps: list[Clamp]
+    amount_paise: int,
+    discount_pct: float,
+    limits: PolicyLimitsFull,
+    clamps: list[Clamp],
+    *,
+    strategy: RecoveryStrategy,
 ) -> EscalationRung:
-    """Authority ladder (§8.3, dimension A)."""
+    """Authority ladder (§8.3, dimension A).
+
+    INC-031. The ladder is about **authority to act**, and it used to be
+    computed from the amount alone -- so a ``NO_ACTION`` on a large order was
+    escalated, and a reviewer was asked to approve doing nothing. They can
+    neither grant nor withhold anything.
+
+    RC-0023 was the case that showed it: RISK_BLOCKED, correctly left alone,
+    sitting in a queue of twenty demanding human attention. A queue padded with
+    unactionable items gets rubber-stamped, and the items that *do* matter get
+    rubber-stamped with them.
+
+    The exemption is only sound because NO_ACTION cannot move money, which
+    ``test_no_action_can_never_move_money`` proves rather than assumes.
+    Restraint is still reported -- the morning briefing's "what I chose not to
+    do" section is where a decision a human should know about but cannot act on
+    belongs.
+    """
+    if strategy is RecoveryStrategy.NO_ACTION:
+        return EscalationRung.A0_AUTONOMOUS
     if amount_paise >= limits.hitl_dual_signal_amount_paise:
         return EscalationRung.A3_APPROVAL_DUAL
     if amount_paise >= limits.max_autonomous_amount_paise:
@@ -395,9 +419,36 @@ def evaluate_policy(
     discount_pct, discount_paise = _apply_absolute_cap(
         discount_pct, ctx.order_amount_paise, ctx.limits, clamps
     )
+    if proposal.strategy is RecoveryStrategy.NO_ACTION and (discount_pct or discount_paise):
+        # There is nothing to discount. An applied action reading "NO_ACTION at
+        # 15% off" is incoherent, and it would put a discount figure into the
+        # audit payload and the approval hash for an action that never happens.
+        #
+        # Recorded as a clamp rather than zeroed silently: "every reduction is
+        # recorded" is a property this file is proved against, and the property
+        # suite caught the first version of this fix for violating it. Not a
+        # violation though -- a discount alongside NO_ACTION is incoherent
+        # rather than dangerous, and flagging it as one would re-escalate the
+        # case the fix exists to stop escalating.
+        clamps.append(
+            Clamp(
+                "discount_pct",
+                discount_pct,
+                0.0,
+                "NO_ACTION: nothing to discount",
+                is_violation=False,
+            )
+        )
+        discount_pct, discount_paise = 0.0, 0
     expiry = _sanitise_expiry(proposal.link_validity_minutes, ctx.limits, clamps)
     charge_amount = ctx.order_amount_paise - discount_paise
-    rung = _escalation_rung(ctx.order_amount_paise, discount_pct, ctx.limits, clamps)
+    rung = _escalation_rung(
+        ctx.order_amount_paise,
+        discount_pct,
+        ctx.limits,
+        clamps,
+        strategy=proposal.strategy,
+    )
 
     applied = AppliedAction(
         case_id=ctx.case_id,

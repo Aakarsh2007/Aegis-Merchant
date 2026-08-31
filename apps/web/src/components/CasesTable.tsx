@@ -56,15 +56,15 @@ function Row({ row }: { row: CaseSummary }) {
 
   return (
     <tr className={`border-b border-ink-800 ${isControl ? "opacity-55" : ""}`}>
-      <td className="numeric py-2 pr-3 text-[11px] text-paper-300">
+      <td className="numeric px-2 py-2 text-[11px] text-paper-300">
         <Link href={`/cases/${row.id}`} className="hover:text-brand-400">
           {row.id}
         </Link>
       </td>
-      <td className="numeric py-2 pr-3 text-right text-[11px] text-paper-100">
+      <td className="numeric px-2 py-2 text-right text-[11px] text-paper-100">
         {(row.amount_paise / 100).toLocaleString("en-IN")}
       </td>
-      <td className="py-2 pr-3">
+      <td className="px-2 py-2">
         <span
           className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
             STATUS_STYLES[row.status] ?? "bg-ink-800 text-paper-500"
@@ -73,7 +73,7 @@ function Row({ row }: { row: CaseSummary }) {
           {row.status}
         </span>
       </td>
-      <td className="py-2 pr-3 text-[11px] text-paper-500">
+      <td className="px-2 py-2 text-[11px] text-paper-500">
         {isControl ? (
           <span title="Held as control. No action was taken — this is the counterfactual.">
             CONTROL · not contacted
@@ -82,7 +82,7 @@ function Row({ row }: { row: CaseSummary }) {
           (row.diagnosis ?? "—")
         )}
       </td>
-      <td className="py-2 pr-3">
+      <td className="px-2 py-2">
         {source ? (
           <span
             title={source.hint}
@@ -98,7 +98,7 @@ function Row({ row }: { row: CaseSummary }) {
           <span className="text-[10px] text-paper-500">—</span>
         )}
       </td>
-      <td className="numeric py-2 text-right text-[11px] text-paper-500">
+      <td className="numeric px-2 py-2 text-right text-[11px] text-paper-500">
         {row.confidence !== null ? row.confidence.toFixed(2) : "—"}
       </td>
     </tr>
@@ -138,7 +138,12 @@ export async function CasesTable({ query = "?limit=25" }: { query?: string }) {
                   (heading, i) => (
                     <th
                       key={heading}
-                      className={`pb-2 text-[10px] font-semibold tracking-wider text-paper-500 ${
+                      /*
+                        `px-2` matters: AMOUNT is right-aligned and STATUS is
+                        left-aligned immediately after it, so with no padding
+                        their edges touch and the header reads "AMOUNTSTATUS".
+                      */
+                      className={`px-2 pb-2 text-[10px] font-semibold tracking-wider text-paper-500 ${
                         i === 1 || i === 5 ? "text-right" : ""
                       }`}
                     >

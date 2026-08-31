@@ -999,3 +999,37 @@ and against the payload we actually send the provider — `notify: {sms: true}` 
 control customer and no assertion on our own tables would ever see it. Sabotage-verified four
 ways: an outbox row for control, a namespace collision, provider notification enabled, and a
 significance verdict in the report. Each fails tests.
+
+---
+
+## DEC-041 · 2026-09-01 · The batch may clear simulated data; it may not delete proof
+
+**Context.** INC-032: `_clear` was an unfiltered `delete(RecoveryCase)`, so the most routine
+command in the project destroyed every RAZORPAY_VERIFIED recovery. It had already cost this
+project its first live verification, which I had recorded as carelessness rather than as a bug.
+
+**Decision.** One invariant, stated so it can be tested: **the batch owns simulated data and
+may clear it; a payment Razorpay confirmed is not the batch's to delete.** `_clear` skips any
+case whose `recovery_verified_via` is `WEBHOOK` or `API_RECONCILIATION`.
+
+**Rejected:** deleting nothing, and requiring an explicit `--reset`. It makes the batch
+non-re-runnable by default and doubles every figure on a second run — a judge running `demo`
+twice would see 420 cases and a lift computed over a duplicated population. The test suite
+asserts *both* halves for this reason: verified cases survive **and** simulated ones are
+cleared.
+
+**Rejected:** preserving the audit blocks of the surviving cases. The blocks are a hash chain
+ordered by `block_index`, and the real cases' blocks are interleaved with the batch's rather
+than forming a prefix. Deleting a subset leaves gaps and broken links, so the chain would fail
+verification for a reason that has nothing to do with tampering — trading a data-loss bug for
+a false alarm on the project's integrity claim.
+
+**So the chain is still rebuilt, and each preserved case gets a `case.carried_over` block.** A
+RAZORPAY_VERIFIED case appearing in the totals with no entry in the ledger is precisely the
+shape an auditor should distrust, and "its history was in the previous chain" is not something
+a reader can check. The new block says so explicitly.
+
+**And the batch reports what it preserved**, rather than only logging it. The operator has to be
+able to see that their real evidence survived a routine command — a guarantee nobody observes
+is indistinguishable from an absent one, which is the argument this project makes about
+verifiers and brakes and applies here too.

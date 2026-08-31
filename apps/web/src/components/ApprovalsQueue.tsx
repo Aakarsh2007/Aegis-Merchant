@@ -39,7 +39,17 @@ function ApprovalRow({ approval }: { approval: Approval }) {
     >
       <div className="flex items-baseline justify-between gap-3">
         <span className="numeric text-sm font-semibold text-paper-50">
-          Rs {(approval.amount_paise / 100).toLocaleString("en-IN")}
+          {/*
+            minimumFractionDigits, or currency loses a digit: Rs 20,055.6 was
+            rendered for 2005560 paise. `toLocaleString` drops a trailing zero
+            by default, which is correct for a quantity and wrong for money --
+            and this figure sits on a card asking a human to authorise it.
+          */}
+          Rs{" "}
+          {(approval.amount_paise / 100).toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
         </span>
         <span
           className={`text-[10px] font-medium ${

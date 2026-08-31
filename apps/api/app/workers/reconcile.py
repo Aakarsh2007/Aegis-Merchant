@@ -37,7 +37,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.clock import Clock
-from app.db.enums import CaseStatus, OutboxStatus
+from app.db.enums import CaseStatus, OutboxStatus, RecoveryVerifier
 from app.db.models import Outbox, RecoveryCase
 from app.tools.audit import AuditChain
 from app.tools.provider import PaymentLinkResult, PaymentProvider
@@ -182,6 +182,7 @@ async def reconcile_outstanding(
             # would be the wrong trade.
             payment_id = _payment_id(link)
             fresh.recovery_verified_by = payment_id or link.link_id
+            fresh.recovery_verified_via = RecoveryVerifier.API_RECONCILIATION
             fresh.resolved_at = clock.now_utc()
 
             await AuditChain(clock).append(

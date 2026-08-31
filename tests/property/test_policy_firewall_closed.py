@@ -395,13 +395,46 @@ class TestAuthorityIsNeverBypassed:
         self, proposal: RecoveryProposal, ctx: PolicyContext
     ) -> None:
         """The ₹10,000 ceiling. With no approval hash supplied, anything at or
-        above it must escalate rather than execute."""
+        above it must escalate rather than execute.
+
+        **Except NO_ACTION** (INC-031). The ladder governs *authority to act*,
+        and doing nothing needs none: a reviewer asked to approve NO_ACTION can
+        neither grant nor withhold anything, and a queue padded with
+        unactionable items gets rubber-stamped along with the items that matter.
+
+        The exemption is only safe if NO_ACTION genuinely cannot move money, so
+        that is asserted here rather than assumed -- see also
+        ``test_no_action_can_never_move_money`` below, which is the property
+        that licenses this carve-out.
+        """
         d = run(proposal, ctx)
         if (
             ctx.order_amount_paise >= ctx.limits.max_autonomous_amount_paise
             and ctx.approved_action_hash is None
+            and proposal.strategy is not RecoveryStrategy.NO_ACTION
         ):
             assert d.verdict is not PolicyVerdict.PASSED
+
+    @given(proposal=mixed_proposals, ctx=viable_contexts)
+    @SETTINGS
+    def test_no_action_can_never_move_money(
+        self, proposal: RecoveryProposal, ctx: PolicyContext
+    ) -> None:
+        """**The property that licenses the exemption above.**
+
+        Without this, exempting NO_ACTION from the authority ladder would be an
+        unproven hole: a strategy that skips approval must be incapable of
+        having an effect. Asserted over every generated amount, including ones
+        far above the dual-signal ceiling.
+        """
+        d = run(proposal, ctx)
+        if d.applied is None or d.applied.strategy is not RecoveryStrategy.NO_ACTION:
+            return
+        assert d.applied.discount_pct == 0.0
+        assert d.applied.discount_amount_paise == 0
+        # Nothing is being charged beyond the order itself -- no new money is
+        # authorised by an action that does not happen.
+        assert d.applied.charge_amount_paise == ctx.order_amount_paise
 
     @given(proposal=proposals, ctx=contexts)
     @SETTINGS
@@ -619,6 +652,11 @@ class TestEscalationRungIsCoherent:
     ) -> None:
         d = run(proposal, ctx)
         if d.applied is None:
+            return
+        if d.applied.strategy is RecoveryStrategy.NO_ACTION:
+            # INC-031: no action, no authority needed. Its safety is proved by
+            # `test_no_action_can_never_move_money`, not asserted here.
+            assert d.applied.escalation_rung is EscalationRung.A0_AUTONOMOUS
             return
         amount = ctx.order_amount_paise
         if amount >= ctx.limits.hitl_dual_signal_amount_paise:

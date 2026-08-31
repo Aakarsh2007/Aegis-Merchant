@@ -1166,3 +1166,120 @@ different clothes: **a green test that cannot distinguish working from absent.**
 table returning zeros, a shape that every layer produces, a key that never crosses the wire.
 The instrument has to be able to tell the two states apart, and for a dashboard that
 instrument is a pair of eyes on the actual screen.
+
+---
+
+## INC-030 · The tile said "webhook"; the rupee came from a poll
+
+**Symptom:** ₹1.00 appeared on the RAZORPAY_VERIFIED tile with a basis reading *"proven by a
+**REAL signed Razorpay webhook**"*. No webhook had arrived. The rupee was proven by
+`workers/reconcile` polling Razorpay's API, because the tunnel had died and the delivery
+failed.
+
+**Cause.** The basis string asserted the mechanism unconditionally. `recovery_verified_by`
+holds whatever id proved the payment — an event id from a webhook, a payment or payment-link
+id from a poll — and nothing recorded *which*. The badge was correct: Razorpay did assert the
+payment, both ways. The sentence under it was false, on the one tile this project asks to be
+taken at face value.
+
+**A second problem, found in the same read.** The real/simulated split was decided by sniffing
+an id prefix (`sim_evt_`). The comment above that constant already named the hazard: *"a
+simulator that wrote a realistic-looking one would silently promote seeded outcomes to
+RAZORPAY_VERIFIED."* A convention that holds only while everyone remembers it is not a
+guarantee, and this one guarded the most damaging possible overclaim.
+
+**Fix.** `RecoveryVerifier` — `WEBHOOK` / `API_RECONCILIATION` / `SIMULATOR` — as a column,
+set at each of the three write sites. The verified query filters on the column **and** keeps
+the prefix check as a second condition, so a bug in either one cannot promote a simulated
+rupee. The basis now reports the actual split: *"1 by signed webhook, 1 by direct API
+reconciliation"*.
+
+**Regression test:** weighted towards the promotion hazard, including a SIMULATOR row whose id
+is `TWSSP5BW90Y89E` — indistinguishable from a real event id — which the old prefix check would
+have promoted. Sabotage-verified three ways.
+
+---
+
+## INC-031 · Asked to approve doing nothing, at the wrong rung
+
+**Symptom:** an approval card reading `RC-0007 · rung A3_APPROVAL_DUAL` directly above its own
+reason, *"amount ₹12,848 requires approval at rung A2_APPROVAL"*. The card contradicted itself.
+
+**Cause.** The batch computed `trigger_rung` from its own hardcoded ₹10,000 threshold while
+`trigger_reason` carried the policy firewall's actual decision. Two implementations of one
+number — the INC-007 shape — and the batch's was the wrong one, because escalation is the
+firewall's decision to make. Over-escalating is not a safe default: it would make a merchant
+demand two signatures where policy requires one.
+
+**A worse finding behind it.** RC-0023 was `AWAITING_APPROVAL` with `strategy: NO_ACTION`. The
+case was RISK_BLOCKED, the agent correctly decided to do nothing, and a human was being asked
+to *approve doing nothing*. They can neither grant nor withhold anything. The escalation ladder
+was computed from the amount alone, with no regard for whether the action did anything at all.
+
+That is not cosmetic. A queue padded with unactionable items gets rubber-stamped, and the items
+that *do* matter get rubber-stamped along with them.
+
+**Fix.** `trigger_rung` reads the firewall's `escalation_rung`. `NO_ACTION` returns
+`A0_AUTONOMOUS` — the ladder governs authority to act, and doing nothing needs none. Restraint
+is still reported, in the morning briefing's *"what I chose not to do"* section, which is where
+a decision a human should know about but cannot act on belongs.
+
+**The property suite then caught two things the fix had missed**, which is the best argument for
+having it:
+
+1. `test_a_fully_autonomous_action_carries_no_discount` started failing, because an applied
+   action could now read *"NO_ACTION at 15% off"* — incoherent, and it would have put a
+   discount figure into the audit payload and the approval hash for an action that never
+   happens.
+2. Zeroing that discount then broke `test_every_reduction_is_recorded`. It is now recorded as a
+   non-violation clamp, because "every reduction is recorded" is a property this file is proved
+   against and quietly exempting one would hollow it out.
+
+**The exemption is proved, not assumed.** `test_no_action_can_never_move_money` asserts that a
+NO_ACTION applied action carries no discount and authorises no charge beyond the order itself,
+over every generated amount including ones far above the dual-signal ceiling. Without it,
+exempting NO_ACTION from the authority ladder would be an unproven hole.
+
+**Effect:** 20 approvals became 19, and rung mismatches went from every row to zero.
+
+---
+
+## INC-032 · A routine command deleted the money we had proved
+
+**Symptom:** none, until it was looked for. `_clear` in the batch worker was an unfiltered
+`delete(RecoveryCase)`.
+
+**So `python tasks.py batch` — and therefore `demo` — destroyed every RAZORPAY_VERIFIED
+recovery in the database.** Silently. The one figure in this system meant to be beyond argument,
+deleted by the most routine command it has.
+
+This is not hypothetical, and it is not a near-miss. It is how the first live Test Mode
+verification of this project was lost: the ₹1.00 from `RC-TM64210`, gone because a database was
+reset during testing. I recorded that as my own carelessness at the time. It was a bug, and the
+carelessness was only the trigger.
+
+It would have hit the user directly. The intended demo-day sequence is *make a live payment,
+then run the demo* — which would have erased the payment they had just made, on camera.
+
+**Fix.** `_clear` never deletes a case whose `recovery_verified_via` is `WEBHOOK` or
+`API_RECONCILIATION`. The invariant, stated once so it can be checked: **the batch owns
+simulated data and may clear it; a payment Razorpay confirmed is not the batch's to delete.**
+
+The audit chain is still rebuilt from scratch, because the blocks are a hash chain ordered by
+`block_index` and deleting an interleaved subset would leave gaps and broken links — a chain
+failing verification for a reason that has nothing to do with tampering. Each preserved case
+therefore gets a `case.carried_over` block in the rebuilt chain, so a verified case never
+appears in the totals with no entry in the ledger. And the batch *reports* what it preserved
+rather than only logging it, because the point is that the operator can see their evidence
+survived.
+
+**Regression test:** one case per real mechanism plus a simulated row that must still be
+cleared — without that second half the fix could have been "never delete anything", which would
+make the batch non-re-runnable and double every figure. Sabotage-verified: restoring the
+unfiltered delete fails five of eight.
+
+**What was learned, across all three.** Every one of these was found by reading the running
+product rather than the test suite, which was green at 1,040 tests throughout. INC-030 came from
+reading a hover caption. INC-031 came from a scanned PDF of the dashboard. INC-032 came from
+asking, before re-running a command I had already run a dozen times, *what does this delete?* —
+a question worth asking about any command that says it makes something "re-runnable".

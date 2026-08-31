@@ -138,7 +138,7 @@ export async function HeadlineResult() {
             <p className="mt-1 text-[10px] leading-snug text-paper-500">
               {o.gross_recovered.paise > 0
                 ? "Proven by a real signed Razorpay webhook, in Test Mode. Small on purpose: this figure proves the execution path, not that customers change their behaviour."
-                : "Nothing verified yet. Run POST /api/v1/testmode/recover, pay the link, and this moves."}
+                : "Nothing verified yet. Use the “Prove it against real Razorpay” panel below — one click creates a real ₹1 Test Mode link, and paying it moves this tile."}
             </p>
           </div>
         </div>
