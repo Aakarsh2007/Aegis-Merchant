@@ -64,6 +64,17 @@ _PLAYBOOK_WORDING: dict[Playbook, str] = {
 }
 
 
+def _singular(plural: str, count: int) -> str:
+    """`1 failed payment`, not `1 failed payments`.
+
+    Trivial, and worth doing: a grammatical slip in the one paragraph asking a
+    merchant to trust a number undermines it out of proportion to the effort.
+    """
+    if count != 1:
+        return plural
+    return plural[:-1] if plural.endswith("s") else plural
+
+
 @router.get("/today", summary="The morning briefing")
 async def today(
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -110,8 +121,10 @@ async def today(
 
     attribution = recovery_report(await _outcomes(session))
 
+    # Singular where the count is one. "1 failed payments" reads as a bug in a
+    # line a merchant is meant to trust.
     recovered_phrase = " · ".join(
-        f"{count} {_PLAYBOOK_WORDING.get(playbook, playbook.value)}"
+        f"{count} {_singular(_PLAYBOOK_WORDING.get(playbook, playbook.value), count)}"
         for playbook, count in recovered_rows
     )
 
@@ -147,6 +160,12 @@ async def today(
             (
                 f"{overview.gross_simulated.display} recovered"
                 + (f" — {recovered_phrase}." if recovered_phrase else ".")
+                if overview.gross_simulated.paise
+                else (
+                    f"Nothing recovered yet — {recovered_phrase}."
+                    if recovered_phrase
+                    else "Nothing recovered yet; run the batch to put the corpus through the agent."
+                )
             ),
             (
                 f"Rs {rupees(attribution.net_incremental_paise)} net incremental against "

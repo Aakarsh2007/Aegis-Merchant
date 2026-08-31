@@ -59,9 +59,15 @@ export async function CostPanel() {
               {percent(c.cache_hit_rate)} served from cache
             </p>
           </div>
+          {/*
+            Not RAZORPAY_VERIFIED: Razorpay has nothing to do with how many
+            times we called a language model. The badge means "a signed webhook
+            proves this", and applying it to an inference count devalues it
+            everywhere else it appears.
+          */}
           <ProvenanceBadge
-            provenance="RAZORPAY_VERIFIED"
-            basis="Counted from the llm_calls ledger; every call records its own source."
+            provenance="SIMULATED"
+            basis="Counted from our own llm_calls ledger; every call records its own source. Razorpay is not involved in this figure."
           />
         </header>
 

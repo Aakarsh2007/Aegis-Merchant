@@ -53,9 +53,13 @@ export async function MetricsBar() {
       */}
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <MoneyTile
-          label="Verified by webhook"
+          label="Razorpay verified"
           figure={m.gross_recovered}
-          caption="Nothing has run against live traffic yet — this is the honest zero"
+          caption={
+            m.gross_recovered.paise > 0
+              ? "Proven by Razorpay itself. Small on purpose — it proves the path, not the lift."
+              : "Nothing proven by Razorpay yet. This zero is the honest figure."
+          }
         />
         <CountTile
           label="Unsafe proposals intercepted"

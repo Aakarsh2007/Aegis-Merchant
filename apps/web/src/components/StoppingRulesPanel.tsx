@@ -52,11 +52,16 @@ export async function StoppingRulesPanel() {
       <ul className="mt-3 space-y-1">
         {rules.map((rule) => (
           <li key={rule.rule} className="flex items-center gap-2.5">
+            {/*
+              The rule id, not a three-character slice of it. `slice(0, 3)`
+              rendered every row as "S-0", which is not an identifier and reads
+              as a rendering fault.
+            */}
             <span
-              className="numeric w-10 shrink-0 text-[10px] text-paper-500"
+              className="numeric w-11 shrink-0 text-[10px] text-paper-500"
               title={rule.rule}
             >
-              {rule.rule.slice(0, 3)}
+              {rule.rule.split("_")[0]}
             </span>
             <span className="flex-1 truncate text-[11px] text-paper-300">
               {DESCRIPTIONS[rule.rule] ?? rule.rule}

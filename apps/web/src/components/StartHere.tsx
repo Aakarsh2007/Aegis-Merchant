@@ -30,12 +30,12 @@ const STEPS: Step[] = [
     title: "The number, and the smaller one beside it",
     body: (
       <>
-        The tiles below show <strong>₹2,02,760 recovered</strong> and{" "}
-        <strong>₹60,217 net incremental</strong>. Both are true. The second is
-        the lift we estimate the agent caused, because{" "}
-        <strong>39 cases were deliberately never contacted</strong> as a control
-        group — and nearly a quarter of them paid anyway. The API cannot return
-        the first figure without the second.
+        Look at <strong>Gross recovered</strong> and{" "}
+        <strong>Net incremental</strong> below. Both are true, and the second is
+        much smaller: it is the lift <em>estimated</em> against a group of cases
+        the agent was <strong>deliberately not allowed to touch</strong>, a
+        quarter of whom paid anyway. The API cannot return the first figure
+        without the second.
       </>
     ),
   },
@@ -45,12 +45,11 @@ const STEPS: Step[] = [
     body: (
       <>
         Hover any figure for its basis. A badge reads{" "}
-        <span className="text-verified-500">RAZORPAY VERIFIED</span> only when a
-        signed webhook proves it — which is why{" "}
-        <em>Verified by webhook</em> honestly reads <strong>₹0.00</strong>:
-        nothing has run against live production traffic.{" "}
+        <span className="text-verified-500">RAZORPAY VERIFIED</span> only when
+        Razorpay itself proves it — so that tile stays tiny, and honestly so.{" "}
         <span className="text-simulated-500">SIMULATED</span> means the
         machinery is real and the customer responses are a declared parameter.
+        Nothing has run against live production traffic.
       </>
     ),
   },

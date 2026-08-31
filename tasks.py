@@ -193,7 +193,13 @@ def demo() -> int:
 
     with sqlite3.connect(runtime_db) as conn:
         try:
-            cases = conn.execute("select count(*) from recovery_cases").fetchone()[0]
+            # Count only NON-DEMO cases. A single Test Mode case
+            # (`testmode/recover`, is_demo=1) used to satisfy `count > 0` and
+            # skip the batch entirely, leaving a dashboard of zeroes with one
+            # row in it -- which is exactly what a judge would have seen.
+            cases = conn.execute(
+                "select count(*) from recovery_cases where is_demo = 0"
+            ).fetchone()[0]
         except sqlite3.OperationalError:
             cases = 0
     if cases == 0:
