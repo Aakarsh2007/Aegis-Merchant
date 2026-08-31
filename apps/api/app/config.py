@@ -53,9 +53,20 @@ class Settings(BaseSettings):
     razorpay_key_secret: str = ""
     razorpay_webhook_secret: str = ""
 
-    #: Reject webhooks whose event timestamp is older than this. Signature
-    #: validity alone does not stop replay of a captured valid payload (§10.1).
-    webhook_replay_tolerance_s: int = 300
+    #: Reject webhooks whose event timestamp is older than this.
+    #:
+    #: 24 hours, not 300 seconds (INC-024). The tight window looked like a
+    #: security control and was mostly a liability: **replay is already
+    #: prevented by `UNIQUE(event_id)`**, which is strictly stronger — it
+    #: rejects a duplicate whatever its timestamp says, and a timestamp is
+    #: attacker-controlled data inside a signed payload anyway.
+    #:
+    #: What the tight window actually did was reject Razorpay's own retries.
+    #: Razorpay retries a failed delivery for hours, so by the second attempt a
+    #: legitimate event was "stale" and every retry was refused with a valid
+    #: signature. The window is kept, generously, only to discard absurdly old
+    #: events; idempotency is the real defence.
+    webhook_replay_tolerance_s: int = 86_400
 
     # ------------------------------------------------------------------ llm
     gemini_api_key: str = ""

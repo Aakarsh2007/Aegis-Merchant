@@ -57,6 +57,17 @@ EVENT_PLAYBOOKS = dict(RISK_EVENTS)
 #: Where the meaningful entity lives, per event family.
 _ENTITY_KEYS = ("payment", "order", "invoice", "subscription", "payment_link", "refund")
 
+#: Fallback order only. The authoritative entity is chosen from the EVENT NAME
+#: (INC-025).
+#:
+#: A real `payment_link.paid` from Razorpay carries THREE entities --
+#: `payment_link`, `order` and `payment` -- and only `payment_link` has the
+#: `reference_id`. Picking by a fixed priority list put `payment` first, so the
+#: reference was invisible and a genuine recovery could not be attributed to
+#: the action that caused it.
+#:
+#: Our own fixture had a single entity, which is why every test passed.
+
 
 @dataclass(frozen=True)
 class RevenueRiskEvent:
@@ -117,17 +128,67 @@ def extract_event_ts(payload: dict[str, Any]) -> datetime | None:
 
 
 def _first_entity(payload: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
-    """Unwrap ``payload.<thing>.entity`` for whichever thing is present."""
+    """Unwrap the entity the EVENT is about, not merely the first one present.
+
+    `payment_link.paid` is about the payment link. Razorpay includes the order
+    and the payment alongside it as context, and those do not carry the
+    `reference_id` — so choosing by a fixed priority list silently discarded
+    the attribution key (INC-025).
+
+    The event name is the authority: everything before the first dot names the
+    entity. The fixed list remains only as a fallback for event names we do not
+    recognise, because a webhook Razorpay adds next year must still parse.
+    """
     container = payload.get("payload")
     if not isinstance(container, dict):
         return None, {}
-    for key in _ENTITY_KEYS:
+
+    def _unwrap(key: str) -> dict[str, Any] | None:
         wrapper = container.get(key)
         if isinstance(wrapper, dict):
             entity = wrapper.get("entity")
             if isinstance(entity, dict):
-                return key, entity
+                return entity
+        return None
+
+    preferred = str(payload.get("event", "")).split(".", 1)[0]
+    if preferred:
+        entity = _unwrap(preferred)
+        if entity is not None:
+            return preferred, entity
+
+    for key in _ENTITY_KEYS:
+        entity = _unwrap(key)
+        if entity is not None:
+            return key, entity
     return None, {}
+
+
+def _find_reference(payload: dict[str, Any]) -> str | None:
+    """Search every entity for a reference we issued.
+
+    Belt and braces on top of the entity choice above. The reference is *the*
+    attribution key — condition 3 of six, the line between attribution and
+    coincidence — so losing it costs a recovery that actually happened. Cheap
+    to look everywhere; expensive to look in one place and be wrong.
+    """
+    container = payload.get("payload")
+    if not isinstance(container, dict):
+        return None
+    for wrapper in container.values():
+        if not isinstance(wrapper, dict):
+            continue
+        entity = wrapper.get("entity")
+        if not isinstance(entity, dict):
+            continue
+        candidate = entity.get("reference_id")
+        if not candidate:
+            notes = entity.get("notes")
+            if isinstance(notes, dict):
+                candidate = notes.get("reference_id")
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate
+    return None
 
 
 def route_to_playbook(event_type: str) -> Playbook | None:
@@ -152,7 +213,12 @@ def normalise(payload: dict[str, Any], *, event_id: str) -> RevenueRiskEvent:
     raw_notes = entity.get("notes")
     notes: dict[str, Any] = raw_notes if isinstance(raw_notes, dict) else {}
 
-    reference_id = entity.get("reference_id") or notes.get("reference_id")
+    # Chosen entity first, then every other entity in the payload. Razorpay
+    # puts the reference on the entity the event is about, and a multi-entity
+    # payload is the normal case rather than the exception.
+    reference_id = (
+        entity.get("reference_id") or notes.get("reference_id") or _find_reference(payload)
+    )
 
     # A payment_link.paid event carries its own id under `id`; a payment that
     # settled a link carries the link under `payment_link_id`.

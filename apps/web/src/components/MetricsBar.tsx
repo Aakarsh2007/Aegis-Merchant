@@ -36,7 +36,7 @@ export async function MetricsBar() {
           label="Net incremental"
           figure={m.net_incremental}
           emphasis
-          caption="What we actually caused, net of the holdout"
+          caption="Estimated causal lift vs the holdout, net of costs"
         />
         <CountTile
           label="Held as control"

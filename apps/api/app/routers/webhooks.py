@@ -35,8 +35,10 @@ from app.config import Settings, get_settings
 from app.core.clock import Clock
 from app.db.ids import new_id
 from app.db.models import WebhookEvent
+from app.db.session import get_sessionmaker
 from app.deps import get_clock, get_db
 from app.ingest.normalise import normalise
+from app.ingest.settle import mark_processed, process_settlement
 from app.security.webhook import verify_signature, verify_timestamp
 
 __all__ = ["router"]
@@ -56,16 +58,33 @@ class IngestStatus:
     FAILED = "FAILED"
 
 
-async def _process_event(event_row_id: str, payload: dict[str, Any], event_id: str) -> None:
-    """Background processing.
+async def _process_event(
+    event_row_id: str, payload: dict[str, Any], event_id: str, clock: Clock
+) -> None:
+    """Attribute the event, after the response has already gone out.
 
-    Phase 2 normalises and classifies only. Case creation and the agent graph
-    arrive in Phases 4-7; wiring them here now would mean writing rows the
-    policy firewall cannot yet gate.
+    Runs in the background because Razorpay retries anything slow or non-2xx,
+    so holding the connection open while attribution runs would turn one event
+    into several. The acknowledgement is the contract; this is the work.
+
+    Until this was wired, the handler verified the signature, stored the event
+    and dropped it -- so a genuine `payment_link.paid` could never move the
+    RAZORPAY_VERIFIED figure. See `app/ingest/settle.py`.
     """
-    event = normalise(payload, event_id=event_id)
-    # Structured logging lands in Phase 11; until then this is the seam.
-    _ = event
+    factory = get_sessionmaker()
+    outcome = await process_settlement(factory, payload=payload, event_id=event_id, clock=clock)
+    await mark_processed(
+        factory,
+        event_row_id=event_row_id,
+        outcome=IngestStatus.PROCESSED if outcome.counted else IngestStatus.IGNORED_UNKNOWN_EVENT,
+    )
+    log.info(
+        "webhook %s: counted=%s case=%s reason=%s",
+        event_id,
+        outcome.counted,
+        outcome.case_id,
+        outcome.reason,
+    )
 
 
 def _log_rejected_signature(raw_body: bytes, received: str | None, settings: Settings) -> None:
@@ -195,7 +214,7 @@ async def razorpay_webhook(
         }
 
     # 5. Acknowledge now; think later.
-    background.add_task(_process_event, row.id, payload, x_razorpay_event_id)
+    background.add_task(_process_event, row.id, payload, x_razorpay_event_id, clock)
 
     return {
         "status": "accepted",

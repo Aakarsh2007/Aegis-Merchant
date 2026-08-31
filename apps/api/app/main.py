@@ -30,6 +30,7 @@ from app.routers import dlq as dlq_router
 from app.routers import metrics as metrics_router
 from app.routers import simulation as simulation_router
 from app.routers import stream as stream_router
+from app.routers import testmode as testmode_router
 from app.routers import webhooks
 from app.security.auth import auth_mode
 from app.services.metrics import queue_depths
@@ -214,6 +215,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(simulation_router.router)
     app.include_router(control_router.router)
     app.include_router(adversarial_router.router)
+    app.include_router(testmode_router.router)
 
     @app.get("/healthz", tags=["health"], summary="Liveness probe")
     async def healthz() -> dict[str, Any]:

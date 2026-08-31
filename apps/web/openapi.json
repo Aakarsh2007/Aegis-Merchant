@@ -235,6 +235,20 @@
         "title": "TamperRequest",
         "type": "object"
       },
+      "TestRecoveryRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "amount_paise": {
+            "default": 100,
+            "maximum": 100000.0,
+            "minimum": 100.0,
+            "title": "Amount Paise",
+            "type": "integer"
+          }
+        },
+        "title": "TestRecoveryRequest",
+        "type": "object"
+      },
       "ToggleRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1725,6 +1739,120 @@
         "summary": "Live event feed (SSE)",
         "tags": [
           "stream"
+        ]
+      }
+    },
+    "/api/v1/testmode/recover": {
+      "post": {
+        "description": "Detect \u2192 diagnose \u2192 policy \u2192 real Razorpay link, then hand back the URL.\n\nEverything up to the link is the production path, including the policy\nfirewall and the capability token. The link is a genuine Razorpay Test Mode\npayment link with a `reference_id` **we** issued, committed to the outbox\n*before* the provider call \u2014 so paying it produces a webhook that\nattribution can match, and a crash between the two is recoverable.",
+        "operationId": "test_recovery_api_v1_testmode_recover_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestRecoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Test Recovery Api V1 Testmode Recover Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create one real Test Mode recovery, end to end",
+        "tags": [
+          "test mode"
+        ]
+      }
+    },
+    "/api/v1/testmode/status": {
+      "get": {
+        "description": "What is configured, and what each missing piece costs.\n\nA button that fails with \"something went wrong\" is worse than one that is\ndisabled with a reason, so the UI reads this first.",
+        "operationId": "testmode_status_api_v1_testmode_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Testmode Status Api V1 Testmode Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Whether a real Test Mode run is possible",
+        "tags": [
+          "test mode"
         ]
       }
     },

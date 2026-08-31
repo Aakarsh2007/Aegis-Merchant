@@ -32,7 +32,7 @@ const STEPS: Step[] = [
       <>
         The tiles below show <strong>₹2,02,760 recovered</strong> and{" "}
         <strong>₹60,217 net incremental</strong>. Both are true. The second is
-        what we actually caused, because{" "}
+        the lift we estimate the agent caused, because{" "}
         <strong>39 cases were deliberately never contacted</strong> as a control
         group — and nearly a quarter of them paid anyway. The API cannot return
         the first figure without the second.

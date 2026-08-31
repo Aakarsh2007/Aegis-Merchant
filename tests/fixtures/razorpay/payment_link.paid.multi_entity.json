@@ -1,0 +1,134 @@
+{
+  "_fixture_meta": {
+    "attributed": true,
+    "entities": [
+      "payment_link",
+      "order",
+      "payment"
+    ],
+    "event_id": "TWK4SYivi78jL4",
+    "note": "THREE entities: payment_link, order, payment. Only payment_link carries reference_id. Picking the entity by a fixed priority list grabbed `payment` and lost the attribution key -- INC-025. Contact details redacted.",
+    "provenance": "captured_live_webhook",
+    "received_at": "2026-08-31T09:11:20.041Z",
+    "signature_verified": true,
+    "source": "a real Razorpay Test Mode delivery, HMAC-verified and attributed"
+  },
+  "account_id": "acc_TVgEITke1lMF46",
+  "contains": [
+    "payment_link",
+    "order",
+    "payment"
+  ],
+  "created_at": 1788167279,
+  "entity": "event",
+  "event": "payment_link.paid",
+  "payload": {
+    "order": {
+      "entity": {
+        "amount": 100,
+        "amount_due": 0,
+        "amount_paid": 100,
+        "attempts": 1,
+        "checkout": null,
+        "created_at": 1788167404,
+        "currency": "INR",
+        "description": null,
+        "entity": "order",
+        "id": "order_TWK39pzx2xXYt8",
+        "notes": [],
+        "offer_id": null,
+        "receipt": "rvp_rc-tm64210_278",
+        "status": "paid"
+      }
+    },
+    "payment": {
+      "entity": {
+        "acquirer_data": {
+          "auth_code": "611297"
+        },
+        "amount": 100,
+        "amount_refunded": 0,
+        "amount_transferred": 0,
+        "bank": null,
+        "base_amount": 100,
+        "captured": true,
+        "card": {
+          "emi": false,
+          "entity": "card",
+          "id": "card_TWK4BH76ET4Oj4",
+          "international": false,
+          "issuer": "DCBL",
+          "last4": "1007",
+          "name": "",
+          "network": "Visa",
+          "sub_type": "consumer",
+          "token_iin": "410028000",
+          "type": "debit"
+        },
+        "card_id": "card_TWK4BH76ET4Oj4",
+        "contact": "REDACTED",
+        "created_at": 1788167463,
+        "currency": "INR",
+        "description": "#TWK0wkXdOh8nE0",
+        "email": "REDACTED",
+        "entity": "payment",
+        "error_code": null,
+        "error_description": null,
+        "error_reason": null,
+        "error_source": null,
+        "error_step": null,
+        "fee": 3,
+        "fee_bearer": "platform",
+        "id": "pay_TWK4B3c3LcDVNJ",
+        "international": false,
+        "invoice_id": null,
+        "method": "card",
+        "notes": [],
+        "order_id": "order_TWK39pzx2xXYt8",
+        "refund_status": null,
+        "status": "captured",
+        "tax": 0,
+        "vpa": null,
+        "wallet": null
+      }
+    },
+    "payment_link": {
+      "entity": {
+        "accept_partial": false,
+        "allow_full_payment": false,
+        "amount": 100,
+        "amount_paid": 100,
+        "cancelled_at": 0,
+        "created_at": 1788167279,
+        "currency": "INR",
+        "customer": {
+          "contact": "REDACTED",
+          "email": "REDACTED",
+          "name": "Ananya"
+        },
+        "description": "RevPilot - final Test Mode verification",
+        "expire_by": 1788685678,
+        "expired_at": 0,
+        "first_min_partial_amount": 0,
+        "id": "plink_TWK0wkXdOh8nE0",
+        "notes": null,
+        "notify": {
+          "email": "REDACTED",
+          "sms": false,
+          "whatsapp": false
+        },
+        "order_id": "order_TWK39pzx2xXYt8",
+        "payment_plan": false,
+        "reference_id": "rvp_rc-tm64210_278",
+        "reminder_enable": false,
+        "reminders": {},
+        "short_url": "https://rzp.io/rzp/siVeEui",
+        "status": "paid",
+        "updated_at": 1788167477,
+        "upi_link": false,
+        "user_id": "",
+        "whatsapp_link": false
+      }
+    }
+  }
+}

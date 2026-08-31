@@ -180,8 +180,8 @@ async def overview(session: AsyncSession, *, clock: Clock) -> OverviewReport:
             basis=(
                 "sum of recovered_amount over cases proven by a REAL signed Razorpay "
                 "webhook; the recovery_requires_proof CHECK makes an unverified "
-                "recovery unrepresentable. Zero here means nothing has yet been "
-                "recovered against live traffic, which is the honest figure."
+                "recovery unrepresentable. A non-zero figure here has been proven "
+                "by a real signed webhook; zero means nothing has yet been."
             ),
         ),
         gross_simulated=Figure(

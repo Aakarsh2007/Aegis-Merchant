@@ -944,3 +944,99 @@ the *entry point* still reads the wall clock. The lint rule forbids `datetime.no
 `SystemClock`; it cannot forbid handing `SystemClock` to something that should have been given
 a fixed anchor. And a test suite that always injects a fake clock is structurally unable to
 notice.
+
+
+## INC-024 · The webhook handler stored the event and dropped it
+
+**Symptom:** none available. A real signed Razorpay webhook had already arrived, verified, and
+been stored — and the `RAZORPAY_VERIFIED` figure stayed at ₹0. Which looked exactly like the
+honest answer it was supposed to be.
+
+**What was wrong:** `_process_event` was still the Phase-2 stub. It normalised the payload,
+assigned it to `_`, and returned. Fourteen phases of attribution work — the six conditions,
+the settling-event set, the reference match, the window, the idempotency check — was code that
+**nothing called on the live path.**
+
+Stated plainly: every claim this project made about attribution was true of a function no
+webhook ever reached.
+
+**Why the tests did not catch it.** They test `attribute()` directly, with hand-built
+arguments, and they are thorough. Not one of them went through the HTTP handler. The
+webhook tests asserted 200/401/duplicate — the *acknowledgement* contract — and never that
+anything happened afterwards. Two well-tested halves with no test across the join.
+
+**How it surfaced:** building the one-click Test Mode demo, because that demo's final step is
+"the dashboard shows RAZORPAY_VERIFIED" and it could not.
+
+**Fix:** `app/ingest/settle.py`. Applies the same `attribute()` unchanged, and on a pass marks
+the case RECOVERED with the **real** Razorpay event id — no `sim_evt_` prefix, so the amount
+lands in the verified column rather than the simulated one. Runs in its own session, because
+`BackgroundTasks` fires after the request-scoped session has closed. Never raises: a
+background task that throws is a log line nobody reads and a silently unattributed payment.
+
+**Verified on live traffic.** `case=RC-TM64210 amount=100 event=TWK4SYivi78jL4`, delivered by
+Razorpay from `52.66.76.63`. `RAZORPAY_VERIFIED` moved from ₹0.00 to ₹1.00 for the first time.
+
+**What was learned:** "the component is tested" and "the component runs" are different claims,
+and the gap between them is invisible from either side. The tests were not weak; they simply
+all stopped at the same seam. A single end-to-end test through the HTTP handler would have
+caught this on day one, and there was none because each half looked well covered.
+
+---
+
+## INC-025 · Razorpay sends three entities; we read the wrong one
+
+**Symptom:** the real webhook arrived, verified, and was recorded as
+`IGNORED_UNKNOWN_EVENT`. The log said: `no reference_id: not attributable to any action of
+ours`.
+
+**Cause.** A genuine `payment_link.paid` carries **three** entities:
+
+```
+contains: ["payment_link", "order", "payment"]
+  order.entity         -> id, status, amount        (no reference_id)
+  payment.entity       -> id, status, amount        (no reference_id)
+  payment_link.entity  -> id, status, amount, REFERENCE_ID   <- the only one
+```
+
+`_first_entity` walked a fixed priority list — `("payment", "order", "invoice",
+"subscription", "payment_link", "refund")` — and returned the **first present**. `payment` is
+first; `payment_link` is fifth. So it took the entity without the reference, and
+`reference_id` came back `None`.
+
+The reference is attribution condition 3, the line between attribution and coincidence. A
+genuine recovery, correctly executed and correctly signed, was unattributable because the
+parser read the wrong sibling.
+
+**Why every test passed.** Our fixture had **one** entity:
+`contains: ["payment_link"]`. With a single entity present, a priority list cannot pick the
+wrong one. The fixture was simpler than reality in exactly the dimension that mattered — the
+same failure as INC-015, in a different file, three weeks later.
+
+**Fix, two layers.** The entity is chosen from the **event name**: everything before the first
+dot names what the event is about, so `payment_link.paid` selects `payment_link`. The fixed
+list survives only as a fallback for event names we do not recognise, because a webhook
+Razorpay adds next year must still parse. And `_find_reference` searches **every** entity plus
+its `notes` — belt and braces, because losing this field costs a recovery that actually
+happened, and looking everywhere is cheap.
+
+**Regression test:** pinned to the captured multi-entity delivery, with a test asserting the
+fixture is still `provenance: captured_live_webhook` and still contains all three entities —
+so a fixture that quietly reverted to a single-entity reconstruction would make the others
+vacuous while staying green. Sabotage-verified: restoring the priority list fails seven tests.
+
+**A third finding, in passing.** The `webhook_replay_tolerance_s` of 300 seconds rejected every
+one of Razorpay's retries with a **valid signature**. Razorpay retries a failed delivery for
+hours, so by the second attempt a legitimate event was "stale". Replay is already prevented by
+`UNIQUE(event_id)`, which is strictly stronger — a timestamp is attacker-controlled data
+inside a signed payload, whereas a duplicate id is refused whatever it claims. Widened to 24
+hours, and the tests now assert the defence that exists rather than the one that was removed.
+
+**This also settles INC-021.** The original webhook secret was almost certainly correct all
+along; every 401 I diagnosed as a secret mismatch was this window. I asked the user to redo
+configuration on a theory I could not support.
+
+**What was learned:** a fixture is a hypothesis about the shape of reality, and a passing test
+against it only confirms internal consistency. Both INC-015 and INC-025 were found in the
+first ninety seconds of touching the real provider, and neither was reachable from any amount
+of local testing.

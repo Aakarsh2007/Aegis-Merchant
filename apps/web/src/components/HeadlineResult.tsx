@@ -6,7 +6,8 @@
  *
  *   - what a dashboard would show (gross),
  *   - what we can prove with a signed webhook (₹0, so far),
- *   - what we actually caused (incremental, against a holdout).
+ *   - what the intervention is estimated to have caused (incremental,
+ *     against a holdout, under a declared response model).
  *
  * The wording is deliberate throughout. It says **"simulated incremental
  * recovery under a declared response model"**, never "we recovered". The
@@ -128,15 +129,16 @@ export async function HeadlineResult() {
           </div>
 
           <div className="rounded-lg border border-ink-700 bg-ink-950/50 p-3">
-            <p className="text-[10px] uppercase tracking-wider text-paper-500">
-              Live Razorpay-verified recovery
+            <p className="text-[10px] uppercase tracking-wider text-verified-500">
+              Razorpay-verified recovery
             </p>
             <p className="numeric mt-0.5 text-xl font-semibold text-verified-500">
               {o.gross_recovered.display}
             </p>
             <p className="mt-1 text-[10px] leading-snug text-paper-500">
-              Nothing has run against live merchant traffic. We would rather
-              report zero than manufacture a bigger number.
+              {o.gross_recovered.paise > 0
+                ? "Proven by a real signed Razorpay webhook, in Test Mode. Small on purpose: this figure proves the execution path, not that customers change their behaviour."
+                : "Nothing verified yet. Run POST /api/v1/testmode/recover, pay the link, and this moves."}
             </p>
           </div>
         </div>

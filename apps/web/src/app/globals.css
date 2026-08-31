@@ -67,3 +67,90 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * ---------------------------------------------------------------------------
+ * Polish pass.
+ *
+ * Restraint is the design here. This dashboard argues that its numbers can be
+ * trusted, and a decorative interface undermines that in a way a plain one does
+ * not — so the effects below are the ones that aid *reading*: depth to separate
+ * a card from its ground, a subtle top highlight so panels do not look flat,
+ * a focus ring that is actually visible, and nothing that moves without being
+ * asked.
+ * ---------------------------------------------------------------------------
+ */
+
+/* A soft radial wash so the navy is not a flat field across a large monitor. */
+body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(51, 149, 255, 0.1), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(51, 149, 255, 0.05), transparent);
+  background-attachment: fixed;
+}
+
+/*
+ * Cards. A 1px inset highlight along the top edge is what separates a panel
+ * from a rectangle — it reads as a surface catching light rather than a border.
+ */
+[class*="rounded-xl"][class*="border-ink-700"],
+[class*="rounded-xl"][class*="border-brand-500"] {
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(2, 4, 43, 0.4),
+    0 8px 24px -12px rgba(2, 4, 43, 0.5);
+}
+
+/* Numerals never jitter as they update over SSE. */
+.numeric {
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+/* Keyboard focus must be obvious. The default ring is nearly invisible on navy. */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Buttons: a real pressed state, so a click is acknowledged instantly. */
+button:not(:disabled):active {
+  transform: translateY(0.5px);
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/*
+ * Scrollbars inside the event feed. Left at browser defaults the feed gets a
+ * wide light-grey bar that fights the panel it lives in.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-700) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-700);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Tables: a hairline that separates rows without drawing attention. */
+tbody tr {
+  transition: background-color 120ms ease;
+}
+
+/* Anything struck through is a number we are deliberately NOT claiming. */
+.line-through {
+  text-decoration-thickness: 1.5px;
+}

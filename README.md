@@ -21,13 +21,24 @@ effect happens without a capability token the policy firewall mints.
 
 **The experiment.** 210 cases. **39 deliberately never contacted.**
 
-**The result.** ₹2,02,760 gross → **₹60,217 simulated incremental recovery**
-under a declared response model. Nearly a quarter of the holdout paid without
-us, so gross overstates our contribution roughly threefold.
+**The result — three numbers, never one.**
 
-**The reality check.** Live Razorpay-verified recovery: **₹0.** Nothing has run
-against real merchant traffic, and the schema will not let a simulated
-settlement reach the verified column.
+| | | |
+|---|---|---|
+| **Razorpay verified** | **₹1.00** | A real signed webhook proves it. Test Mode, end to end. |
+| **Simulated experiment** | **₹60,217** | Estimated incremental lift under a declared response model, over 210 cases with a 39-case holdout. |
+| **Live production** | **₹0** | No real merchant traffic. Not attempted. |
+
+Gross across the simulated batch was ₹2,02,760 — but nearly a quarter of the
+holdout paid without us, so gross overstates our contribution roughly
+threefold. The system refuses to report it alone.
+
+**The ₹1 matters more than the ₹60,217.** It is the whole loop on real Razorpay
+infrastructure: agent → policy firewall → capability token → real payment link
+→ Razorpay's own signed webhook → HMAC verified → reference matched →
+attributed → audit block. Test Mode proves the *execution path*. It does not
+prove that customers change their behaviour, which is why the lift experiment
+stays labelled SIMULATED.
 
 **The proof.** 900+ tests · one real signed Razorpay webhook verified end to
 end · tamper-evident audit ledger you can break yourself · 12 stopping rules
@@ -104,7 +115,7 @@ Over 210 recovery cases, with 39 of them deliberately **never contacted**:
 | | |
 |---|---|
 | Gross recovered | **₹2,02,760** — what a dashboard would show |
-| **Net incremental** | **₹60,217** — what we actually caused |
+| **Simulated incremental** | **₹60,217** — estimated causal lift under the declared response model |
 | Absolute lift | 6.2% (treatment 29.2%, control 23.1%) |
 | Statistically significant | **No.** 39 control cases; the intervals overlap. |
 
@@ -150,7 +161,7 @@ Running all 210 eligible cases through the agent and the attribution rules:
 | Authorised for execution | 139 · escalated to a human 25 · stopped by policy 11 |
 | Held as CONTROL, never acted on | 39 (18.6%) |
 | Gross recovered | ₹2,02,760 — *what a dashboard would show* |
-| **Net incremental** | **₹60,217** — *what we actually caused* |
+| **Simulated incremental** | **₹60,217** — *estimated causal lift under the declared response model* |
 | Absolute lift | 6.2% (treatment 29.2%, control 23.1%) |
 | Statistically significant | **No.** 39 control cases; the 95% intervals overlap. Reported as directional. |
 
@@ -216,6 +227,33 @@ twelve named rules ([`stopping_rules.py`](apps/api/app/guardrails/stopping_rules
 each individually counted, with termination established by property test over 2,000
 generated contexts per run rather than by example
 ([proof](tests/property/test_stopping_termination.py)).
+
+### A real Razorpay recovery, end to end
+
+Not a fixture. The agent created a real Test Mode payment link, it was paid,
+and Razorpay's own infrastructure delivered the settlement:
+
+```
+case            RC-TM64210
+status          RECOVERED
+recovered       ₹1.00
+verified_by     TWK4SYivi78jL4        <- a real Razorpay event id
+delivered by    52.66.76.63           (Razorpay, Mumbai)
+reference       rvp_rc-tm64210_278    <- a reference WE issued
+audit chain     valid, 214 blocks
+```
+
+Reproduce it: `POST /api/v1/testmode/recover` returns a real payment link; pay
+it with card `4111 1111 1111 1111`; the webhook arrives over a tunnel
+([`docs/webhooks.md`](docs/webhooks.md)) and the case moves to
+`RAZORPAY_VERIFIED`.
+
+**Doing this found two bugs nothing local could have.** The webhook handler was
+storing events and dropping them, so attribution never ran on the live path
+(INC-024). And a real `payment_link.paid` carries three entities where only one
+holds the `reference_id` — our single-entity fixture could not have revealed
+it (INC-025). Both are written up in
+[`docs/INCIDENTS.md`](docs/INCIDENTS.md).
 
 ### A real Razorpay webhook, verified
 

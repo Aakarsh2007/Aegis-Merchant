@@ -189,13 +189,34 @@ class TestRejection:
         )
         assert r.status_code == 401
 
-    def test_stale_event_rejected(self, client: TestClient) -> None:
-        """Correctly signed, but captured and replayed hours later."""
+    def test_absurdly_old_event_rejected(self, client: TestClient) -> None:
+        """A week old. Beyond any plausible provider retry.
+
+        The window was 300 seconds until INC-024, which rejected Razorpay's own
+        retries -- by the second attempt a legitimate event was "stale" and
+        every delivery was refused with a valid signature. It is now 24 hours,
+        and this asserts the remaining purpose: discarding events so old that
+        no retry explains them.
+        """
         payload = load_fixture("payment.failed")
-        payload["created_at"] = 1788200000  # ~11 hours before the clock
-        r = post(client, payload, event_id="evt_stale")
+        payload["created_at"] = 1788240900 - 7 * 24 * 3600
+        r = post(client, payload, event_id="evt_ancient")
         assert r.status_code == 401
         assert "too_old" in r.json()["reason"]
+
+    def test_a_retry_hours_later_is_accepted(self, client: TestClient) -> None:
+        """The INC-024 regression, stated as a requirement.
+
+        Razorpay retries a failed delivery for hours. An event eleven hours old
+        is a normal retry, not an attack, and rejecting it loses a real
+        recovery. Replay is prevented by UNIQUE(event_id) -- see below -- which
+        is strictly stronger than a clock, since a timestamp is
+        attacker-controlled data inside a signed payload.
+        """
+        payload = load_fixture("payment.failed")
+        payload["created_at"] = 1788240900 - 11 * 3600
+        r = post(client, payload, event_id="evt_legit_retry")
+        assert r.status_code == 200, r.text
 
     def test_missing_event_id_rejected(self, client: TestClient) -> None:
         """Without an event id we cannot deduplicate, so accepting one risks
@@ -287,16 +308,27 @@ class TestStoredRecord:
 
 
 class TestReplayWindowAtTheEndpoint:
-    def test_fixture_older_than_the_window_is_rejected(self, client: TestClient) -> None:
-        """subscription.pending is ~30 minutes older than the test clock.
+    def test_replay_is_stopped_by_the_event_id_not_the_clock(
+        self, client: TestClient, clock: FakeClock
+    ) -> None:
+        """The real replay defence, asserted directly.
 
-        Posted unmodified it must be refused. This is the endpoint-level proof
-        that a correctly signed but stale payload cannot be replayed -- the
-        exact case that first showed up as an unexpected 401.
+        A captured payload replayed with the SAME event id is refused however
+        fresh its timestamp claims to be -- because `UNIQUE(event_id)` is the
+        check, and unlike a clock it cannot be defeated by editing a field
+        inside the signed body.
+
+        The 300-second window used to stand in for this and was strictly worse:
+        it rejected Razorpay's own retries (INC-024) while an attacker replaying
+        promptly would have passed it.
         """
-        r = post(client, load_fixture("subscription.pending"), event_id="evt_replay")
-        assert r.status_code == 401
-        assert "too_old" in r.json()["reason"]
+        payload = load_fixture("subscription.pending")
+        first = post(client, payload, event_id="evt_replay_once", now=clock)
+        assert first.status_code == 200
+
+        second = post(client, payload, event_id="evt_replay_once", now=clock)
+        assert second.status_code == 200
+        assert second.json()["status"] == "duplicate"
 
     def test_same_fixture_accepted_when_fresh(self, client: TestClient, clock: FakeClock) -> None:
         r = post(client, load_fixture("subscription.pending"), event_id="evt_fresh", now=clock)
