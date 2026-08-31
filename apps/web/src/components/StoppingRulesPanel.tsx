@@ -12,19 +12,33 @@
 import { api } from "@/lib/api";
 import { FetchError, ProvenanceBadge } from "./Provenance";
 
+/**
+ * Keyed on the id the API actually sends.
+ *
+ * This map was keyed on the Python enum's MEMBER names -- S01_ALREADY_RESOLVED
+ * -- which never cross the wire; the API sends the enum's VALUE, "S-01". Every
+ * one of the twelve rows therefore rendered with no description, in the panel
+ * whose entire purpose is to name the brakes. Two of the old keys were wrong on
+ * their own terms as well (S03_DISCOUNT_BUDGET, S10_PROMISE_TO_PAY), which is
+ * what happens when a mapping is written from memory instead of from the enum.
+ *
+ * `test_stopping_rule_descriptions.py` asserts this key set equals
+ * `StoppingRule`'s values exactly, so a thirteenth rule fails a test rather
+ * than rendering as a blank row.
+ */
 const DESCRIPTIONS: Record<string, string> = {
-  S01_ALREADY_RESOLVED: "Already paid — do not contact",
-  S02_ATTEMPT_BUDGET: "Attempt budget spent",
-  S03_DISCOUNT_BUDGET: "Discount budget spent — retry at 0%",
-  S04_CONTACT_CAP_24H: "24-hour contact cap",
-  S05_CONTACT_CAP_48H: "48-hour contact cap",
-  S06_RECOVERY_WINDOW: "Recovery window closed",
-  S07_OPT_OUT: "Opted out — permanent, every case",
-  S08_CONSENT_CLASS: "No marketing consent — downgrade or stop",
-  S09_QUIET_HOURS: "Quiet hours — held, never dropped",
-  S10_PROMISE_TO_PAY: "Active promise — outreach frozen",
-  S11_MERCHANT_BUDGET: "Merchant daily/monthly budget",
-  S12_KILL_SWITCH: "Autopilot disabled",
+  "S-01": "Already paid — do not contact",
+  "S-02": "Attempt budget spent",
+  "S-03": "Discount budget spent — retry at 0%",
+  "S-04": "24-hour contact cap",
+  "S-05": "48-hour contact cap",
+  "S-06": "Recovery window closed",
+  "S-07": "Opted out — permanent, every case",
+  "S-08": "No marketing consent — downgrade or stop",
+  "S-09": "Quiet hours — held, never dropped",
+  "S-10": "Active promise — outreach frozen",
+  "S-11": "Merchant daily/monthly budget",
+  "S-12": "Autopilot disabled",
 };
 
 export async function StoppingRulesPanel() {
@@ -53,15 +67,14 @@ export async function StoppingRulesPanel() {
         {rules.map((rule) => (
           <li key={rule.rule} className="flex items-center gap-2.5">
             {/*
-              The rule id, not a three-character slice of it. `slice(0, 3)`
-              rendered every row as "S-0", which is not an identifier and reads
-              as a rendering fault.
+              The rule id verbatim. `slice(0, 3)` rendered every row as "S-0",
+              which is not an identifier and reads as a rendering fault.
             */}
             <span
               className="numeric w-11 shrink-0 text-[10px] text-paper-500"
               title={rule.rule}
             >
-              {rule.rule.split("_")[0]}
+              {rule.rule}
             </span>
             <span className="flex-1 truncate text-[11px] text-paper-300">
               {DESCRIPTIONS[rule.rule] ?? rule.rule}

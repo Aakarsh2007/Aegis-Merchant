@@ -25,7 +25,7 @@ inside a policy firewall, and proves any recovery against Razorpay itself.
 python tasks.py demo        # no credentials, no Docker, ~40 seconds
 ```
 
-938 tests · `mypy --strict` clean · 25 documented incidents · one command to run.
+964 tests · `mypy --strict` clean · 29 documented incidents · one command to run.
 
 ---
 

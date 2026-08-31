@@ -63,6 +63,7 @@ from app.db.models import (
     Consent,
     Customer,
     ExperimentAssignment,
+    LLMCall,
     Merchant,
     PaymentAttempt,
     PromiseToPay,
@@ -167,6 +168,7 @@ async def _clear(session: AsyncSession) -> None:
     Deletes cases, assignments and audit blocks — not the corpus. A judge who
     runs it twice should see the same numbers, not doubled ones.
     """
+    await session.execute(delete(LLMCall))
     await session.execute(delete(AuditBlock))
     await session.execute(delete(ExperimentAssignment))
     await session.execute(delete(RecoveryCase))
@@ -373,6 +375,31 @@ async def run_batch(
                 )
             )
             await session.flush()
+            # INC-026: the llm_calls table had a reader (cost_report) and no
+            # writer anywhere in the codebase, so "Where the answers came from"
+            # rendered three empty bars on every clone. The graph is pure and
+            # holds no session; it accumulates records on the state and this is
+            # the one place that persists them.
+            for entry in final.llm_ledger:
+                session.add(
+                    LLMCall(
+                        id=new_id("llmcall"),
+                        case_id=case_id,
+                        task=entry.task,
+                        source=entry.source,
+                        provider=entry.provider,
+                        model=entry.model,
+                        prompt_version=entry.prompt_version,
+                        cache_key=entry.cache_key,
+                        input_tokens=entry.input_tokens,
+                        output_tokens=entry.output_tokens,
+                        projected_cost_micro_inr=entry.projected_cost_micro_inr,
+                        latency_ms=entry.latency_ms,
+                        schema_valid_first_try=entry.schema_valid_first_try,
+                        fell_back=entry.fell_back,
+                        created_at=now,
+                    )
+                )
             session.add(
                 ExperimentAssignment(
                     case_id=case_id,

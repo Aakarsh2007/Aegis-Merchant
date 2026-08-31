@@ -35,8 +35,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.agent.classifier import Diagnosis, classify, classify_abandoned_checkout
-from app.db.enums import DiagnosisSource, FailureCategory, LLMTask
-from app.llm.adapter import LLMAdapter
+from app.db.enums import DiagnosisSource, FailureCategory, LLMSource, LLMTask
+from app.llm.adapter import LLMAdapter, StructuredResult
 from app.llm.schemas import DiagnosisOutput
 
 __all__ = ["RoutedDiagnosis", "diagnose"]
@@ -59,6 +59,10 @@ class RoutedDiagnosis:
     model_category: FailureCategory | None = None
     llm_source: str | None = None
     latency_ms: int = 0
+    #: The adapter's own account of the call -- source, model, tokens, cache
+    #: key. Carried verbatim rather than re-derived so the ledger row and the
+    #: cost projection cannot drift from what actually happened (INC-026).
+    result: StructuredResult | None = None
 
 
 async def diagnose(
@@ -93,7 +97,9 @@ async def diagnose(
     result = await adapter.complete_structured(task=LLMTask.DIAGNOSE, context=context)
     output = result.output
     if not isinstance(output, DiagnosisOutput):
-        return RoutedDiagnosis(diagnosis=rule, consulted_model=False)
+        # The call happened and cost whatever it cost, even though its output
+        # was unusable. Dropping the result here would under-report spend.
+        return RoutedDiagnosis(diagnosis=rule, consulted_model=False, result=result)
 
     disagreed = output.category is not rule.category
     merged = Diagnosis(
@@ -108,15 +114,31 @@ async def diagnose(
         discount_could_help=rule.discount_could_help,
         confidence=output.confidence,
         reasoning=output.reasoning,
-        source=DiagnosisSource.LLM,
+        # INC-027. This said `DiagnosisSource.LLM` unconditionally, so an
+        # answer the DeterministicAdapter produced beneath a cache miss was
+        # stored as model reasoning and traced as provenance "model". 41 of 199
+        # cases in the batch were labelled that way. adapter.py's own docstring
+        # states the rule it broke: "a deterministic fallback must never be
+        # displayed as model reasoning". A structured output is not evidence a
+        # model produced it -- the deterministic adapter returns the same shape.
+        source=(
+            DiagnosisSource.LLM
+            if result.source in {LLMSource.LIVE, LLMSource.CACHED}
+            else DiagnosisSource.DETERMINISTIC_FALLBACK
+        ),
         signals_conflict=rule.signals_conflict,
         missing_fields=rule.missing_fields,
     )
+    model_answered = result.source in {LLMSource.LIVE, LLMSource.CACHED}
     return RoutedDiagnosis(
         diagnosis=merged,
-        consulted_model=True,
-        model_disagreed=disagreed,
-        model_category=output.category,
+        # False when the deterministic floor answered. `consulted_model` drives
+        # the "ⓘ this came from a model" annotation, and it must not be true
+        # for an answer no model produced.
+        consulted_model=model_answered,
+        model_disagreed=disagreed and model_answered,
+        model_category=output.category if model_answered else None,
         llm_source=result.source.value,
         latency_ms=result.latency_ms,
+        result=result,
     )

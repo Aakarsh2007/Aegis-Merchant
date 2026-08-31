@@ -16,7 +16,13 @@ import pytest
 from pydantic import ValidationError
 
 from app.core.clock import FakeClock
-from app.db.enums import FailureCategory, LLMSource, LLMTask, MessageClass
+from app.db.enums import (
+    DiagnosisSource,
+    FailureCategory,
+    LLMSource,
+    LLMTask,
+    MessageClass,
+)
 from app.llm.adapter import StructuredResult
 from app.llm.cache import CachedAdapter, ResponseCache, cache_key
 from app.llm.deterministic import DeterministicAdapter
@@ -390,7 +396,19 @@ class TestRouting:
         assert not routed.consulted_model
         assert routed.diagnosis.category is FailureCategory.RAIL_FAULT
 
-    async def test_conflicting_signals_do_call_the_model(self) -> None:
+    async def test_conflicting_signals_do_reach_the_adapter(self) -> None:
+        """Conflicting signals must not be settled by the rule table alone.
+
+        This test used to assert ``routed.consulted_model`` while driving a
+        ``DeterministicAdapter`` — and so it **encoded INC-027**: it treated
+        "the adapter was reached" as "a model was consulted". No model is
+        involved here; the deterministic floor answers, in the same
+        ``StructuredResult`` shape. The distinction is the entire point of the
+        provenance labelling, so the assertion now names the thing it means.
+
+        ``consulted_model`` for a genuinely model-backed adapter is covered in
+        ``test_llm_ledger.py``, parametrised over all three sources.
+        """
         conflicting = {
             "error_source": "customer",
             "error_step": "payment_authorization",
@@ -399,7 +417,11 @@ class TestRouting:
             "playbook": "PAYMENT_FAILURE",
         }
         routed = await diagnose(conflicting, adapter=DeterministicAdapter())
-        assert routed.consulted_model
+        assert routed.result is not None, "the adapter was never asked"
+        assert routed.result.source is LLMSource.DETERMINISTIC
+        # No model answered, so nothing may claim one did.
+        assert not routed.consulted_model
+        assert routed.diagnosis.source is DiagnosisSource.DETERMINISTIC_FALLBACK
 
     async def test_no_adapter_still_produces_a_diagnosis(self) -> None:
         routed = await diagnose(FAILURE, adapter=None)

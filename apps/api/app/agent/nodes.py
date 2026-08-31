@@ -17,12 +17,13 @@ from dataclasses import replace
 from typing import Protocol
 
 from app.agent.playbooks import select_strategy, violations
-from app.agent.state import NodeTrace, RecoveryState
+from app.agent.state import LLMCallRecord, NodeTrace, RecoveryState
 from app.core.clock import Clock
 from app.db.enums import (
     CaseStatus,
     ExperimentArm,
     FailureCategory,
+    LLMSource,
     LLMTask,
     PolicyVerdict,
     RecoveryStrategy,
@@ -34,7 +35,7 @@ from app.guardrails.policy_engine import (
     evaluate_policy,
 )
 from app.guardrails.stopping_rules import Decision, PolicyLimits, StoppingContext, evaluate
-from app.llm.adapter import LLMAdapter
+from app.llm.adapter import LLMAdapter, StructuredResult
 from app.llm.routing import diagnose as routed_diagnose
 from app.llm.schemas import ProposalOutput
 from app.services.experiments import assign_arm
@@ -221,6 +222,48 @@ async def triage_node(state: RecoveryState, deps: AgentDeps) -> RecoveryState:
     )
 
 
+def _ledger_entry(
+    task: LLMTask,
+    result: StructuredResult | None,
+    *,
+    case_id: str | None,
+    latency_ms: int,
+) -> LLMCallRecord:
+    """One ledger row for one routed decision.
+
+    Called on every decision, not only the ones a model answered. A
+    DETERMINISTIC row is the measurement behind "the rule table handled this
+    and no token was spent" -- the claim the cost panel exists to make, and
+    the one a judge is most likely to test.
+    """
+    if result is None:
+        return LLMCallRecord(
+            task=task,
+            source=LLMSource.DETERMINISTIC,
+            case_id=case_id,
+            latency_ms=latency_ms,
+        )
+    return LLMCallRecord(
+        task=task,
+        source=result.source,
+        case_id=case_id,
+        model=result.model,
+        provider=result.provider,
+        prompt_version=result.prompt_version,
+        cache_key=result.cache_key,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        # Left at zero deliberately. The projection needs the published rate
+        # table, which lives in the metrics service and is applied there to
+        # the token SUM. Applying a second copy of the rates here is how the
+        # per-row cost and the dashboard total drift apart.
+        projected_cost_micro_inr=0,
+        latency_ms=result.latency_ms or latency_ms,
+        schema_valid_first_try=result.schema_valid_first_try,
+        fell_back=result.fell_back,
+    )
+
+
 async def diagnose_node(state: RecoveryState, deps: AgentDeps) -> RecoveryState:
     """Why the payment failed.
 
@@ -235,7 +278,14 @@ async def diagnose_node(state: RecoveryState, deps: AgentDeps) -> RecoveryState:
     routed = await routed_diagnose(_llm_context(state), adapter=adapter)
     diagnosis = routed.diagnosis
 
-    provenance = "model" if routed.consulted_model else "rule table (no model call)"
+    # Names the layer that actually answered. "model" for a deterministic
+    # fallback is the same lie as INC-027, one field over.
+    if routed.consulted_model:
+        provenance = f"model ({routed.llm_source or 'unknown'})"
+    elif routed.result is not None:
+        provenance = "rule table (model unavailable, deterministic floor answered)"
+    else:
+        provenance = "rule table (no model call)"
     note = ""
     if routed.consulted_model and routed.model_disagreed:
         note = f" - model disagreed, said {routed.model_category.value if routed.model_category else '?'}"
@@ -259,6 +309,15 @@ async def diagnose_node(state: RecoveryState, deps: AgentDeps) -> RecoveryState:
         consulted_model=routed.consulted_model,
         model_disagreed=routed.model_disagreed,
         llm_calls=state.llm_calls + (1 if routed.consulted_model else 0),
+        llm_ledger=(
+            *state.llm_ledger,
+            _ledger_entry(
+                LLMTask.DIAGNOSE,
+                routed.result,
+                case_id=state.case_id,
+                latency_ms=int((time.perf_counter() - started) * 1000),
+            ),
+        ),
     )
 
 
@@ -271,6 +330,7 @@ async def strategise_node(state: RecoveryState, deps: AgentDeps) -> RecoveryStat
     started = time.perf_counter()
     diagnosis = state.diagnosis
     consulted = False
+    strategy_result: StructuredResult | None = None
 
     if diagnosis is None:
         proposal = RecoveryProposal(strategy=RecoveryStrategy.NO_ACTION)
@@ -298,7 +358,9 @@ async def strategise_node(state: RecoveryState, deps: AgentDeps) -> RecoveryStat
             },
         )
         output = result.output
-        consulted = result.source.value == "LIVE"
+        strategy_result = result
+        # LIVE or CACHED: both are the model's own words. DETERMINISTIC is not.
+        consulted = result.source in {LLMSource.LIVE, LLMSource.CACHED}
         if isinstance(output, ProposalOutput):
             # The model may ARGUE for an action; it may not select one the
             # playbook forbids. A plausible-sounding rationale is precisely
@@ -353,6 +415,15 @@ async def strategise_node(state: RecoveryState, deps: AgentDeps) -> RecoveryStat
         status=CaseStatus.STRATEGY_FORMED,
         proposal=proposal,
         llm_calls=state.llm_calls + (1 if consulted else 0),
+        llm_ledger=(
+            *state.llm_ledger,
+            _ledger_entry(
+                LLMTask.STRATEGISE,
+                strategy_result,
+                case_id=state.case_id,
+                latency_ms=int((time.perf_counter() - started) * 1000),
+            ),
+        ),
     )
 
 

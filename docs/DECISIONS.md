@@ -902,3 +902,57 @@ one figure in this project meant to be beyond argument. So the tests are weighte
 *not* counting: an unpaid link, an already-settled case, an unknown reference, an unreachable
 provider, an inflated provider amount, and a control-arm case are all asserted to produce
 nothing.
+
+---
+
+## DEC-038 · 2026-08-31 · The ledger rides on the state, not on a session in the graph
+
+**Context.** INC-026: `llm_calls` had a reader and no writer. Writing to it needs a session;
+the agent graph deliberately has none — nodes are pure functions of state, which is what makes
+the whole graph testable without a database and replayable from a trace.
+
+**Decision.** Nodes append `LLMCallRecord`s to `RecoveryState.llm_ledger`. The persister — the
+batch — writes them after flushing the case.
+
+**Rejected:** passing a session into `AgentDeps`. It would let any node write anything, and the
+`test_no_unauthorised_writes.py` guarantee (execution reads only the clamped action) becomes
+unenforceable the moment nodes can reach the database. The purity is worth more than the
+convenience.
+
+**Rejected:** computing the projected cost per row. The rate table lives in the metrics service
+and is applied to the token *sum*; a second copy in the node is how the per-row cost and the
+dashboard total drift apart. `projected_cost_micro_inr` stays zero on the record and the
+projection happens in exactly one place.
+
+**A DETERMINISTIC row is written even when no model was consulted.** It is not a gap in the
+data — it is the measurement behind *"the rule table handled this and no token was spent"*,
+which is the claim the cost panel exists to make. `fell_back` distinguishes "never asked" from
+"asked and fell through to the floor", because those are different facts.
+
+---
+
+## DEC-039 · 2026-08-31 · Warm the cache by running the batch, not by rebuilding its contexts
+
+**Context.** INC-029: the committed response cache had a structurally guaranteed 0% hit rate.
+The cache key hashes the whole model context; `warm_cache.py` built a five-key context and the
+agent built an eight-key one, so no committed entry could ever match a lookup.
+
+**Decision.** `batch_cli --warm` is the same batch run with a live model behind the cache and
+recording on. The contexts are the batch's own, so a key recorded while warming is *by
+construction* the key looked up later.
+
+**Rejected:** making `warm_cache.context_for()` match `_llm_context()`. That keeps two copies
+of the context shape in step by discipline, and the discipline had already failed once —
+silently, for weeks, in the artefact whose only purpose is offline reproducibility. Removing
+the second place is strictly better than synchronising it.
+
+**Rejected:** hashing only a subset of the context. It would make the cache hit more often and
+would let a lookup return a response generated for materially different inputs. A cache that
+answers the wrong question quickly is worse than one that misses.
+
+**Consequence, stated plainly.** `--warm` waits for rate-limit slots (`wait_for_slot_s=90`)
+rather than falling through to the deterministic floor. The first attempt without this recorded
+17 of 226 consultations: the limiter refused under load and the adapter degraded exactly as it
+is designed to on the request path, which is the wrong behaviour for an offline warming pass.
+A run that hits the daily quota saves what it recorded — the remainder falls through and is
+labelled DETERMINISTIC, which is a smaller cache hit rate rather than a lie.

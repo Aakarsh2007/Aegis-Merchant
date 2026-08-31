@@ -1040,3 +1040,129 @@ configuration on a theory I could not support.
 against it only confirms internal consistency. Both INC-015 and INC-025 were found in the
 first ninety seconds of touching the real provider, and neither was reachable from any amount
 of local testing.
+
+---
+
+## INC-026 · The LLM ledger had a reader and no writer
+
+**Symptom:** "Where the answers came from" — the panel showing the LIVE / CACHED /
+DETERMINISTIC split — rendered three empty bars and *"0 inferences · 0% served from cache"*.
+On every clone. Since the day it was written.
+
+**Cause.** `llm_calls` was declared as a table, registered in the model list, created by
+`init_db`, indexed twice, and read by `cost_report`. Nothing anywhere in the codebase ever
+inserted a row into it. Not the agent, not the batch, not a single test.
+
+The existing cost test passed **because** the feature was missing: it built a session,
+called `cost_report`, and asserted the zeros an empty table returns. It was a test of SQL
+`COUNT` over no rows, written and reviewed as a test of cost accounting.
+
+**Why no test caught it.** The graph is deliberately pure — it holds no session and returns a
+value — and the persistence layer is deliberately dumb. Each half was well tested. Nothing
+tested the join, because there was nothing at the join to test: the wire was never run. This
+is INC-024 exactly, one subsystem over, and I did not recognise it until the dashboard was
+photographed.
+
+**Fix.** `RecoveryState` accumulates an `llm_ledger` of `LLMCallRecord`s — one per routed
+decision, appended by `diagnose_node` and `strategise_node`. The batch writes them after
+flushing the case. A record is written **even when no model was consulted**: a DETERMINISTIC
+row is not a gap in the data, it is the measurement behind *"the rule table handled this and
+no token was spent"*, which is the claim the cost panel exists to make.
+
+**Regression test:** `tests/test_llm_ledger.py`, driven through the real `run_batch` rather
+than a hand-built session, because a unit test that does not cross the boundary cannot see
+this class of defect. Sabotage-verified — and the sabotage found a second problem: the
+"re-running does not double the ledger" test passed at `0 == 0` with the writer deleted. A
+`first > 0` guard was added. A test that cannot distinguish "correct" from "absent" is the
+INC-006 pattern, and it appeared inside the fix for it.
+
+---
+
+## INC-027 · A deterministic answer stored as model reasoning
+
+**Symptom:** 41 of 199 cases in the batch had `diagnosis_source = LLM` and a decision trace
+reading `provenance: model`. No model had produced any of them.
+
+**Cause.** `routing.diagnose` set `source=DiagnosisSource.LLM` whenever the adapter returned a
+valid `DiagnosisOutput`. But the adapter stack degrades: cache in front, live behind it,
+`DeterministicAdapter` underneath. With a cache miss and no live adapter — the batch's normal
+configuration, and a judge's — the deterministic floor answers, in the same
+`StructuredResult` shape, with the same schema. Routing read the shape and inferred a model.
+
+`adapter.py`'s own module docstring states the rule this broke: *"a deterministic fallback
+must never be displayed as model reasoning."* The rule was written down, tested elsewhere, and
+violated in the one function that decides the label.
+
+**The root cause is worth naming precisely: a structured output is not evidence that a model
+produced it.** Every layer returns the identical shape, deliberately, so that the caller need
+not care which answered. That design makes the shape useless as a signal. Only `source` can
+carry it, and the code was ignoring `source`.
+
+**Fix.** `DiagnosisSource.LLM` only when `result.source` is LIVE or CACHED. `consulted_model`
+likewise — it drives the *"this came from a model"* annotation, and must be false for an
+answer no model produced. CACHED counts as the model: a cached response is the model's own
+words, replayed, and calling it deterministic would be the same error in the other direction.
+The node's trace string now names the layer that answered rather than saying "model".
+
+**Regression test:** parametrised over all three sources, with a stub whose *output is
+identical in every case* and only `source` differs — so a test that guessed from the payload
+could not pass. Also driven against the real shipping `DeterministicAdapter`, since a stub can
+agree with a wrong implementation of itself.
+
+---
+
+## INC-028 · Twelve rules, twelve blank labels
+
+**Symptom:** in the scanned dashboard, every one of the twelve stopping-rule rows showed a
+bare identifier and no description. Earlier, all twelve read `S-0`.
+
+**Cause, two of them.** First, `slice(0, 3)` applied to `"S-01"` yields `"S-0"` — not an
+identifier, and it reads as a rendering fault in the panel whose entire job is to be checked.
+Second, and worse: the description map was keyed on the Python enum's **member** names
+(`S01_ALREADY_RESOLVED`), which never cross the wire. The API sends the enum's **value**,
+`"S-01"`. Every lookup missed and fell back to printing the id. Two of the keys were also
+wrong on their own terms — `S03_DISCOUNT_BUDGET` for `S03_DISCOUNT_ATTEMPT_BUDGET`,
+`S10_PROMISE_TO_PAY` for `S10_PROMISE_FREEZE` — which is what a map written from memory rather
+than from the enum looks like.
+
+**Fix.** Keyed on the wire value. Plus `tests/test_stopping_rule_descriptions.py`, which reads
+the `.tsx` file from Python and asserts the key set equals `StoppingRule`'s values exactly —
+in both directions, so a stale key is caught as well as a missing one. Reading a TypeScript
+file from a Python test is unusual; it is also the cheapest instrument that can actually fail
+here, and the alternative (moving labels into the API) would couple presentation to the
+backend for no gain.
+
+---
+
+## INC-029 · A cache with a structurally guaranteed 0% hit rate
+
+**Symptom:** 81 committed cache entries, and the batch recorded zero cache hits — every one of
+226 model consultations fell through to the deterministic floor. Found immediately after
+INC-026 gave the hit rate a place to be seen.
+
+**Cause.** The cache key is a SHA-256 over `(task, model, prompt_version, canonical context)`.
+`warm_cache.context_for()` builds a **five**-key context: error source, step, reason, method,
+playbook. The agent's `_llm_context()` builds **eight** — it adds `customer_ltv_paise`,
+`customer_prior_orders` and `amount_paise`. Different context, different hash, guaranteed
+miss. Not one of the 81 entries could ever match a lookup the batch makes.
+
+The cache exists for exactly one purpose — *"the batch demo and CI run in seconds with zero
+API calls and byte-for-byte reproducible numbers"* — and it could not serve that purpose at
+all, in the only run that matters.
+
+**INC-026 and INC-029 concealed each other.** The hit rate was the symptom, and the only
+instrument that reports it reads a table nothing wrote to. Fixing the ledger exposed the
+cache in the same afternoon.
+
+**Fix.** `batch_cli --warm`: the same batch run, with a live model behind the cache and
+recording on. The contexts are the batch's own, so a key recorded during warming is *by
+construction* the key looked up later. Reconstructing contexts in a second place is what
+broke; the fix removes the second place rather than trying to keep two copies in step.
+
+**What was learned, across all four.** Every one of these was found by looking at the running
+product — a screenshot, then the numbers behind it — and none was reachable from the test
+suite, which was green at 938 tests throughout. Three of the four are the same defect wearing
+different clothes: **a green test that cannot distinguish working from absent.** An empty
+table returning zeros, a shape that every layer produces, a key that never crosses the wire.
+The instrument has to be able to tell the two states apart, and for a dashboard that
+instrument is a pair of eyes on the actual screen.

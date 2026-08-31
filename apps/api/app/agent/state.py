@@ -27,6 +27,8 @@ from app.agent.classifier import Diagnosis
 from app.db.enums import (
     CaseStatus,
     ExperimentArm,
+    LLMSource,
+    LLMTask,
     Playbook,
     PolicyVerdict,
     StoppingRule,
@@ -34,7 +36,7 @@ from app.db.enums import (
 from app.guardrails.policy_engine import Clamp, RecoveryProposal
 from app.guardrails.token import AppliedAction, PolicyToken
 
-__all__ = ["NodeTrace", "RecoveryState"]
+__all__ = ["LLMCallRecord", "NodeTrace", "RecoveryState"]
 
 
 @dataclass(frozen=True)
@@ -53,6 +55,30 @@ class NodeTrace:
     at: datetime
     duration_ms: int = 0
     detail: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class LLMCallRecord:
+    """One routed decision, and how it was answered.
+
+    ``source`` is the field this exists for. A DETERMINISTIC record is not an
+    absence of data -- it is the measurement that says the rule table answered
+    and no token was spent, which is the claim the cost panel makes.
+    """
+
+    task: LLMTask
+    source: LLMSource
+    case_id: str | None = None
+    model: str | None = None
+    provider: str | None = None
+    prompt_version: str | None = None
+    cache_key: str | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    projected_cost_micro_inr: int = 0
+    latency_ms: int = 0
+    schema_valid_first_try: bool = True
+    fell_back: bool = False
 
 
 @dataclass(frozen=True)
@@ -146,6 +172,12 @@ class RecoveryState:
     approval_request_id: str | None = None
 
     # --- observability ---
+    #: One record per diagnose/strategise decision, including the ones taken
+    #: WITHOUT a model. INC-026: the llm_calls table had a reader and no
+    #: writer, so the panel that shows the LIVE/CACHED/DETERMINISTIC split
+    #: rendered three empty bars on every clone. The graph is pure and holds no
+    #: session, so the records ride on the state and the persister writes them.
+    llm_ledger: tuple[LLMCallRecord, ...] = ()
     trace_id: str = ""
     node_visits: int = 0
     llm_calls: int = 0
