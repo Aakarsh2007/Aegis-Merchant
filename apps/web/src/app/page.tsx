@@ -18,13 +18,16 @@ import { Suspense } from "react";
 import { ApprovalsQueue } from "@/components/ApprovalsQueue";
 import { AttributionPanel } from "@/components/AttributionPanel";
 import { AuditVerifier } from "@/components/AuditVerifier";
+import { AdversarialPanel } from "@/components/AdversarialPanel";
 import { CasesTable } from "@/components/CasesTable";
 import { ChaosPanel } from "@/components/ChaosPanel";
 import { CostPanel } from "@/components/CostPanel";
+import { HeadlineResult } from "@/components/HeadlineResult";
 import { MetricsBar } from "@/components/MetricsBar";
 import { MorningBriefing } from "@/components/MorningBriefing";
 import { PipelineStream } from "@/components/PipelineStream";
 import { StartHere } from "@/components/StartHere";
+import { WhereAIStops } from "@/components/WhereAIStops";
 import { StoppingRulesPanel } from "@/components/StoppingRulesPanel";
 
 export const dynamic = "force-dynamic";
@@ -71,20 +74,35 @@ export default function Page() {
 
       <StartHere />
 
-      <Suspense fallback={<Skeleton label="briefing" />}>
-        <MorningBriefing />
+      {/* 1. The question a judge actually has, answered first. */}
+      <Suspense fallback={<Skeleton label="the headline result" />}>
+        <HeadlineResult />
       </Suspense>
 
+      {/* 2. The tiles behind it. */}
       <div className="mt-6">
         <Suspense fallback={<Skeleton label="metrics" />}>
           <MetricsBar />
         </Suspense>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      {/* 3. Why it is an AI project, and where the AI is not allowed. */}
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <WhereAIStops />
+        <AdversarialPanel />
+      </div>
+
+      {/* 4. What it chose not to do, and whether any of it can be checked. */}
+      <div className="mt-6">
+        <Suspense fallback={<Skeleton label="briefing" />}>
+          <MorningBriefing />
+        </Suspense>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-4">
-          <Suspense fallback={<Skeleton label="attribution" />}>
-            <AttributionPanel />
+          <Suspense fallback={<Skeleton label="stopping rules" />}>
+            <StoppingRulesPanel />
           </Suspense>
           <Suspense fallback={<Skeleton label="approvals" />}>
             <ApprovalsQueue />
@@ -92,24 +110,28 @@ export default function Page() {
         </div>
 
         <div className="space-y-4">
-          <Suspense fallback={<Skeleton label="stopping rules" />}>
-            <StoppingRulesPanel />
-          </Suspense>
           <AuditVerifier />
           <ChaosPanel />
         </div>
 
         <div className="flex min-h-[520px] flex-col gap-4">
           <PipelineStream />
-          <Suspense fallback={<Skeleton label="cost" />}>
-            <CostPanel />
+          <Suspense fallback={<Skeleton label="attribution detail" />}>
+            <AttributionPanel />
           </Suspense>
         </div>
       </div>
 
+      {/* 5. Follow one case end to end. */}
       <div className="mt-6">
         <Suspense fallback={<Skeleton label="cases" />}>
           <CasesTable />
+        </Suspense>
+      </div>
+
+      <div className="mt-4">
+        <Suspense fallback={<Skeleton label="cost" />}>
+          <CostPanel />
         </Suspense>
       </div>
 

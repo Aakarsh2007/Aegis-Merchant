@@ -1,13 +1,91 @@
-# RevPilot AI — Merchant Autopilot for Razorpay
-
-**An autonomous revenue-recovery employee for Razorpay merchants: it diagnoses why
-money was lost, takes the cheapest bounded action that recovers it, proves the
-recovery against signed webhooks, measures its own incremental lift against a
-control group, and asks a human only when a human decision is genuinely required.**
+# RevPilot AI — Revenue Recovery Autopilot for Razorpay
 
 Razorpay AI Buildathon 2026 · Track: **AI Revenue Recovery**
 
 [![CI](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml/badge.svg)](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml)
+
+## RevPilot in 60 seconds
+
+**The problem.** A merchant does not lose ₹10 lakh at once. They lose ₹4,299
+here and ₹18,500 there — a UPI timeout, an abandoned cart, an invoice nobody
+chased, a subscription mandate that quietly died.
+
+**What this does.** Detect → Diagnose → Decide → Act → Verify → Attribute.
+Four revenue leaks, one agent, one attribution system.
+
+**What makes it safe.** The model reads ambiguity and argues for an action. It
+cannot touch money: it has no field to change an amount with, and no side
+effect happens without a capability token the policy firewall mints.
+
+> ### AI proposes. Policy disposes.
+
+**The experiment.** 210 cases. **39 deliberately never contacted.**
+
+**The result.** ₹2,02,760 gross → **₹60,217 simulated incremental recovery**
+under a declared response model. Nearly a quarter of the holdout paid without
+us, so gross overstates our contribution roughly threefold.
+
+**The reality check.** Live Razorpay-verified recovery: **₹0.** Nothing has run
+against real merchant traffic, and the schema will not let a simulated
+settlement reach the verified column.
+
+**The proof.** 900+ tests · one real signed Razorpay webhook verified end to
+end · tamper-evident audit ledger you can break yourself · 12 stopping rules
+with a property-based termination proof · 23 documented incidents.
+
+```
+                        RAZORPAY
+                            |
+                      signed webhook
+                            v
+                    +---------------+
+                    |    DETECT     |   deterministic
+                    +-------+-------+
+                            v
+                    +---------------+
+                    |   DIAGNOSE    |   <-- AI (or a rule table: 96.5%)
+                    +-------+-------+
+                            v
+                    +---------------+
+                    |    PROPOSE    |   <-- AI
+                    +-------+-------+
+                            v
+            +-------------------------------+
+            |       POLICY FIREWALL         |   deterministic
+            |  consent · DND · quiet hours  |
+            |  limits · budgets · 12 rules  |
+            +---------------+---------------+
+                            v
+                   CAPABILITY TOKEN          no token, no side effect
+                            v
+                       EXECUTION             transactional outbox
+                            v
+                    SIGNED WEBHOOK
+                            v
+                     ATTRIBUTION             6 conditions, all required
+                            v
+                  INCREMENTAL REVENUE        measured against the holdout
+```
+
+## Run it — 40 seconds
+
+```bash
+pip install -r apps/api/requirements.txt
+cd apps/web && npm install && cd ../..
+python tasks.py demo
+```
+
+Then open **<http://localhost:3000>** and read the guided tour at the top of the
+page. It walks you through the four things worth looking at, and doubles as the
+demo script.
+
+**The one thing to click:** the *Try to make it do something dangerous* panel.
+Ask the agent for a 90% discount, try to charge double, try to market to a DND
+customer, try to act with the kill switch off. Each is refused by a **different
+mechanism**, and one legitimate action is allowed — so you can tell the
+firewall apart from a system that just says no.
+
+---
 
 > **Status: complete and running.** 900+ tests, `mypy --strict` clean, CI green.
 > Clone it and `python tasks.py demo` — no credentials, no Docker, no Postgres.
@@ -87,45 +165,7 @@ have overstated our contribution by a factor of three, and the system refuses to
 
 ---
 
-## Run it
-
-```bash
-pip install -r apps/api/requirements.txt
-cd apps/web && npm install && cd ../..     # optional: the dashboard
-python tasks.py demo
-```
-
-`demo` seeds the corpus, runs 210 cases through the agent (~3 s, zero API
-calls), starts the API and opens the dashboard. Re-running is idempotent.
-
-| | |
-|---|---|
-| Dashboard | <http://localhost:3000> |
-| API docs | <http://localhost:8000/docs> |
-| Verify the audit chain | <http://localhost:8000/api/v1/audit/verify> |
-| Dependency report | <http://localhost:8000/api/v1/health/deep> |
-
-### Four things to try, in order
-
-```bash
-# 1. Verify the audit chain, then break it, then verify again.
-curl localhost:8000/api/v1/audit/verify
-curl -X POST localhost:8000/api/v1/audit/tamper      -H 'content-type: application/json' -d '{"block_index":2,"mode":"payload"}'
-curl localhost:8000/api/v1/audit/verify     # valid:false, and it names the block
-
-# 2. Pull the kill switch and watch the agent stop.
-curl -X POST localhost:8000/api/v1/autopilot/toggle      -H 'content-type: application/json' -d '{"enabled":false}'
-
-# 3. Try to LOOSEN a policy bound. It refuses.
-curl -X POST localhost:8000/api/v1/policy      -H 'content-type: application/json' -d '{"max_discount_pct":90}'   # 409
-
-# 4. Read what the agent chose NOT to do.
-curl localhost:8000/api/v1/briefing/today
-```
-
-`python tasks.py` lists every command. `make <task>` is an exact alias.
-
-### Progressive fidelity — every step is free
+## Adding credentials — every step is free
 
 | Add to `.env` | What upgrades |
 |---|---|
@@ -133,6 +173,8 @@ curl localhost:8000/api/v1/briefing/today
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Real Razorpay **Test Mode** payment links |
 | `GEMINI_API_KEY` | Live LLM reasoning (Google AI Studio free tier) |
 | A Cloudflare Tunnel URL | Real signed inbound webhooks |
+
+---
 
 ---
 

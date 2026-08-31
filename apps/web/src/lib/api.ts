@@ -257,6 +257,38 @@ export const api = {
       "/api/v1/simulation/inject",
       { method: "POST", body: JSON.stringify({ fault }) },
     ),
+  attacks: () =>
+    safeFetch<{
+      attacks: Array<{
+        attack: string;
+        asks: string;
+        why_tempting: string;
+        expected: string;
+        mechanism: string;
+      }>;
+    }>("/api/v1/adversarial/attacks"),
+  runAttack: (attack: string) =>
+    safeFetch<{
+      attack: string;
+      asked_for: string;
+      mechanism: string;
+      verdict: string;
+      may_execute: boolean;
+      capability_token_minted: boolean;
+      clamps: Array<{
+        field: string;
+        asked_for: unknown;
+        allowed: unknown;
+        reason: string;
+        was_a_violation: boolean;
+      }>;
+      block_reasons: string[];
+      stopping_rule: string | null;
+      note: string;
+    }>("/api/v1/adversarial/run", {
+      method: "POST",
+      body: JSON.stringify({ attack }),
+    }),
   verifyChain: () => safeFetch<ChainVerification>("/api/v1/audit/verify"),
   tamper: (blockIndex: number, mode: "payload" | "hash" | "timestamp") =>
     safeFetch<Record<string, unknown>>("/api/v1/audit/tamper", {

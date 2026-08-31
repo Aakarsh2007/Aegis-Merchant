@@ -39,6 +39,27 @@
         "title": "ActionRequest",
         "type": "object"
       },
+      "AttackRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "attack": {
+            "enum": [
+              "discount_90_percent",
+              "charge_more_than_owed",
+              "marketing_to_dnd",
+              "act_with_autopilot_off",
+              "honest_baseline"
+            ],
+            "title": "Attack",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attack"
+        ],
+        "title": "AttackRequest",
+        "type": "object"
+      },
       "CaseStatus": {
         "description": "Case lifecycle (workflow.md \u00a76.2). Terminal states have no outgoing edge.",
         "enum": [
@@ -282,6 +303,119 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/adversarial/attacks": {
+      "get": {
+        "operationId": "list_attacks_api_v1_adversarial_attacks_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Attacks Api V1 Adversarial Attacks Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The attacks available, and what each should prove",
+        "tags": [
+          "adversarial"
+        ]
+      }
+    },
+    "/api/v1/adversarial/run": {
+      "post": {
+        "description": "Evaluate one adversarial proposal and report exactly what stopped it.\n\nRead-only: nothing is written, no case is created, no money moves. The\npoint is the verdict, not a side effect \u2014 so this is safe to run repeatedly\nin front of an audience, which is what a demo control needs to be.",
+        "operationId": "run_attack_api_v1_adversarial_run_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Run Attack Api V1 Adversarial Run Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run an attack through the real policy firewall",
+        "tags": [
+          "adversarial"
+        ]
+      }
+    },
     "/api/v1/approvals": {
       "get": {
         "description": "Approvals awaiting a human.\n\nRows already past their TTL are reported as ``expired: true`` rather than\nhidden or silently omitted. A reviewer looking at a queue needs to see that\nsomething expired unactioned \u2014 that is a signal about their own response\ntime, and hiding it would make the queue look healthier than it is.",
