@@ -28,6 +28,7 @@ import { MetricsBar } from "@/components/MetricsBar";
 import { MorningBriefing } from "@/components/MorningBriefing";
 import { PipelineStream } from "@/components/PipelineStream";
 import { StartHere } from "@/components/StartHere";
+import { TestModePanel } from "@/components/TestModePanel";
 import { WhereAIStops } from "@/components/WhereAIStops";
 import { StoppingRulesPanel } from "@/components/StoppingRulesPanel";
 
@@ -87,7 +88,14 @@ export default function Page() {
         </Suspense>
       </div>
 
-      {/* 3. The limitation, stated before the features rather than after.
+      {/* 3. The one button that touches real Razorpay. Directly under the
+             tile it moves, because the tile's honest zero is otherwise a dead
+             end -- the instruction used to be a curl string in a caption. */}
+      <div className="mt-6">
+        <TestModePanel />
+      </div>
+
+      {/* 4. The limitation, stated before the features rather than after.
              Placed here deliberately: a reader who sees Rs 2,02,760 and then
              Rs 60,217 should learn what neither number proves BEFORE they are
              shown eight panels of things that work. Burying it at the bottom
@@ -98,13 +106,13 @@ export default function Page() {
         </Suspense>
       </div>
 
-      {/* 4. Why it is an AI project, and where the AI is not allowed. */}
+      {/* 5. Why it is an AI project, and where the AI is not allowed. */}
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <WhereAIStops />
         <AdversarialPanel />
       </div>
 
-      {/* 5. What it chose not to do, and whether any of it can be checked. */}
+      {/* 6. What it chose not to do, and whether any of it can be checked. */}
       <div className="mt-6">
         <Suspense fallback={<Skeleton label="briefing" />}>
           <MorningBriefing />
@@ -134,7 +142,7 @@ export default function Page() {
         </div>
       </div>
 
-      {/* 6. Follow one case end to end. */}
+      {/* 7. Follow one case end to end. */}
       <div className="mt-6">
         <Suspense fallback={<Skeleton label="cases" />}>
           <CasesTable />

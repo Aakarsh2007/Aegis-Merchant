@@ -296,6 +296,27 @@ export const api = {
   stoppingRules: () => safeFetch<StoppingRules>("/api/v1/metrics/stopping-rules"),
   power: () => safeFetch<PowerPlan>("/api/v1/metrics/power"),
   holdout: () => safeFetch<Holdout>("/api/v1/metrics/holdout"),
+  testmodeStatus: () =>
+    safeFetch<{
+      razorpay_configured: boolean;
+      webhook_secret_configured: boolean;
+      ready: boolean;
+      missing: string[];
+      webhook_note: string;
+      verified_count: number;
+    }>("/api/v1/testmode/status"),
+  testmodeRecover: () =>
+    safeFetch<{
+      stopped_before_execution: boolean;
+      case_id: string;
+      pay_url?: string;
+      reference_id?: string;
+      diagnosis?: string | null;
+      strategy?: string | null;
+      stopping_rule?: string | null;
+      note?: string;
+      next_step?: string;
+    }>("/api/v1/testmode/recover", { method: "POST", body: JSON.stringify({}) }),
   cases: (query = "") => safeFetch<CaseList>(`/api/v1/cases${query}`),
   caseTrace: (id: string) => safeFetch<CaseTrace>(`/api/v1/cases/${id}`),
   approvals: () =>

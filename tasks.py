@@ -322,6 +322,17 @@ def verify_audit() -> int:
     return run([PY, "-m", "app.tools.verify_cli", *paths], cwd=API)
 
 
+@task("testmode-recover", "One real Razorpay Test Mode recovery, end to end")
+def testmode_recover() -> int:
+    """POST /testmode/recover against a running API.
+
+    The dashboard has a button for this. The command exists because
+    `docs/PITCH.md` told a reader to run it and it did not exist -- a doc
+    referencing a command that is not there is worse than no doc.
+    """
+    return run([PY, "-m", "app.tools.testmode_cli", *sys.argv[2:]], cwd=API)
+
+
 @task("testmode-experiment", "A real randomised holdout against Razorpay Test Mode")
 def testmode_experiment() -> int:
     """Both arms, real provider. Needs Razorpay keys and a tunnel.
