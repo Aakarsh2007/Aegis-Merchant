@@ -119,6 +119,47 @@ async def testmode_status(
     }
 
 
+@router.post("/reconcile", summary="Ask Razorpay which of our links were paid")
+async def reconcile(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    clock: Annotated[Clock, Depends(get_clock)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    _principal: Annotated[Principal, Depends(require_api_token)],
+) -> dict[str, Any]:
+    """Settle outstanding references by reading Razorpay directly.
+
+    This is what makes the demo tunnel-free. A webhook is a notification and
+    can be lost, delayed, or sent to a URL that has since died; a direct read
+    asks Razorpay what it currently believes, which is the fact we want.
+    """
+    if not settings.razorpay_live:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No Razorpay credentials, so there is nothing to reconcile against.",
+        )
+
+    from app.db.session import get_sessionmaker
+    from app.deps import get_provider
+    from app.workers.reconcile import reconcile_outstanding
+
+    result = await reconcile_outstanding(
+        get_sessionmaker(), provider=get_provider(settings), clock=clock
+    )
+    return {
+        "checked": result.checked,
+        "settled": result.settled,
+        "recovered_paise": result.recovered_paise,
+        "still_open": result.still_open,
+        "errors": result.errors,
+        "details": result.details,
+        "note": (
+            "Read directly from Razorpay, authenticated by our API key. Both this "
+            "and the webhook path are Razorpay asserting the payment; this one "
+            "needs no public URL, so a lost webhook cannot cost us a recovery."
+        ),
+    }
+
+
 @router.post("/recover", summary="Create one real Test Mode recovery, end to end")
 async def test_recovery(
     body: TestRecoveryRequest,

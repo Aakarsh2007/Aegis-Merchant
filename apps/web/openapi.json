@@ -1742,6 +1742,58 @@
         ]
       }
     },
+    "/api/v1/testmode/reconcile": {
+      "post": {
+        "description": "Settle outstanding references by reading Razorpay directly.\n\nThis is what makes the demo tunnel-free. A webhook is a notification and\ncan be lost, delayed, or sent to a URL that has since died; a direct read\nasks Razorpay what it currently believes, which is the fact we want.",
+        "operationId": "reconcile_api_v1_testmode_reconcile_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reconcile Api V1 Testmode Reconcile Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ask Razorpay which of our links were paid",
+        "tags": [
+          "test mode"
+        ]
+      }
+    },
     "/api/v1/testmode/recover": {
       "post": {
         "description": "Detect \u2192 diagnose \u2192 policy \u2192 real Razorpay link, then hand back the URL.\n\nEverything up to the link is the production path, including the policy\nfirewall and the capability token. The link is a genuine Razorpay Test Mode\npayment link with a `reference_id` **we** issued, committed to the outbox\n*before* the provider call \u2014 so paying it produces a webhook that\nattribution can match, and a crash between the two is recoverable.",

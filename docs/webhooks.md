@@ -1,5 +1,13 @@
 # Real webhooks over a tunnel
 
+> **You may not need this.** `python tasks.py reconcile` asks Razorpay directly
+> which of our links were paid, and needs no public URL at all. Use it for a
+> demo or a recording — nothing to register, nothing to re-register when the
+> tunnel URL changes. Webhooks are faster and are what a real deployment wants;
+> the poller is the backstop that makes a lost delivery survivable
+> ([DEC-037](DECISIONS.md)).
+
+
 Razorpay will not POST to `localhost`, and it will not POST to plain HTTP. To
 receive a genuine signed webhook you need a public HTTPS URL pointing at the
 local API.

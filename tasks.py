@@ -291,6 +291,17 @@ def chaos() -> int:
     return run([PY, "-m", "app.tools.chaos_cli", fault], cwd=API)
 
 
+@task("reconcile", "Ask Razorpay which of our links were actually paid")
+def reconcile() -> int:
+    """Settle outstanding references by reading Razorpay directly.
+
+    The webhook path is a notification and can be lost; this is the backstop
+    production needs anyway. It also means the Test Mode demo needs no tunnel:
+    create a link, pay it, run this.
+    """
+    return run([PY, "-m", "app.workers.reconcile_cli"], cwd=API)
+
+
 @task("verify-audit", "Recompute and verify the SHA-256 audit chain")
 def verify_audit() -> int:
     """Verify the chain without starting the API.

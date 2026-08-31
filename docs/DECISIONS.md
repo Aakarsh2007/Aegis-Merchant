@@ -857,3 +857,48 @@ were applied" is the worst possible answer about a safety limit.
 
 **Cost of being wrong:** a merchant who genuinely wants a looser bound needs a restart. That
 is the correct amount of friction for the direction that costs money.
+
+## DEC-037 · 2026-08-31 · Poll Razorpay as well as listening for webhooks
+
+**Phase:** final
+
+**Decision:** `python tasks.py reconcile` (and `POST /api/v1/testmode/reconcile`) asks Razorpay
+directly whether each outstanding reference was paid, and attributes anything that was. It runs
+alongside the webhook path, not instead of it.
+
+**Why, and it is not primarily about the demo.** A webhook is a *notification*, not a source of
+truth. Over the course of building this, deliveries were lost to a dead tunnel URL, rejected by
+our own replay window while carrying a valid signature (INC-024), and dropped by a handler that
+stored them and did nothing (INC-021). Every one of those would have been money we actually
+recovered and could not prove. A production recovery system needs a reconciliation poller
+regardless of how good its webhook handling is.
+
+**The secondary benefit, which is large:** it takes the tunnel off the demo's critical path. A
+judge can create a link, pay it, and run one command. No public URL, no webhook registration,
+no re-registering a URL that changed since the last rehearsal.
+
+**Is a polled settlement as trustworthy as a signed webhook?** Yes, and arguably more. Both
+come from Razorpay over TLS authenticated with our own keys. A webhook proves Razorpay *sent*
+something and the HMAC matched; a direct read proves Razorpay *currently believes* the link is
+paid, which is the fact actually being claimed. There is no signature because there is no third
+party in between — the API key is the authentication.
+
+**But they are not identical, so they are distinguishable.** A webhook settlement records the
+Razorpay event id; a reconciled one records the payment id (or the link id, since Razorpay's
+list endpoint returns `payments: []` even for a paid link) and the audit block carries
+`source: razorpay_api_reconciliation` and `verifier_kind`. Both are RAZORPAY_VERIFIED, because
+in both cases Razorpay is the one asserting it.
+
+**Rejected:** replacing the webhook path. Webhooks are how a real deployment learns about a
+settlement within seconds rather than on a polling interval, and the sub-10ms acknowledgement
+is a genuine design property worth keeping.
+
+**Rejected:** letting the poller re-settle a case the webhook already settled. Exactly one
+path should win and it does not matter which; the guard is a re-read of
+`recovery_verified_by` inside the write transaction.
+
+**Cost of being wrong:** reconciliation writes to the RAZORPAY_VERIFIED column, which is the
+one figure in this project meant to be beyond argument. So the tests are weighted towards
+*not* counting: an unpaid link, an already-settled case, an unknown reference, an unreachable
+provider, an inflated provider amount, and a control-arm case are all asserted to produce
+nothing.

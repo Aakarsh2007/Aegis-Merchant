@@ -243,10 +243,22 @@ reference       rvp_rc-tm64210_278    <- a reference WE issued
 audit chain     valid, 214 blocks
 ```
 
-Reproduce it: `POST /api/v1/testmode/recover` returns a real payment link; pay
-it with card `4111 1111 1111 1111`; the webhook arrives over a tunnel
-([`docs/webhooks.md`](docs/webhooks.md)) and the case moves to
-`RAZORPAY_VERIFIED`.
+**Reproduce it in three steps — no tunnel needed:**
+
+```bash
+curl -X POST localhost:8000/api/v1/testmode/recover     # returns a real Razorpay link
+#   ... pay it with card 4111 1111 1111 1111, any future expiry, any CVV
+python tasks.py reconcile                                # asks Razorpay what was paid
+```
+
+The agent runs the whole path — diagnose, policy firewall, capability token,
+real payment link with a reference we issued. `reconcile` then asks Razorpay
+directly whether it was paid, which needs no public URL.
+
+Webhooks work too, and are faster ([`docs/webhooks.md`](docs/webhooks.md)) — but
+a webhook is a notification, not a source of truth. It can be lost, delayed, or
+delivered to a URL that has since died. All three happened while building this,
+which is why the poller exists ([DEC-037](docs/DECISIONS.md)).
 
 **Doing this found two bugs nothing local could have.** The webhook handler was
 storing events and dropping them, so attribution never ran on the live path
