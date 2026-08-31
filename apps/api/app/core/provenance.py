@@ -13,9 +13,15 @@ Why this matters more than it sounds
 
 The single most damaging thing this project could do is put ₹2,02,760 on a
 screen next to ₹60,217 without saying that the first is what a dashboard would
-show and the second is what we actually caused. Both numbers are true. They
-answer different questions, and a viewer who cannot tell which is which will
-take the larger one.
+show and the second is the lift *estimated* against a holdout under a declared
+response model. Both numbers are true. They answer different questions, and a
+viewer who cannot tell which is which will take the larger one.
+
+Note the wording, because it is the point of the module: **"estimated causal
+lift", never "what we caused"**. The machinery that computes it is real and
+unmodified, and the customer responses it runs against are a parameter we
+declared. A simulation cannot establish causation, and a docstring in the file
+whose job is honest labelling is a poor place to imply otherwise.
 
 Three levels, and the distinction between them is the whole point:
 

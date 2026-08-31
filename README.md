@@ -4,34 +4,50 @@ Razorpay AI Buildathon 2026 · Track: **AI Revenue Recovery**
 
 [![CI](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml/badge.svg)](https://github.com/Aakarsh2007/Aegis-Merchant/actions/workflows/ci.yml)
 
-## RevPilot in 60 seconds
+**An autonomous revenue-recovery agent for Razorpay merchants.** It finds money
+that is slipping away — failed payments, abandoned checkouts, overdue invoices,
+dead subscription mandates — diagnoses why, takes the cheapest bounded action
+inside a policy firewall, and proves any recovery against Razorpay itself.
+
+|  |  |  |
+|---|---|---|
+| **₹1.00** | **RAZORPAY VERIFIED** | A real Test Mode payment, proven by Razorpay's own signed webhook. The full loop. |
+| **₹60,217** | **SIMULATED** | Estimated incremental lift over a 39-case holdout, under a declared response model. |
+| **₹0** | **LIVE PRODUCTION** | No real merchant traffic. Not attempted. |
+
+> ### AI proposes. Policy disposes.
+>
+> The model reads ambiguity and argues for an action. It **cannot touch money** —
+> it has no field to change an amount with, and nothing happens without a
+> capability token the policy firewall mints.
+
+```bash
+python tasks.py demo        # no credentials, no Docker, ~40 seconds
+```
+
+938 tests · `mypy --strict` clean · 25 documented incidents · one command to run.
+
+---
+
+## How it works, in 60 seconds
 
 **The problem.** A merchant does not lose ₹10 lakh at once. They lose ₹4,299
 here and ₹18,500 there — a UPI timeout, an abandoned cart, an invoice nobody
 chased, a subscription mandate that quietly died.
 
-**What this does.** Detect → Diagnose → Decide → Act → Verify → Attribute.
+**What it does.** Detect → Diagnose → Decide → Act → Verify → Attribute.
 Four revenue leaks, one agent, one attribution system.
 
-**What makes it safe.** The model reads ambiguity and argues for an action. It
-cannot touch money: it has no field to change an amount with, and no side
-effect happens without a capability token the policy firewall mints.
+**What makes it safe.** A deterministic policy firewall between the model and
+the money: consent classes, DND, quiet hours, twelve stopping rules, hard
+amount and discount ceilings, and a capability token without which no side
+effect can occur. Nine places where an LLM was deliberately *rejected* in
+favour of a rule — a limit check that sometimes hallucinates is strictly worse
+than one that cannot.
 
-> ### AI proposes. Policy disposes.
-
-**The experiment.** 210 cases. **39 deliberately never contacted.**
-
-**The result — three numbers, never one.**
-
-| | | |
-|---|---|---|
-| **Razorpay verified** | **₹1.00** | A real signed webhook proves it. Test Mode, end to end. |
-| **Simulated experiment** | **₹60,217** | Estimated incremental lift under a declared response model, over 210 cases with a 39-case holdout. |
-| **Live production** | **₹0** | No real merchant traffic. Not attempted. |
-
-Gross across the simulated batch was ₹2,02,760 — but nearly a quarter of the
-holdout paid without us, so gross overstates our contribution roughly
-threefold. The system refuses to report it alone.
+**How we know it worked.** 210 cases, **39 deliberately never contacted.** The
+gross-versus-incremental argument is [below](#the-number-and-why-it-is-smaller-than-the-one-you-expected),
+and it is the point of the whole project.
 
 **The ₹1 matters more than the ₹60,217.** It is the whole loop on real Razorpay
 infrastructure: agent → policy firewall → capability token → real payment link
