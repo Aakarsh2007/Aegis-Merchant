@@ -956,3 +956,46 @@ rather than falling through to the deterministic floor. The first attempt withou
 is designed to on the request path, which is the wrong behaviour for an offline warming pass.
 A run that hits the daily quota saves what it recorded — the remainder falls through and is
 labelled DETERMINISTIC, which is a smaller cache hit rate rather than a lie.
+
+---
+
+## DEC-040 · 2026-08-31 · The control arm gets a checkout link, and no contact
+
+**Context.** The randomised holdout had never been exercised against real provider data. To
+run it in Test Mode, a control-arm case needs to be *settleable* — otherwise control
+conversion is pinned at 0% by construction and the measured lift inflates to whatever the
+treated arm did, which is worse than not running the experiment at all.
+
+**Decision.** A control case gets a real Razorpay payment link representing **the merchant's
+own checkout**, carrying an `rvpo_` reference in a namespace disjoint from the `rvp_` one the
+recovery path uses. It is never messaged. No outbox row, no `RecoveryAction`, no contact
+ledger entry, and `notify` off so Razorpay does not message either.
+
+The counterfactual the holdout needs is *"the merchant's ordinary checkout stays open to this
+customer"*, not *"this customer has no way to pay"*. The second is a different experiment and
+a flattering one.
+
+**Why the two namespaces are disjoint by construction.** A webhook on an `rvpo_` reference
+finds the case with **no issued outreach reference to match**, which routes straight into
+`attribute()`'s existing *"no reference_id to match on"* branch and resolves organically. The
+guard against crediting ourselves is therefore the one that was already there and already
+tested, not a new branch written for this feature. A collision between the two forms would
+credit a control payment as our recovery — the single error the holdout exists to prevent — so
+the prefixes differ rather than the lengths or the separators.
+
+**Rejected:** creating no link for control cases. Control conversion becomes 0% by
+construction, and every lift figure computed from it is arithmetic on a number the design
+guaranteed.
+
+**Rejected:** running the agent graph on control cases and letting the stopping rules block the
+action, which is what the batch does. Stricter here: the agent is not run at all. With n this
+small a single accidental outreach artefact would invalidate the only claim the experiment
+makes, and "a rule would have stopped it" is a weaker guarantee than "the code path was never
+entered".
+
+**Cost of being wrong.** Every rupee of the incremental figure rests on the control arm being
+untouched. So it is asserted as an **absence**, over every table that could record a contact,
+and against the payload we actually send the provider — `notify: {sms: true}` would contact a
+control customer and no assertion on our own tables would ever see it. Sabotage-verified four
+ways: an outbox row for control, a namespace collision, provider notification enabled, and a
+significance verdict in the report. Each fails tests.

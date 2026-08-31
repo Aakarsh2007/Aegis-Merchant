@@ -15,7 +15,7 @@ Four criteria, in their words:
 | Criterion | Their gloss | Where this project answers it |
 |---|---|---|
 | **Problem taste** | did you pick something that actually matters | the gross-vs-incremental split — most recovery tools report the first number |
-| **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 964 tests, `mypy --strict` |
+| **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 1,028 tests, `mypy --strict` |
 | **AI judgment** | the right tool in the right place, **and where you chose not to use one** | the rule table answers 158 of 199 diagnoses; the model is consulted on 41 |
 | **Failure recovery** | what broke, and what you did about it | 29 written incidents, each with the reason no test caught it |
 
@@ -51,7 +51,29 @@ so it says 'not statistically significant' right on the screen."
 **Pause here for a beat.** This is the whole pitch. If a judge stops watching at 0:25, this is
 what they keep.
 
-### 0:25 – 1:05 · One case, end to end
+### 0:25 – 0:50 · And the number that is still missing
+
+> **Shot:** the "What we have not proven" panel. Let the completion bar sit on screen.
+
+"There's a third question, and I haven't answered it. Did RevPilot actually *cause* those
+customers to pay?
+
+No. Not proven. Sixty thousand rupees is a simulation — real machinery, declared responses.
+
+Answering it properly needs 1,592 cases at a balanced split. I have 210, which is 4.9% of the
+control arm. That's not an estimate I made up for this video; the design is pre-registered in
+the repo, committed before any of this data existed, and it says what would make me abandon
+the hypothesis. The panel shows the gap because a gap you can measure is worth more than a
+disclaimer nobody reads.
+
+What's blocking it isn't code. It's a merchant with the traffic, and DLT registration in
+*their* name — which takes weeks."
+
+**Why this is at 0:25 and not 4:30.** A reviewer will find this limitation whether or not I
+mention it. Saying it before showing eight panels of things that work is the difference between
+honesty and damage control.
+
+### 0:50 – 1:30 · One case, end to end
 
 > **Shot:** the Cases table → click `RC-0142` → the decision trace expanding, node by node.
 
@@ -67,7 +89,7 @@ She has no marketing consent. So the message downgrades to transactional, and th
 strategy asked for is clamped to zero — not because a model decided to be careful, but because
 the policy firewall has no code path that lets it through."
 
-### 1:05 – 1:55 · AI proposes, policy disposes
+### 1:30 – 2:10 · AI proposes, policy disposes
 
 > **Shot:** the "Where AI stops" panel, then the Adversarial panel — run all five attacks live.
 
@@ -84,7 +106,7 @@ mock. Charge more than owed —" *(click)* "— the answer isn't 'blocked', it's
 `UNREPRESENTABLE`. The proposal object the model fills in **has no amount field**. There is no
 number for it to raise. That's not a guardrail, it's an absence."
 
-### 1:55 – 2:45 · A real rupee, proven by Razorpay
+### 2:10 – 2:55 · A real rupee, proven by Razorpay
 
 > **Shot:** terminal — `python tasks.py testmode-recover` — then the tunnel log showing the
 > inbound POST, then the dashboard tile flipping to ₹1.00 RAZORPAY VERIFIED.
@@ -100,7 +122,7 @@ One rupee. And it's on its own tile, badged `RAZORPAY VERIFIED`, separate from t
 because a signed webhook and a simulation are different kinds of evidence and averaging them
 would make both worthless."
 
-### 2:45 – 3:30 · The brakes, and the audit trail
+### 2:55 – 3:35 · The brakes, and the audit trail
 
 > **Shot:** the stopping-rules panel, then Audit Verifier → click "Tamper".
 
@@ -116,7 +138,7 @@ Every decision is a block in a SHA-256 hash chain. Let me break it." *(click Tam
 field, one block. The verifier names the block and the field. You cannot edit history here and
 have it still verify."
 
-### 3:30 – 4:15 · What broke
+### 3:35 – 4:20 · What broke
 
 > **Shot:** `docs/INCIDENTS.md` scrolling, then stop on INC-026.
 
@@ -135,7 +157,7 @@ cache key is a hash of the whole context. The two bugs had been hiding each othe
 Three of my four worst bugs are the same defect: **a green test that cannot tell working from
 absent.** I found all of them by looking at the running product, not by writing more tests."
 
-### 4:15 – 5:00 · Run it yourself
+### 4:20 – 5:00 · Run it yourself
 
 > **Shot:** a clean terminal. `git clone`, then `python tasks.py demo`. Let it run at real speed.
 
@@ -154,7 +176,7 @@ The gross number is two lakh. The honest number is sixty thousand. Thank you."
 
 1. `python tasks.py demo` and confirm the dashboard shows non-zero numbers. A zeroed dashboard
    was the single worst thing in the last screenshot review.
-2. Do a live ₹1 Test Mode payment for the 1:55 segment. The tile flipping from ₹0.00 to ₹1.00
+2. Do a live ₹1 Test Mode payment for the 2:10 segment. The tile flipping from ₹0.00 to ₹1.00
    **on camera** is the most convincing twenty seconds available, and it needs the tunnel
    running (`python tasks.py tunnel`) plus the webhook URL updated in the Razorpay dashboard.
 3. Check the audit chain verifies *before* you record the tamper demo, so the "valid" state is
@@ -217,6 +239,17 @@ Six are facts only you can supply. Six are below, ready to paste.
 > One real Test Mode rupee has been recovered end-to-end and proven by Razorpay's own signed
 > webhook. It sits on its own tile, badged `RAZORPAY VERIFIED`, never averaged with the
 > simulation — because a signed webhook and a seeded corpus are different kinds of evidence.
+>
+> **And the question it has not answered is on the dashboard too, third from the top.** Whether
+> RevPilot *caused* additional customers to pay is unproven: that needs 1,592 cases at a
+> balanced split and a DLT-registered merchant, and the dashboard reports that we are at 4.9%
+> of the control arm required. The full design — primary endpoint, allocation, stopping rule,
+> and the result that would make us abandon the hypothesis — is pre-registered in
+> `docs/PRE-REGISTRATION.md`, committed before any of the data existed so the ordering is
+> checkable rather than claimed. The randomised holdout itself has been exercised end-to-end
+> against real Razorpay: both arms, real links for treated cases, nothing sent to control, and
+> a control payment recorded as organic rather than credited to us. That is a test of the
+> instrument, labelled as one.
 >
 > Runs with one command. No Docker, no Postgres, no Redis, no API key required.
 
@@ -283,7 +316,7 @@ Six are facts only you can supply. Six are below, ready to paste.
 > new test now gets sabotage-verified — I break the thing it covers and confirm the test fails,
 > and that step has caught vacuous tests inside the fixes for vacuous tests. Every real bug in
 > this project was found by touching the real provider or by looking at the running product;
-> none was reachable from local testing at any volume. The suite is at 964 tests and I trust it
+> none was reachable from local testing at any volume. The suite is at 1,028 tests and I trust it
 > considerably less than I did at 400.
 
 ---
@@ -317,6 +350,20 @@ to change a rupee figure with.
 I measured it. 90.6% against the rule table's 96.5% on the golden set. The commitment was
 written down before the measurement: if the model doesn't beat the table, ship the table and
 say so. It didn't, so the table ships.
+
+**"You're claiming a lift you haven't measured."**
+Correct, and the dashboard says so before it says anything else. What is measured is that the
+machinery computing the lift works on real provider data: the arm assignment is recomputable
+from the case id, a treated settlement matches a reference we issued, and a control settlement
+resolves as organic rather than being credited to us. What is *not* measured is customer
+behaviour, and the pre-registration says exactly what would measure it and what would make me
+abandon the hypothesis.
+
+**"Why not just run it on a few real people and report that?"**
+Because 30 cases gives a confidence interval about 40 points wide, and reporting it would
+destroy the only thing that makes this submission worth reading. The arithmetic is in
+`tasks.py power`: 796 per arm at the effect size I'm assuming. Anything less and I'd be
+publishing noise with a decimal point on it.
 
 **"What would you do next?"**
 Get it in front of one real merchant with enough volume to make the holdout arm significant.

@@ -9,11 +9,17 @@ that is slipping away — failed payments, abandoned checkouts, overdue invoices
 dead subscription mandates — diagnoses why, takes the cheapest bounded action
 inside a policy firewall, and proves any recovery against Razorpay itself.
 
-|  |  |  |
+Three numbers, three different questions, and the third one is open:
+
+| | | Question it answers |
 |---|---|---|
-| **₹1.00** | **RAZORPAY VERIFIED** | A real Test Mode payment, proven by Razorpay's own signed webhook. The full loop. |
-| **₹60,217** | **SIMULATED** | Estimated incremental lift over a 39-case holdout, under a declared response model. |
+| **₹1.00** | **RAZORPAY VERIFIED** | *Can it execute and verify a recovery through Razorpay?* **Yes** — a real Test Mode payment, proven by Razorpay's own signed webhook. |
+| **₹60,217** | **SIMULATED** | *What might it recover at scale?* Estimated incremental lift over a 39-case holdout, under a **declared** response model. |
 | **₹0** | **LIVE PRODUCTION** | No real merchant traffic. Not attempted. |
+| **—** | **NOT PROVEN** | *Did it cause additional customers to pay?* **No.** That needs 1,592 cases and a DLT-registered merchant. The plan is [pre-registered](docs/PRE-REGISTRATION.md), committed before any data existed, and the dashboard shows how far short we are: **4.9%**. |
+
+The fourth row is on the dashboard, third from the top, above the panels showing
+things that work. `python tasks.py power` prints the arithmetic.
 
 > ### AI proposes. Policy disposes.
 >
@@ -25,7 +31,7 @@ inside a policy firewall, and proves any recovery against Razorpay itself.
 python tasks.py demo        # no credentials, no Docker, ~40 seconds
 ```
 
-964 tests · `mypy --strict` clean · 29 documented incidents · one command to run.
+1,028 tests · `mypy --strict` clean · 29 documented incidents · one command to run.
 
 ---
 

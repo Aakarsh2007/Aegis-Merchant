@@ -18,7 +18,14 @@ from __future__ import annotations
 import hashlib
 import secrets
 
-__all__ = ["PREFIXES", "idempotency_hash", "new_id", "reference_id", "seq_id"]
+__all__ = [
+    "PREFIXES",
+    "idempotency_hash",
+    "new_id",
+    "observed_reference_id",
+    "reference_id",
+    "seq_id",
+]
 
 #: Row-type prefixes. Kept in one place so nothing invents its own.
 PREFIXES: dict[str, str] = {
@@ -78,6 +85,21 @@ def reference_id(case_id: str, attempt_no: int) -> str:
     asymmetry at the source instead of handling it at every comparison site.
     """
     return f"rvp_{case_id}_{attempt_no}".lower()
+
+
+def observed_reference_id(case_id: str) -> str:
+    """The reference on the merchant's own checkout link, for a control case.
+
+    A distinct prefix, `rvpo_`, and no attempt number -- because there is no
+    attempt. Nothing was sent. If this string ever collided with the `rvp_`
+    form, a control payment would be credited to us as a recovery, which is the
+    one error the holdout exists to prevent; a different prefix makes the two
+    namespaces disjoint by construction rather than by convention.
+
+    Lowercased for the same reason as `reference_id` (INC-012): Razorpay treats
+    reference uniqueness case-insensitively while SQLite's UNIQUE does not.
+    """
+    return f"rvpo_{case_id}".lower()
 
 
 def idempotency_hash(merchant_id: str, order_ref: str, playbook: str) -> str:

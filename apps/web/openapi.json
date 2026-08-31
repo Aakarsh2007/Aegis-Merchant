@@ -1366,6 +1366,58 @@
         ]
       }
     },
+    "/api/v1/metrics/holdout": {
+      "get": {
+        "description": "Outcomes of the Test Mode holdout, from RAZORPAY_VERIFIED events only.\n\nSeparate from ``/attribution`` on purpose. That endpoint reports the seeded\ncorpus, where our own code decides who pays; this one reports cases whose\noutcomes are real signed webhooks. Merging them would produce a single rate\nthat is neither, labelled as whichever the reader preferred.\n\nReturns ``significance: null`` at every sample size. See\n``workers/experiment.holdout_report``.",
+        "operationId": "holdout_api_v1_metrics_holdout_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Holdout Api V1 Metrics Holdout Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The real-provider randomised holdout, arm by arm",
+        "tags": [
+          "metrics"
+        ]
+      }
+    },
     "/api/v1/metrics/overview": {
       "get": {
         "operationId": "overview_api_v1_metrics_overview_get",
@@ -1412,6 +1464,58 @@
           }
         },
         "summary": "Headline tiles; gross and net always together",
+        "tags": [
+          "metrics"
+        ]
+      }
+    },
+    "/api/v1/metrics/power": {
+      "get": {
+        "description": "The gap between what we have and what would settle the causal question.\n\nThis endpoint exists because \"not statistically significant\" is a\ndisclaimer, and a disclaimer invites the reader to guess how close we are.\nA completion percentage and a case count do not.\n\nTwo things it deliberately does **not** return:\n\n* **No p-value, and no significance verdict.** \u00a76 of the pre-registration\n  commits to analysing once, at the full sample. A p-value on a dashboard\n  while data accumulates is an invitation to stop when it looks good, and\n  repeated testing of a growing sample yields a spurious p < 0.05 roughly\n  one time in three. The one place significance is reported is\n  ``/attribution``, over the completed seeded corpus, where it says *not*\n  significant.\n* **No projected date unless there is real arrival data.** ``eta`` is null\n  here rather than extrapolated from the seeded corpus, whose cases all\n  arrive at once. A countdown computed from fabricated velocity is fiction.",
+        "operationId": "power_api_v1_metrics_power_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Power Api V1 Metrics Power Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "How far the corpus is from a powered causal test",
         "tags": [
           "metrics"
         ]

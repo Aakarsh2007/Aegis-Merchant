@@ -89,10 +89,10 @@ discovered later:
 
 | Split | Control needed | Treated needed | Total failed payments |
 |---|---|---|---|
-| 81/19 (current demo) | 465 | 2,038 | **2,503** |
-| 50/50 (this experiment) | 795 | 795 | **1,590** |
+| 81/19 (current demo) | 465 | 2,039 | **2,504** |
+| 50/50 (this experiment) | 796 | 796 | **1,592** |
 
-A balanced split reaches the same power with **36% fewer cases**, because power is governed by
+A balanced split reaches the same power with **36.4% fewer cases**, because power is governed by
 the smaller arm. The cost is real and falls on the merchant: half of all recoverable cases are
 deliberately not acted on for the duration. That trade — a shorter experiment against more
 foregone recovery — is the merchant's to make, so `control_fraction` stays configurable and the
@@ -108,15 +108,21 @@ Effect size assumed: **control 23.1%, treated 29.2%, absolute lift 6.16 pp.** Th
 rates the simulation produces, and using them here is a declared assumption, not evidence. If
 the true effect is smaller, this study is underpowered and §6 says what happens then.
 
-Required, at 50/50: **795 per arm, 1,590 cases total.**
+Required, at 50/50: **796 per arm, 1,592 cases total.**
 
-At an 8–20% payment failure rate that is 8,000–20,000 payment attempts. Reproduce the number:
+1,382 cases short of that. At an 8–20% payment failure rate the shortfall is 6,910–17,275
+payment attempts. Reproduce the number:
 
 ```bash
 python tasks.py power
 ```
 
-**Current position: 39 control cases, 8.2% of the control arm a 50/50 design needs.** The
+The figures above are **computed by that command, not typed here** — `tests/test_power.py::TestAgreementWithThePreRegistration` reads this file and asserts the
+published numbers match `core/power.py`. The first draft of this document said 795 per arm; the
+code said 796, because a sample size must round *up* and the draft had rounded to nearest. The
+test caught it. A pre-registration whose arithmetic nobody checks is a wish.
+
+**Current position: 39 control cases, 4.9% of the control arm a 50/50 design needs.** The
 dashboard shows this as a completion percentage and a projected date at the observed daily
 volume, so the gap is visible rather than described.
 
@@ -124,7 +130,7 @@ volume, so the gap is visible rather than described.
 
 ## 6. Stopping rule, and what would falsify the hypothesis
 
-Fixed sample size. **Analysis happens once, at n = 1,590.** No peeking, and this matters more
+Fixed sample size. **Analysis happens once, at n = 1,592.** No peeking, and this matters more
 than it sounds: repeatedly testing a growing sample and stopping at the first p < 0.05 produces
 a "significant" result from pure noise roughly one time in three.
 
@@ -132,7 +138,7 @@ The dashboard will show arm sizes and the completion percentage while the experi
 will **not** show a p-value or a significance verdict before the sample is complete, because a
 number on a screen is an invitation to stop when it looks good.
 
-**We abandon H₁ if**, at n = 1,590, the 95% confidence interval on the absolute lift contains
+**We abandon H₁ if**, at n = 1,592, the 95% confidence interval on the absolute lift contains
 zero. Not "we gather more data" — that is the same peeking problem with extra steps. The
 outcome is written up in `docs/INCIDENTS.md` and the recovery figures on the dashboard revert
 to gross with an explicit statement that no incremental effect was demonstrated.

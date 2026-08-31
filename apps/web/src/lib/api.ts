@@ -238,11 +238,64 @@ export async function safeFetch<T>(
   }
 }
 
+/**
+ * The gap between what we have and what would settle the causal question.
+ *
+ * Note what is NOT in this type: no p-value and no significance field. The API
+ * does not send one, by design -- `docs/PRE-REGISTRATION.md` §6 commits to a
+ * single analysis at the full sample, and a significance number available while
+ * data accumulates is an invitation to stop when it looks good. Typing it as
+ * absent means a future panel cannot render one by accident.
+ */
+export type PowerPlan = {
+  registered: string;
+  design: {
+    alpha: number;
+    power: number;
+    control_fraction: number;
+    assumed_control_rate: number;
+    assumed_treatment_rate: number;
+    assumption_basis: string;
+  };
+  have: { control: number; treatment: number };
+  need: { control: number; treatment: number };
+  completion: number;
+  completion_basis: string;
+  cases_remaining: number;
+  attempts_remaining: Record<string, number>;
+  is_powered: boolean;
+  eta: string | null;
+  eta_basis: string;
+  blocked_on: string[];
+  today: string;
+};
+
+/** The real-provider randomised holdout. `significance` is always null. */
+export type Holdout = {
+  experiment_key: string;
+  control_fraction: number;
+  arms: Record<
+    string,
+    {
+      cases: number;
+      razorpay_verified_recoveries: number;
+      organic: number;
+      paise: number;
+    }
+  >;
+  what_this_proves: string[];
+  what_this_does_not_prove: string;
+  significance: null;
+  significance_basis: string;
+};
+
 export const api = {
   overview: () => safeFetch<Overview>("/api/v1/metrics/overview"),
   attribution: () => safeFetch<Attribution>("/api/v1/metrics/attribution"),
   cost: () => safeFetch<CostReport>("/api/v1/metrics/cost"),
   stoppingRules: () => safeFetch<StoppingRules>("/api/v1/metrics/stopping-rules"),
+  power: () => safeFetch<PowerPlan>("/api/v1/metrics/power"),
+  holdout: () => safeFetch<Holdout>("/api/v1/metrics/holdout"),
   cases: (query = "") => safeFetch<CaseList>(`/api/v1/cases${query}`),
   caseTrace: (id: string) => safeFetch<CaseTrace>(`/api/v1/cases/${id}`),
   approvals: () =>

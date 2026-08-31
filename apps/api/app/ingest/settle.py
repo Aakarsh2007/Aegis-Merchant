@@ -107,6 +107,23 @@ async def _find_case(
     if action is not None:
         return await session.get(RecoveryCase, action.case_id), action.reference_id
 
+    # The merchant's own checkout, for a control-arm case. Returns the case with
+    # `issued_reference = None` -- and that None is the whole point. It routes
+    # straight into attribute()'s "no reference_id to match on" branch, which
+    # resolves organically, so a control customer who pays is recorded as the
+    # counterfactual rather than credited to an action we never took.
+    observed = (
+        (
+            await session.execute(
+                select(RecoveryCase).where(func.lower(RecoveryCase.observed_reference_id) == needle)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if observed is not None:
+        return observed, None
+
     return None, None
 
 

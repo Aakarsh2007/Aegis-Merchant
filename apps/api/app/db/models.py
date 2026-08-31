@@ -401,6 +401,21 @@ class RecoveryCase(Base):
     #: The webhook event_id that proved the recovery. Null means unproven, and
     #: an unproven case is never counted (§14.1).
     recovery_verified_by: Mapped[str | None] = mapped_column(String(80))
+    #: The reference on the merchant's OWN checkout link for a control-arm case.
+    #:
+    #: Not an action of ours, and deliberately not an ``Outbox`` row: a control
+    #: case is never contacted, so there is nothing to send and nothing to
+    #: record as sent. It exists because the counterfactual the holdout needs is
+    #: *"the merchant's ordinary checkout stays open to this customer"* -- and
+    #: without a way to settle such a case, the control arm can never convert,
+    #: control conversion is pinned at 0%, and the measured lift is inflated to
+    #: whatever the treated arm did.
+    #:
+    #: A webhook arriving on this reference finds the case with **no issued
+    #: outreach reference to match**, which is exactly the condition
+    #: ``attribute()`` already resolves as organic. The guard against crediting
+    #: ourselves is therefore the existing one, not a new branch.
+    observed_reference_id: Mapped[str | None] = mapped_column(String(80), unique=True)
 
     #: Two workers racing on the same order produce the same hash; exactly one
     #: wins the INSERT (§12.4).

@@ -19,6 +19,7 @@ import { ApprovalsQueue } from "@/components/ApprovalsQueue";
 import { AttributionPanel } from "@/components/AttributionPanel";
 import { AuditVerifier } from "@/components/AuditVerifier";
 import { AdversarialPanel } from "@/components/AdversarialPanel";
+import { CausalGap } from "@/components/CausalGap";
 import { CasesTable } from "@/components/CasesTable";
 import { ChaosPanel } from "@/components/ChaosPanel";
 import { CostPanel } from "@/components/CostPanel";
@@ -86,13 +87,24 @@ export default function Page() {
         </Suspense>
       </div>
 
-      {/* 3. Why it is an AI project, and where the AI is not allowed. */}
+      {/* 3. The limitation, stated before the features rather than after.
+             Placed here deliberately: a reader who sees Rs 2,02,760 and then
+             Rs 60,217 should learn what neither number proves BEFORE they are
+             shown eight panels of things that work. Burying it at the bottom
+             would be technically honest and practically misleading. */}
+      <div className="mt-6">
+        <Suspense fallback={<Skeleton label="the causal gap" />}>
+          <CausalGap />
+        </Suspense>
+      </div>
+
+      {/* 4. Why it is an AI project, and where the AI is not allowed. */}
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <WhereAIStops />
         <AdversarialPanel />
       </div>
 
-      {/* 4. What it chose not to do, and whether any of it can be checked. */}
+      {/* 5. What it chose not to do, and whether any of it can be checked. */}
       <div className="mt-6">
         <Suspense fallback={<Skeleton label="briefing" />}>
           <MorningBriefing />
@@ -122,7 +134,7 @@ export default function Page() {
         </div>
       </div>
 
-      {/* 5. Follow one case end to end. */}
+      {/* 6. Follow one case end to end. */}
       <div className="mt-6">
         <Suspense fallback={<Skeleton label="cases" />}>
           <CasesTable />
