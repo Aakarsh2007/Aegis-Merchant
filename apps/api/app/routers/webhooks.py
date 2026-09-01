@@ -39,6 +39,7 @@ from app.db.session import get_sessionmaker
 from app.deps import get_clock, get_db
 from app.ingest.normalise import normalise
 from app.ingest.settle import mark_processed, process_settlement
+from app.routers.stream import bus
 from app.security.webhook import verify_signature, verify_timestamp
 
 __all__ = ["router"]
@@ -85,6 +86,30 @@ async def _process_event(
         outcome.case_id,
         outcome.reason,
     )
+    # INC-038. The Live pipeline panel had no publisher in the application at
+    # all, so a real signed webhook arriving -- the single most convincing
+    # moment this system has -- produced nothing on screen. It does now.
+    if outcome.counted:
+        bus.publish(
+            "recovery.verified",
+            {
+                "case_id": outcome.case_id,
+                "event_id": event_id,
+                "verified_by": "signed webhook",
+            },
+        )
+    elif outcome.case_id:
+        # A control-arm case that paid organically. Published because the
+        # panel's own subtitle promises exactly this: "Control-arm holds appear
+        # here too -- that is the proof they are real."
+        bus.publish(
+            "case.control_held",
+            {
+                "case_id": outcome.case_id,
+                "reason": outcome.reason,
+                "note": "real payment, not credited to us",
+            },
+        )
 
 
 def _log_rejected_signature(raw_body: bytes, received: str | None, settings: Settings) -> None:

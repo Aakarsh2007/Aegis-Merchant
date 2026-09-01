@@ -22,6 +22,7 @@ import sys
 import time
 import urllib.request
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -243,8 +244,32 @@ def demo() -> int:
             ).fetchone()[0]
         except sqlite3.OperationalError:
             cases = 0
-    if cases == 0:
-        print("  [2/4] running the corpus through the agent (~5 s, no API calls) ...")
+    # Cases can exist and still be stale. Approvals carry a 240-minute TTL, so a
+    # judge who ran `demo` this morning and comes back after lunch sees the
+    # "Needs a human" panel full of expired rows and the "Awaiting a human" tile
+    # reading 0 -- with no hint that a five-second re-run fixes it. Expiring is
+    # correct behaviour; leaving the demo in that state is not.
+    stale = False
+    if cases > 0:
+        with sqlite3.connect(runtime_db) as conn:
+            try:
+                pending, expired = conn.execute(
+                    "select count(*), sum(case when expires_at <= ? then 1 else 0 end) "
+                    "from approval_requests where status = 'PENDING'",
+                    (datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",),
+                ).fetchone()
+            except sqlite3.OperationalError:
+                pending, expired = 0, 0
+        stale = bool(pending) and pending == (expired or 0)
+        if stale:
+            print(
+                f"  [2/4] {cases} cases present but all {pending} approvals have "
+                "aged out; re-running so the queue is live"
+            )
+
+    if cases == 0 or stale:
+        if cases == 0:
+            print("  [2/4] running the corpus through the agent (~5 s, no API calls) ...")
         if run([PY, "-m", "app.workers.batch_cli"], cwd=API) != 0:
             return 1
     else:

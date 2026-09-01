@@ -48,9 +48,31 @@ const MAX_ROWS = 60;
 
 function summarise(name: string, data: Record<string, unknown>): string {
   if (name === "case.control_held") return "held as control — no action taken";
+
+  // The node's own trace line, when the publisher sends one. This is the whole
+  // value of the panel: "DIAGNOSE · AUTHENTICATION_ABANDONED (confidence 95%) ·
+  // rule table (no model call)" tells a viewer which layer answered, which is
+  // the claim the project makes everywhere else. Earlier this function ignored
+  // `node`, `summary` and `provenance` entirely and fell through to a generic
+  // "case diagnosed", so the richest data on the wire was dropped on the floor.
+  const node = typeof data.node === "string" ? data.node : null;
+  const summary = typeof data.summary === "string" ? data.summary : null;
+  const provenance = typeof data.provenance === "string" ? data.provenance : null;
+  if (node && summary) {
+    return provenance
+      ? `${node} · ${summary} · ${provenance}`
+      : `${node} · ${summary}`;
+  }
+
+  if (typeof data.verified_by === "string" && typeof data.event_id === "string") {
+    return `recovery verified by ${data.verified_by} (${data.event_id})`;
+  }
+  if (typeof data.razorpay_link_id === "string") {
+    return `dispatched — Razorpay link ${data.razorpay_link_id}`;
+  }
   if (typeof data.reason === "string") return data.reason;
   if (typeof data.note === "string") return data.note;
-  if (typeof data.rule === "string") return `rule ${data.rule}`;
+  if (typeof data.rule === "string") return `rule ${data.rule} fired`;
   return name.replace(/[._]/g, " ");
 }
 
@@ -160,7 +182,7 @@ export function PipelineStream() {
         {events.length === 0 ? (
           <li className="py-6 text-center text-[11px] text-paper-500">
             {status === "live"
-              ? "Connected. No events yet — run a batch to see the pipeline move."
+              ? "Connected. No events yet — click “Create a real ₹1 recovery link” above and every node appears here as it runs."
               : status === "connecting"
                 ? "Connecting…"
                 : "Not connected. Is the API running?"}

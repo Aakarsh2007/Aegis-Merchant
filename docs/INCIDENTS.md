@@ -1473,3 +1473,54 @@ clever one.
 retimed script with a reversed or overrunning segment is a script that cannot be followed —
 and asserts every panel name the script tells the presenter to click is a string the UI
 actually renders.
+
+---
+
+## INC-038 · A live pipeline with no publisher
+
+**Symptom:** the "Live pipeline" panel connects, reports itself **live**, sends heartbeats
+indefinitely — and displays nothing. Ever. Its own subtitle reads *"Control-arm holds appear here
+too — that is the proof they are real."*
+
+**Cause.** `EventBus.publish` was called from `tests/test_stream.py` and **from nowhere else in the
+codebase.** The bus had subscribers, an event allowlist, bounded queues, drop-oldest back-pressure,
+a dropped-frame counter surfaced in the UI, and eleven tests. No producer.
+
+**This is the third time this exact shape has appeared in this project**, and that is the finding
+worth recording:
+
+* **INC-024** — the webhook handler verified signatures, stored events, and dropped them.
+* **INC-026** — `llm_calls` had a reader and no writer.
+* **INC-038** — a bus with subscribers and no publisher.
+
+Each was green across the entire suite, because a test that publishes its own event proves the bus
+works and says nothing about whether anything uses it. Every one of the three was found by looking
+at the running product; none was reachable from the tests, at any coverage.
+
+**Found** while writing the demo script — checking what the panel would actually show on camera
+before telling anyone to point at it.
+
+**Fix.** Two real publishers, on the two paths that run in-process:
+
+* `testmode/recover` publishes `case.detected`, then **one frame per graph node** carrying the
+  node's name, its trace summary and its provenance string, then `action.dispatched` with the real
+  Razorpay link id. A viewer now watches `DIAGNOSE · AUTHENTICATION_ABANDONED (confidence 95%) ·
+  rule table (no model call)` arrive live — which is the project's central claim, moving.
+* the webhook path publishes `recovery.verified` when a settlement counts, and `case.control_held`
+  when a real payment lands on a control case and is deliberately not credited to us. That second
+  one is what the subtitle had been promising.
+
+**The panel was throwing the good data away too.** `summarise()` ignored `node`, `summary` and
+`provenance` and fell through to a generic `name.replace(/[._]/g, " ")` — so even with a publisher
+it would have rendered "case diagnosed" eight times. Fixed in the same pass.
+
+**Regression test** asserts on the *application*, not the bus: that something publishes, that the
+Test Mode and webhook paths specifically do, that `case.control_held` exists somewhere so the
+subtitle's promise is kept, that every published literal is on `PUBLIC_EVENTS` (anything else is
+silently dropped with a log line nobody reads), and that the panel reads all three trace fields.
+
+**And that test caught itself being vacuous.** Its check that the panel reads `provenance` matched
+the word inside the comment *explaining why provenance mattered* — so deleting the field from the
+code left the test green. It now matches the narrowing expression, `typeof data.provenance ===
+"string"`. A test satisfied by its own documentation, which is a new variety of the INC-006 pattern
+and the fourth instance of that pattern in this repository.

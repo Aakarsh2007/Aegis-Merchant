@@ -1063,3 +1063,33 @@ interface becomes unfalsifiable, which is the opposite of what these panels are 
 indistinguishable from an absent one. It was written down for the audit verifier, for the
 stopping rules that list their zeroes, and for the control arm. It applies equally to a
 dispatch that did not happen and a header that cannot be read.
+
+---
+
+## DEC-044 · 2026-09-01 · Publish the node trace, not a progress bar
+
+**Context.** INC-038: the event bus had subscribers, an allowlist, bounded queues, back-pressure
+handling and eleven tests, and nothing in the application ever published to it.
+
+**Decision.** The Test Mode path publishes **one frame per graph node**, carrying the node's name,
+its trace summary, and its provenance string — the same string the decision trace shows. The
+webhook path publishes `recovery.verified` on a counted settlement and `case.control_held` when a
+real payment lands on a control case and is deliberately not credited.
+
+**Rejected:** publishing a coarse status per case — "diagnosing", "executing". It would have made
+the panel a progress bar, and a progress bar is decoration. The provenance string is the payload
+worth streaming: a viewer reads `DIAGNOSE · AUTHENTICATION_ABANDONED (confidence 95%) · rule table
+(no model call)` and watches the project's central claim happen, rather than being told it.
+
+**Rejected:** publishing from the batch worker. It runs in a separate process from the API, so its
+frames would reach no browser — and wiring a cross-process bus would mean Redis, which the whole
+architecture exists without. The two paths that publish are the two that run in-process. Stated
+here so the absence looks deliberate rather than forgotten.
+
+**Rejected:** deriving event names from node names. `PUBLIC_EVENTS` is an allowlist and `publish`
+drops anything not on it with a log line nobody reads, so a derived name would vanish silently.
+`_NODE_EVENTS` maps them explicitly, and a test asserts every value is on the allowlist.
+
+**Cost of being wrong.** Publishing happens on the request path, sometimes inside a transaction, so
+`publish` swallows every error: failing to notify a browser must never fail a recovery. That was
+already true of the bus; it matters more now that something actually calls it.

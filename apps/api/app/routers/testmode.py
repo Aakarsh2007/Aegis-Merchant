@@ -46,9 +46,24 @@ from app.db.ids import idempotency_hash, new_id
 from app.db.models import Consent, Customer, Merchant, Outbox, RecoveryCase
 from app.deps import get_clock, get_db
 from app.llm.cache import CachedAdapter, ResponseCache
+from app.routers.stream import bus
 from app.security.auth import Principal, require_api_token
 from app.tools.audit import AuditChain
 from app.tools.razorpay_client import RazorpayProvider
+
+#: Trace node names to the public event the stream allows. Mapped explicitly
+#: rather than derived, because `PUBLIC_EVENTS` is an allowlist and a derived
+#: name would be silently dropped with a log line nobody reads.
+_NODE_EVENTS: dict[str, str] = {
+    "ENRICH": "case.detected",
+    "TRIAGE": "case.detected",
+    "DIAGNOSE": "case.diagnosed",
+    "STRATEGISE": "case.strategy_formed",
+    "POLICY": "policy.clamped",
+    "EXECUTE": "case.executing",
+    "MONITOR": "case.monitoring",
+}
+
 
 router = APIRouter(prefix="/api/v1/testmode", tags=["test mode"])
 
@@ -238,7 +253,43 @@ async def test_recovery(
         control_arm_fraction=0.0,  # a demo case must be treated, not held out
         experiment_key="revpilot_testmode",
     )
+    # INC-038: the Live pipeline panel had no publisher anywhere in the
+    # application -- `EventBus.publish` was called only from tests -- so it
+    # connected, heartbeated forever, and showed nothing, while its subtitle
+    # claimed "Control-arm holds appear here too, that is the proof they are
+    # real". Publishing from here is the honest fix: this is the one path that
+    # runs a real case, in-process, against the real provider.
+    bus.publish(
+        "case.detected",
+        {
+            "case_id": case_id,
+            "amount_paise": body.amount_paise,
+            "playbook": Playbook.PAYMENT_FAILURE.value,
+            "mode": "razorpay_test_mode",
+        },
+    )
     final = await run_case(state, deps)
+
+    for entry in final.trace:
+        # One frame per node, named as the trace names it, with the provenance
+        # string the decision trace shows. A viewer watching this sees which
+        # layer answered each step rather than a progress bar.
+        bus.publish(
+            _NODE_EVENTS.get(entry.node, "case.detected"),
+            {
+                "case_id": case_id,
+                "node": entry.node,
+                "summary": entry.summary,
+                "provenance": entry.provenance,
+                "duration_ms": entry.duration_ms,
+            },
+        )
+
+    if final.stopping_rule_fired is not None:
+        bus.publish(
+            "stopping_rule.fired",
+            {"case_id": case_id, "rule": final.stopping_rule_fired.value},
+        )
 
     if final.status is not CaseStatus.MONITORING or final.reference_id is None:
         # The firewall refused, which is a legitimate outcome and is reported as
@@ -328,6 +379,15 @@ async def test_recovery(
 
     outbox.status = OutboxStatus.SENT
     outbox.provider_ref = str(link.get("id"))
+    bus.publish(
+        "action.dispatched",
+        {
+            "case_id": case_id,
+            "reference_id": final.reference_id,
+            "razorpay_link_id": link.get("id"),
+            "amount_paise": body.amount_paise,
+        },
+    )
     await AuditChain(clock).append(
         session,
         event_name="action.dispatched",

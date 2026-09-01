@@ -1,0 +1,878 @@
+<title>RevPilot Shooting Script</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+  :root {
+    --paper:    #faf9f7;
+    --surface:  #ffffff;
+    --sunken:   #f2f0ec;
+    --ink:      #161a22;
+    --muted:    #5c6472;
+    --faint:    #8a919e;
+    --rule:     #e3e1dc;
+    --accent:   #2b7fff;
+    --accent-soft: #eaf2ff;
+    --verified: #1f8a5a;
+    --verified-soft: #e6f4ec;
+    --careful:  #b26a00;
+    --careful-soft: #fdf3e2;
+    --shadow:   0 1px 2px rgba(22,26,34,.05), 0 8px 24px -16px rgba(22,26,34,.16);
+
+    --sans: "IBM Plex Sans Condensed", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:    #0e1116;
+      --surface:  #151a21;
+      --sunken:   #1b212a;
+      --ink:      #e8eaee;
+      --muted:    #98a1b0;
+      --faint:    #6d7683;
+      --rule:     #242b35;
+      --accent:   #62a3ff;
+      --accent-soft: #17243a;
+      --verified: #4fc08a;
+      --verified-soft: #12271e;
+      --careful:  #e0a545;
+      --careful-soft: #2a2113;
+      --shadow:   0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:    #0e1116;
+    --surface:  #151a21;
+    --sunken:   #1b212a;
+    --ink:      #e8eaee;
+    --muted:    #98a1b0;
+    --faint:    #6d7683;
+    --rule:     #242b35;
+    --accent:   #62a3ff;
+    --accent-soft: #17243a;
+    --verified: #4fc08a;
+    --verified-soft: #12271e;
+    --careful:  #e0a545;
+    --careful-soft: #2a2113;
+    --shadow:   0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px 120px;
+  }
+
+  /* ---------------------------------------------------------- masthead */
+  .masthead { border-bottom: 2px solid var(--ink); padding-bottom: 18px; }
+  .slate {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+  }
+  h1 {
+    font-size: clamp(30px, 6vw, 46px);
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1.05;
+    margin: 14px 0 8px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-family: var(--serif);
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  /* ------------------------------------------------------------ blocks */
+  h2 {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 56px 0 4px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+  }
+  h2 .n {
+    font-family: var(--mono);
+    color: var(--faint);
+    margin-right: 10px;
+    letter-spacing: 0;
+  }
+  h3 {
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    margin: 28px 0 6px;
+    text-wrap: balance;
+  }
+  p { margin: 0 0 12px; max-width: 68ch; }
+  .lede { color: var(--muted); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: .89em;
+    background: var(--sunken);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .1em .35em;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--sunken);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    margin: 0 0 14px;
+    line-height: 1.5;
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+  /* -------------------------------------------------------- checklists */
+  .check { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 2px; }
+  .check li {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 10px;
+    align-items: start;
+    padding: 9px 10px;
+    border-radius: 7px;
+  }
+  .check li:nth-child(odd) { background: var(--sunken); }
+  .check input { margin: 3px 0 0; accent-color: var(--accent); width: 15px; height: 15px; }
+  .check label { cursor: pointer; }
+  .check .why { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  /* ---------------------------------------------------------- segments */
+  .seg {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 18px 20px 20px;
+    margin: 0 0 18px;
+  }
+  .seg > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; }
+  .tc {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--surface);
+    background: var(--ink);
+    border-radius: 5px;
+    padding: 3px 8px;
+    white-space: nowrap;
+  }
+  .seg h4 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    margin: 0;
+    flex: 1 1 260px;
+    text-wrap: balance;
+  }
+  .dur {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    letter-spacing: .06em;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 3px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .tag.do  { background: var(--sunken);       color: var(--muted); border: 1px solid var(--rule); }
+  .tag.say { background: var(--accent-soft);  color: var(--accent); }
+
+  .do-block {
+    background: var(--sunken);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 14px 0 0;
+  }
+  .do-block ol, .do-block ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 5px; }
+  .do-block li { font-size: 14px; }
+  .do-block li::marker { color: var(--faint); font-family: var(--mono); font-size: 12px; }
+  .do-block pre { margin: 8px 0 0; background: var(--surface); }
+
+  .say-block {
+    border-left: 3px solid var(--accent);
+    padding: 4px 0 4px 18px;
+    margin: 16px 0 0;
+  }
+  .say-block p {
+    font-family: var(--serif);
+    font-size: 18.5px;
+    line-height: 1.62;
+    margin: 0 0 14px;
+    max-width: 60ch;
+  }
+  .say-block p:last-child { margin-bottom: 0; }
+  .say-block em { font-style: italic; }
+  .say-block strong { font-weight: 600; }
+  .beat {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin: 0 0 10px;
+  }
+  .say-block .stage {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--muted);
+    background: var(--sunken);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-style: normal;
+  }
+
+  .note {
+    margin: 14px 0 0;
+    padding: 11px 14px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    border-left: 3px solid var(--careful);
+    background: var(--careful-soft);
+    color: var(--ink);
+  }
+  .note.good { border-left-color: var(--verified); background: var(--verified-soft); }
+  .note b { font-weight: 600; }
+
+  /* ------------------------------------------------------------ tables */
+  .tbl-wrap { overflow-x: auto; margin: 0 0 16px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 460px; }
+  th, td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+  }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  details {
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 0 0 12px;
+    background: var(--surface);
+  }
+  summary { cursor: pointer; font-weight: 600; font-size: 14.5px; }
+  details[open] summary { margin-bottom: 10px; }
+
+  .kbd {
+    font-family: var(--mono);
+    font-size: 12px;
+    border: 1px solid var(--rule);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 5px;
+    background: var(--surface);
+    white-space: nowrap;
+  }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <div class="slate">
+    <span>Shooting script</span>
+    <span>Razorpay AI Buildathon 2026</span>
+    <span>Track 03 · AI Revenue Recovery</span>
+    <span>Run time 5:00</span>
+  </div>
+  <h1>RevPilot — five minutes, word for word</h1>
+  <p class="standfirst">Everything you say is written out. Everything you click is numbered. Read the
+  serif lines aloud; do the grey blocks with your hands. Every figure below was read off the running
+  system, not remembered.</p>
+</header>
+
+<h2><span class="n">01</span>Before you press record</h2>
+
+<h3>Recording software</h3>
+<p class="lede">You are on Windows 11, so you already have both tools you need.</p>
+
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>Tool</th><th>Use it for</th><th>How</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>OBS Studio</b><br><span style="color:var(--muted)">free, obsproject.com</span></td>
+      <td>Recording screen + voice</td>
+      <td>Preferred. Gives you a mic level meter, which the Game Bar does not.</td>
+    </tr>
+    <tr>
+      <td><b>Clipchamp</b><br><span style="color:var(--muted)">built into Windows 11</span></td>
+      <td>Joining the eight clips</td>
+      <td>Search "Clipchamp" in Start. Drag clips onto the timeline in order, export 1080p.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="do-block">
+  <span class="tag do">Set up OBS once</span>
+  <ol>
+    <li><b>Settings → Video</b>: Base and Output resolution both <code>1920×1080</code>. FPS <code>30</code>.</li>
+    <li><b>Settings → Output</b>: Recording Quality <code>High Quality, Medium File Size</code>. Format <code>mp4</code>.</li>
+    <li><b>Settings → Audio</b>: Mic/Auxiliary = your headset. Set Desktop Audio to <code>Disabled</code> — you do not want notification pings in the take.</li>
+    <li><b>Sources → +  → Display Capture</b>. If you have two monitors, capture only the one the dashboard is on.</li>
+    <li>Speak a test line and watch the meter. Aim for the green, peaking into yellow. If it never leaves green, raise mic gain; if it hits red, lower it.</li>
+  </ol>
+</div>
+
+<div class="note">
+  <b>Audio matters more than video.</b> Judges forgive a plain screen recording; they do not forgive
+  audio they have to strain at. Use wired earbuds with a mic rather than the laptop's built-in one —
+  the laptop mic sits next to the fan. Record in the smallest room you have, with the door shut and
+  something soft nearby (a bed, curtains, a sofa). Hold the mic about a hand's width from your mouth
+  and slightly to the side, so plosives don't thump.
+</div>
+
+<h3>Screen preparation</h3>
+<div class="do-block">
+  <span class="tag do">Do</span>
+  <ul>
+    <li>Browser at <b>100% zoom</b> (<span class="kbd">Ctrl</span> + <span class="kbd">0</span>). Hide the bookmarks bar (<span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">B</span>).</li>
+    <li>Close every other tab. Windows <b>Focus assist</b> on, so no notifications appear.</li>
+    <li>Terminal font size up two or three steps. What is readable to you at 30&nbsp;cm is unreadable in a 1080p video.</li>
+    <li>Dark or light theme — either is fine, but pick one and stay in it for all eight clips.</li>
+  </ul>
+</div>
+
+<h3>Pre-flight, in this order</h3>
+<p class="lede">Tick these off. Two of them will silently ruin a take if skipped.</p>
+
+<ul class="check">
+  <li><input type="checkbox" id="p1"><label for="p1"><b>Terminal A:</b> <code>python tasks.py demo</code>
+    <span class="why">Wait for the dashboard to open. This seeds, runs the batch, and starts both servers.</span></label></li>
+  <li><input type="checkbox" id="p2"><label for="p2"><b>Check the "Needs a human" panel is not greyed out.</b>
+    <span class="why">Approvals carry a four-hour TTL. If they have aged out, the panel is full of expired rows — run <code>python tasks.py batch</code> and reload. Nineteen live approvals is what you want.</span></label></li>
+  <li><input type="checkbox" id="p3"><label for="p3"><b>Terminal B:</b> <code>python tasks.py tunnel</code> — and leave this window open
+    <span class="why">The tunnel dies with the window and its URL changes every run. This is the step that cost us a lost webhook once already.</span></label></li>
+  <li><input type="checkbox" id="p4"><label for="p4"><b>Copy the tunnel URL into Razorpay.</b> Dashboard → Settings → Webhooks → edit → URL = <code>&lt;tunnel&gt;/api/v1/webhooks/razorpay</code> → Save
+    <span class="why">Leave the secret and the event ticks alone. Confirm <code>payment_link.paid</code> is ticked.</span></label></li>
+  <li><input type="checkbox" id="p5"><label for="p5"><b>Open a third tab</b> on the Razorpay dashboard, logged in
+    <span class="why">So the payment page loads instantly on camera instead of showing you a login screen.</span></label></li>
+  <li><input type="checkbox" id="p6"><label for="p6"><b>Verify the chain is valid before you film breaking it.</b> Open <code>localhost:8000/api/v1/audit/verify</code> — expect <code>"valid": true</code>
+    <span class="why">The tamper demo is only convincing if it starts from a valid state.</span></label></li>
+  <li><input type="checkbox" id="p7"><label for="p7"><b>Read the whole script aloud once</b> without recording
+    <span class="why">You will find two sentences that don't sit right in your mouth. Change those words — they are yours to change.</span></label></li>
+</ul>
+
+<div class="note good">
+  <b>Record eight separate clips, one per segment.</b> Do not attempt one take. If you fluff a line,
+  stop, breathe, and redo that clip only. Then join them in Clipchamp in order. Nobody can tell, and
+  it turns a stressful hour into eight easy minutes.
+</div>
+
+<div class="note">
+  <b>Do not speed anything up.</b> A sped-up terminal tells a judge the real thing was slow. Every
+  command in this script finishes in under ten seconds; the batch takes about five.
+</div>
+
+<h2><span class="n">02</span>The script</h2>
+<p class="lede">Eight clips. Timecodes are cumulative, so you can check you are on pace. The
+narration is about 700 words, which is five minutes at a normal speaking pace — resist the urge to
+rush.</p>
+
+<!-- ============================================================ 1 -->
+<section class="seg">
+  <header>
+    <span class="tc">0:00 – 0:32</span>
+    <h4>The number that is wrong everywhere else</h4>
+    <span class="dur">32s</span>
+  </header>
+
+  <div class="do-block">
+    <span class="tag do">Shot</span>
+    <ol>
+      <li>Dashboard open, scrolled to the panel headed <b>"Did it actually recover money?"</b></li>
+      <li>Nothing moves. Just hold this frame and talk.</li>
+    </ol>
+  </div>
+
+  <div class="say-block">
+    <span class="beat">Say</span>
+    <p>Every payment-recovery tool shows a merchant one number: money recovered. Here it's two lakh
+    two thousand, seven hundred and sixty rupees.</p>
+    <p>That number is real, and it is the wrong number — because some of those customers would have
+    come back on their own. A tool that bills you for them is charging you for the weather.</p>
+    <p>So this system holds back thirty-nine cases and never contacts them at all. The treated group
+    converts at 29.2%. The untouched group converts at <strong>23.1%</strong>. Which means the money
+    we can actually claim is sixty thousand, two hundred and seventeen rupees — <strong>about thirty
+    percent</strong> of what a dashboard would show.</p>
+    <p>The smaller number is the one on the bigger tile. And the API will not return the first figure
+    without the second.</p>
+  </div>
+
+  <div class="note">
+    <b>Pause two seconds before you stop recording.</b> This is the whole pitch. If a judge stops
+    watching at thirty seconds, this is what they keep.
+  </div>
+</section>
+
+<!-- ============================================================ 2 -->
+<section class="seg">
+  <header>
+    <span class="tc">0:32 – 1:02</span>
+    <h4>And the number that is still missing</h4>
+    <span class="dur">30s</span>
+  </header>
+
+  <div class="do-block">
+    <span class="tag do">Shot</span>
+    <ol>
+      <li>Scroll down to the panel headed <b>"What we have not proven"</b>.</li>
+      <li>Let the two progress bars sit on screen — <code>control 39 / 796</code> and
+        <code>treated 171 / 796</code>.</li>
+    </ol>
+  </div>
+
+  <div class="say-block">
+    <span class="beat">Say</span>
+    <p>There's a third question, and I have not answered it. Did RevPilot actually <em>cause</em>
+    additional customers to pay?</p>
+    <p>No. Not proven. That sixty thousand is a simulation — real machinery, declared customer
+    responses.</p>
+    <p>Answering it properly needs one thousand five hundred and ninety-two cases at a balanced
+    split. I have two hundred and ten, which is <strong>4.9%</strong> of the control arm I'd need.
+    That's not a number I invented for this video: the experiment is pre-registered in the repo,
+    committed <em>before</em> any of this data existed, and it states what result would make me
+    abandon the hypothesis.</p>
+    <p>What's blocking it isn't code. It's a merchant with the traffic, and DLT registration in
+    <em>their</em> name — which takes weeks.</p>
+  </div>
+
+  <div class="note">
+    <b>Why this is at thirty seconds and not at four minutes.</b> A judge will find this limitation
+    whether or not you mention it. Saying it before you show eight panels of things that work is the
+    difference between honesty and damage control. Say it calmly — it is a strength.
+  </div>
+</section>
+
+<!-- ============================================================ 3 -->
+<section class="seg">
+  <header>
+    <span class="tc">1:02 – 1:42</span>
+    <h4>One case, and who decided it</h4>
+    <span class="dur">40s</span>
+  </header>
+
+  <div class="do-block">
+    <span class="tag do">Shot</span>
+    <ol>
+      <li>Scroll to the <b>Cases</b> table near the bottom.</li>
+      <li>Click <b>Held as control</b> in the filter row. All thirty-nine appear, greyed, with a dash
+        where an action would be. Hold for two seconds.</li>
+      <li>Click <b>All</b>, then click the case id <code>RC-0001</code>.</li>
+      <li>The case page opens with three numbered sections. Scroll slowly through all three.</li>
+    </ol>
+  </div>
+
+  <div class="say-block">
+    <span class="beat">Say</span>
+    <p><span class="stage">on clicking "Held as control"</span> These are the thirty-nine we
+    deliberately never touched. A holdout you can only read about is indistinguishable from one that
+    doesn't exist, so you can click it.</p>
+    <p><span class="stage">on opening RC-0001</span> One case. Ananya, four thousand two hundred and
+    ninety-nine rupees.</p>
+    <p>Section one: <strong>what Razorpay reported.</strong> Error source, bank. Error step,
+    authorization. Reason, bank timeout. Not our guess — their telemetry.</p>
+    <p>Section two: <strong>what we concluded, and who concluded it.</strong> Rail fault, ninety-five
+    percent confidence, decided by <em>deterministic fallback</em>. That means the rule table
+    answered this, not a model. A bank timeout is a rail problem, not a customer problem — so
+    retrying the same rail is the one thing you must not do, and that's a lookup, not a judgement
+    call.</p>
+    <p>Section three: <strong>the audit chain for this case.</strong> Every hash there is
+    recomputable, and it records which arm the case was in.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 4 -->
+<section class="seg">
+  <header>
+    <span class="tc">1:42 – 2:22</span>
+    <h4>AI proposes. Policy disposes.</h4>
+    <span class="dur">40s</span>
+  </header>
+
+  <div class="do-block">
+    <span class="tag do">Shot</span>
+    <ol>
+      <li>Back to the dashboard. Scroll to <b>"Where the AI stops"</b>.</li>
+      <li>Then the <b>"Try to make it do something dangerous"</b> panel beside it.</li>
+      <li>Click all five buttons, one at a time, waiting for each result before the next.</li>
+    </ol>
+  </div>
+
+  <div class="say-block">
+    <span class="beat">Say</span>
+    <p>Here is where the model is, and where it isn't. Three bands: deterministic facts at the top,
+    the model in the middle, and deterministic authority at the bottom — where the model never
+    reaches.</p>
+    <p>Across the seeded corpus the rule table settles a hundred and fifty-nine of a hundred and
+    ninety-nine diagnoses. The model gets the other forty — the ones where Razorpay sent no error
+    fields at all and there is genuinely nothing to look up. I measured the model against the rule
+    table: it scored 90.6% against the table's 96.5%. So the table ships, and the model gets the
+    cases the table admits it's unsure about.</p>
+    <p><span class="stage">clicking through the five attacks</span> And the model cannot touch money.
+    Five attacks, through the real policy engine — not a mock. Ninety percent off:
+    <strong>escalated</strong>, clamped to the ceiling and held for a human. Market to a
+    do-not-disturb customer: <strong>neutralised</strong> — the marketing class was stripped to
+    transactional. Act with the kill switch off: <strong>refused</strong>.</p>
+    <p>And charge more than the customer owes — the answer isn't "blocked", it's
+    <strong>unrepresentable</strong>. The object the model fills in <em>has no amount field</em>.
+    There is no number for it to raise. That's not a guardrail; it's an absence.</p>
+    <p>The fifth one passes, and that's deliberate. A firewall that refused all five would score
+    perfectly here and be useless.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 5 -->
+<section class="seg">
+  <header>
+    <span class="tc">2:22 – 3:12</span>
+    <h4>A real rupee, through real Razorpay</h4>
+    <span class="dur">50s</span>
+  </header>
+
+  <div class="note">
+    <b>This is your best fifty seconds.</b> Rehearse it twice before recording. Have the tunnel
+    terminal visible in a corner of the screen, or alt-tab to it when the webhook lands.
+  </div>
+
+  <div class="do-block">
+    <span class="tag do">Shot</span>
+    <ol>
+      <li>Scroll to <b>"Prove it against real Razorpay"</b>. Also make sure the <b>Live pipeline</b>
+        panel is visible — split the window, or scroll between them.</li>
+      <li>Click <b>Create a real ₹1 recovery link</b>.</li>
+      <li>Watch the Live pipeline fill with seven named nodes. <b>Pause and let it.</b></li>
+      <li>Click <b>Open the Razorpay link and pay ₹1</b>.</li>
+      <li>Card <code>4111 1111 1111 1111</code>, any future expiry, any CVV → <b>Success</b>.</li>
+      <li>Alt-tab to the tunnel terminal to show the inbound <code>POST</code>, then back to the
+        dashboard and reload.</li>
+    </ol>
+  </div>
+
+  <div class="say-block">
+    <span class="beat">Say</span>
+    <p>Everything so far runs on a seeded corpus. This part doesn't.</p>
+    <p><span class="stage">clicking the button</span> One click. That's a real case going through the
+    real agent and the real policy firewall — and watch the pipeline on the right. Enrich. Triage:
+    twelve of twelve stopping rules clear. Diagnose: <em>rule table, no model call</em>. Strategise.
+    Policy: passed, zero clamps, fully autonomous. Execute. Every step says which layer answered it.</p>
+    <p>And at the end, a real Razorpay payment link. I'm paying it now.</p>
+    <p><span class="stage">after paying, on the tunnel log</span> That's Razorpay's webhook arriving
+    at my machine. HMAC verified. The reference ID matches the action we took — so the money is
+    attributable to us and not to luck.</p>
+    <p><span class="stage">reload the dashboard</span> One rupee. And it sits on its own tile, badged
+    Razorpay-verified, separate from the two lakh — because a signed webhook and a simulation are
+    different kinds of evidence, and averaging them would make both worthless.</p>
+    <p>Hover that tile and it tells you <em>how</em> each rupee was proven: one by signed webhook,
+    one by direct API reconciliation. That second one is there because a tunnel died mid-test and the
+    webhook was lost. The reconciler asked Razorpay directly and picked the payment up. A lost
+    webhook cost us nothing.</p>
+  </div>
+
+  <details>
+    <summary>If the webhook does not arrive</summary>
+    <p>Stop the clip and fix it — don't narrate around it. Run <code>python tasks.py reconcile</code>,
+    which polls Razorpay and records the payment anyway. That is a legitimate and interesting shot in
+    its own right; you can say <em>"the webhook didn't make it, so the reconciler went and asked"</em>
+    and it is arguably a stronger demonstration than the happy path.</p>
+    <p>The usual cause is the tunnel URL in the Razorpay dashboard not matching the tunnel you have
+    running. Check that first. Do <b>not</b> re-enter the webhook secret — that was a wrong diagnosis
+    we made once and it wasted an hour.</p>
+  </details>
+</section>
+
+<!-- ============================================================ 6 -->
+<section class="seg">
+  <header>
+    <span class="tc">3:12 – 3:52</span>
+    <h4>What it chose not to do, and breaking it on purpose</h4>
+    <span class="dur">40s</span>
+  </header>
+
+  <div class="do-block">
+    <span class="tag do">Shot</span>
+    <ol>
+      <li>Scroll to the <b>morning briefing</b> — the "Good morning, GlowKart" block.</li>
+      <li>Then the <b>Stopping rules</b> panel. Hold long enough to read a few rows.</li>
+      <li>Then <b>Audit chain</b>. Click <b>Edit a payload</b>, then <b>Re-verify</b>.</li>
+    </ol>
+  </div>
+
+  <div class="say-block">
+    <span class="beat">Say</span>
+    <p>Every other panel shows actions taken. This one shows restraint: <em>"I did not contact
+    twenty-two customers who were in quiet hours, and eleven who have opted out."</em> An agent that
+    reports what it refused to do is the only kind you can audit.</p>
+    <p>Twelve stopping rules, and all twelve are listed <em>including the ten that fired zero
+    times</em> — because a brake that didn't fire and a brake that doesn't exist look identical if
+    you only show the non-zero rows. Quiet hours held twenty-two actions. Opt-out is permanent and
+    checked before everything else.</p>
+    <p>Termination isn't asserted, it's proved — a property test generates hostile inputs and checks
+    every case reaches a terminal state.</p>
+    <p><span class="stage">clicking Edit a payload, then Re-verify</span> And every decision is a
+    block in a SHA-256 hash chain. Let me break it. One field, one block —
+    <strong>valid: false</strong>, and it names the block that diverged. A verifier nobody has
+    watched fail is indistinguishable from one that always returns true.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 7 -->
+<section class="seg">
+  <header>
+    <span class="tc">3:52 – 4:32</span>
+    <h4>What broke</h4>
+    <span class="dur">40s</span>
+  </header>
+
+  <div class="note good">
+    <b>This is the segment the judges said they read first.</b> Their form asks "what broke, and how
+    you got out". Do not rush it and do not soften it.
+  </div>
+
+  <div class="do-block">
+    <span class="tag do">Shot</span>
+    <ol>
+      <li>Open <code>docs/INCIDENTS.md</code> in your editor. Scroll from the top so the sheer length
+        registers.</li>
+      <li>Stop on <b>INC-026</b>. Then scroll to <b>INC-032</b>.</li>
+    </ol>
+  </div>
+
+  <div class="say-block">
+    <span class="beat">Say</span>
+    <p>Thirty-eight incidents, each written up with the part that matters: why no test caught it.</p>
+    <p>The one I'd point you at is <strong>INC-026</strong>. The panel showing how many model calls
+    were made, and what fraction came from cache, displayed zero. Forever. On every clone. Because
+    the table had a reader and no writer — nothing in the entire codebase ever inserted a row. And
+    the test passed <em>because</em> the feature was missing: it queried an empty table and got the
+    zeros it expected.</p>
+    <p>Fixing it exposed the next one within the hour: the committed response cache had a
+    structurally guaranteed zero percent hit rate, because two code paths built the model's input
+    differently and the cache key is a hash of that input. The two bugs had been hiding each
+    other.</p>
+    <p>And <strong>INC-032</strong> is the one that still bothers me. A routine command —
+    <code>tasks.py batch</code> — ran an unfiltered delete and destroyed every Razorpay-verified
+    recovery in the database. Silently. That's how this project lost its <em>first</em> live
+    verification, which I'd written off as my own carelessness. It was a bug.</p>
+    <p>The pattern across most of them is one thing: <strong>a green test that cannot tell working
+    from absent.</strong> So every new test now gets deliberately sabotaged — I break the thing it
+    covers and confirm the test fails. That step has caught vacuous tests <em>inside</em> the fixes
+    for vacuous tests, twice.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 8 -->
+<section class="seg">
+  <header>
+    <span class="tc">4:32 – 5:00</span>
+    <h4>Run it yourself</h4>
+    <span class="dur">28s</span>
+  </header>
+
+  <div class="do-block">
+    <span class="tag do">Shot</span>
+    <ol>
+      <li>A clean terminal. Type <code>git clone &lt;your repo URL&gt;</code> and let it run.</li>
+      <li><code>cd Aegis-Merchant</code> then <code>python tasks.py demo</code>. Let it run at real
+        speed — it is about forty seconds.</li>
+      <li>When the dashboard opens, scroll once to the <b>cost</b> panel at the bottom, then stop
+        recording.</li>
+    </ol>
+  </div>
+
+  <div class="say-block">
+    <span class="beat">Say</span>
+    <p>One command. No Docker, no Postgres, no Redis, no Kafka, and no API key required.</p>
+    <p>Forty seconds and you have the dashboard I just showed you, with the same numbers — because
+    the model's responses are committed to the repo and content-addressed, so it replays instead of
+    re-billing.</p>
+    <p>Actual inference spend: <strong>zero rupees</strong>, on a free tier plus that cache. The
+    projection at published paid rates is one rupee twenty-eight, and it's labelled
+    <em>estimated</em>, because a price list is not a bill.</p>
+    <p>Eleven hundred and forty-nine tests. Thirty-eight written incidents. The gross number is two
+    lakh. The honest number is sixty thousand. Thank you.</p>
+  </div>
+</section>
+
+<h2><span class="n">03</span>After the recording</h2>
+
+<div class="do-block">
+  <span class="tag do">Do</span>
+  <ol>
+    <li>Open <b>Clipchamp</b>. Drag the eight clips onto the timeline in order.</li>
+    <li>Trim the dead air at the start and end of each clip — leave about half a second.</li>
+    <li>No music, no titles, no transitions. A cut is fine. Music competes with your voice and
+      judges are listening to the words.</li>
+    <li><b>Export → 1080p.</b> Check the total is at or just under 5:00.</li>
+    <li>Upload to YouTube as <b>Unlisted</b> — not Private. Judges cannot open a private video.</li>
+    <li>Watch it once, all the way through, with the sound on. This is the only way to catch a clip
+      that recorded silence.</li>
+  </ol>
+</div>
+
+<div class="note">
+  <b>The one check people skip.</b> After uploading, open the unlisted link in a private browsing
+  window — logged out. If it plays there, the judges can watch it. If it asks you to sign in, you
+  set it to Private by mistake.
+</div>
+
+<h2><span class="n">04</span>Every figure you will say aloud</h2>
+<p class="lede">Read off the running system. If the dashboard disagrees with this table on the day,
+<b>the dashboard is right and this table is stale</b> — say what is on screen.</p>
+
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>Figure</th><th>Value</th><th>Where it appears</th></tr></thead>
+  <tbody>
+    <tr><td>Gross recovered</td><td class="num">₹2,02,759.95</td><td>Say "two lakh two thousand seven hundred and sixty"</td></tr>
+    <tr><td>Net incremental</td><td class="num">₹60,216.66</td><td>Say "sixty thousand two hundred and seventeen"</td></tr>
+    <tr><td>Razorpay verified</td><td class="num">₹2.00</td><td>Becomes ₹3.00 after your demo payment</td></tr>
+    <tr><td>Treated conversion</td><td class="num">29.2%</td><td>50 of 171 · CI 22.9–36.4%</td></tr>
+    <tr><td>Control conversion</td><td class="num">23.1%</td><td>9 of 39 · CI 12.7–38.3%</td></tr>
+    <tr><td>Absolute lift</td><td class="num">6.16 pp</td><td>Not statistically significant — the panel says so</td></tr>
+    <tr><td>Cases held as control</td><td class="num">39</td><td>Clickable via the "Held as control" filter</td></tr>
+    <tr><td>Unsafe proposals intercepted</td><td class="num">33</td><td>S-07 opt-out: 11 · S-09 quiet hours: 22</td></tr>
+    <tr><td>Awaiting a human</td><td class="num">19</td><td>Only if the batch ran within four hours</td></tr>
+    <tr><td>Power completion</td><td class="num">4.9%</td><td>39 of 796 control · 171 of 796 treated</td></tr>
+    <tr><td>Cases still needed</td><td class="num">1,382</td><td>To reach 1,592 total</td></tr>
+    <tr><td>Rule table vs model</td><td class="num">159 / 40</td><td>Of 199 diagnoses</td></tr>
+    <tr><td>Model accuracy measured</td><td class="num">90.6% vs 96.5%</td><td>Model lost to the rule table, so the table ships</td></tr>
+    <tr><td>Inferences</td><td class="num">398</td><td>55.3% served from the committed cache · 0 live calls</td></tr>
+    <tr><td>Actual spend</td><td class="num">₹0.00</td><td>Projected at paid rates: ₹1.28</td></tr>
+    <tr><td>Audit chain</td><td class="num">213 blocks</td><td>Valid before you tamper with it</td></tr>
+    <tr><td>Tests</td><td class="num">1,149</td><td>ruff, mypy --strict, tsc, eslint all clean</td></tr>
+    <tr><td>Incidents · decisions</td><td class="num">38 · 43</td><td>docs/INCIDENTS.md · docs/DECISIONS.md</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2><span class="n">05</span>If a judge asks</h2>
+<p class="lede">Short answers. State the number, then the caveat, then stop talking.</p>
+
+<details>
+  <summary>"Is the two lakh real money?"</summary>
+  <p>No, and the dashboard says so. It's a seeded corpus through real machinery — the same
+  attribution rules, the same arm assignment, the same arithmetic. The customer <em>responses</em>
+  are a declared parameter, and the badge says simulated. The only figure badged Razorpay-verified is
+  the rupees, and those have signed webhooks behind them.</p>
+</details>
+
+<details>
+  <summary>"So you've recovered three rupees."</summary>
+  <p>Correct, and I'd rather say that than inflate it. Two lakh of machinery, three rupees of proof,
+  and they're on separate tiles so you can tell which is which.</p>
+</details>
+
+<details>
+  <summary>"You're claiming a lift you haven't measured."</summary>
+  <p>Correct, and the dashboard says so before it says anything else. What <em>is</em> measured is
+  that the machinery computing the lift works on real provider data: the arm assignment is
+  recomputable from the case id, a treated settlement matches a reference we issued, and a control
+  settlement resolves as organic rather than being credited to us. What is not measured is customer
+  behaviour, and the pre-registration says exactly what would measure it.</p>
+</details>
+
+<details>
+  <summary>"Why not run it on a few real people and report that?"</summary>
+  <p>Because thirty cases gives a confidence interval about forty points wide. Publishing that would
+  destroy the only thing that makes this submission worth reading. <code>python tasks.py power</code>
+  prints the arithmetic: 796 per arm at the effect size I'm assuming.</p>
+</details>
+
+<details>
+  <summary>"Where does the AI actually do anything?"</summary>
+  <p>Two places. It diagnoses the forty of a hundred and ninety-nine cases where Razorpay sent no
+  error fields, so there's nothing to look up. And it argues for a strategy, which the playbook then
+  overrides if the action is forbidden. It does not choose amounts, it cannot send anything, and it
+  has no field to change a rupee figure with.</p>
+</details>
+
+<details>
+  <summary>"What's the weakest part?"</summary>
+  <p>The response model in the simulation is mine, so the sixty thousand is only as good as that
+  assumption and I can't validate it without real traffic. Second is tail truncation in the audit
+  chain: the hash chain detects any edit to history, but a chain cut short at the end verifies
+  clean. That's written down in <code>audit.py</code> rather than left for someone to find.</p>
+</details>
+
+<details>
+  <summary>"What would you do next?"</summary>
+  <p>Get it in front of one real merchant with enough volume to make the holdout arm significant.
+  Everything else — the firewall, the audit chain, the stopping rules — is built to survive that.
+  The statistics are the only part that needs traffic I can't simulate.</p>
+</details>
+
+<footer>
+  Figures verified against the running system on 1 September 2026. Regenerate with
+  <code>python tasks.py demo</code> and read them off the dashboard before you record — if anything
+  here disagrees with the screen, the screen wins.
+</footer>
+
+</div>

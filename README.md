@@ -31,7 +31,7 @@ things that work. `python tasks.py power` prints the arithmetic.
 python tasks.py demo        # no credentials, no Docker, ~40 seconds
 ```
 
-1,139 tests · `mypy --strict` clean · 37 documented incidents · one command to run.
+1,149 tests · `mypy --strict` clean · 38 documented incidents · one command to run.
 
 > **On a fresh clone the verified tile reads ₹0.00, and that is correct.** Nothing has been
 > proven on *your* machine yet. The two recoveries above happened here, on 31 August 2026, with
@@ -69,7 +69,7 @@ stays labelled SIMULATED.
 
 **The proof.** 900+ tests · one real signed Razorpay webhook verified end to
 end · tamper-evident audit ledger you can break yourself · 12 stopping rules
-with a property-based termination proof · 37 documented incidents.
+with a property-based termination proof · 38 documented incidents.
 
 ```
                         RAZORPAY
