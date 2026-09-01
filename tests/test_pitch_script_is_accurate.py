@@ -165,13 +165,19 @@ class TestTheShotsPointAtThingsThatExist:
         """A retimed script with an overlapping or reversed segment is a script
         that cannot be followed."""
         starts = [
-            int(m[0]) * 60 + int(m[1]) for m in re.findall(r"^### `(\d):(\d\d) –", _script(), re.M)
+            int(m[0]) * 60 + int(m[1])
+            # The escape rather than the literal character: the lint rule flags an
+            # ambiguous dash in a string, and a reader should not have to guess
+            # which dash a regex is matching.
+            for m in re.findall(r"^### `(\d):(\d\d) \u2013", _script(), re.M)
         ]
         assert len(starts) >= 6, f"only found {len(starts)} timed segments"
         assert starts == sorted(starts), f"segment start times are out of order: {starts}"
 
     def test_the_script_fits_five_minutes(self) -> None:
-        ends = [int(m[0]) * 60 + int(m[1]) for m in re.findall(r"– (\d):(\d\d)`", _script(), re.M)]
+        ends = [
+            int(m[0]) * 60 + int(m[1]) for m in re.findall(r"\u2013 (\d):(\d\d)`", _script(), re.M)
+        ]
         assert ends, "no segment end times found"
         assert max(ends) <= 5 * 60, f"the script runs to {max(ends)}s, over the 5-minute limit"
 
@@ -182,7 +188,7 @@ class TestTheScriptCanActuallyBeSpoken:
 
     INC-040. The first version of `docs/DEMO-SCRIPT.md` carried 1,586 words of
     narration across five minutes — **317 words per minute.** Normal clear
-    speech is 130–150; a fast presenter reaches 180. The document asserted "about
+    speech is 130-150; a fast presenter reaches 180. The document asserted "about
     700 words, which fits five minutes with room to breathe" and I had never
     counted it.
 
