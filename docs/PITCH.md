@@ -15,9 +15,9 @@ Four criteria, in their words:
 | Criterion | Their gloss | Where this project answers it |
 |---|---|---|
 | **Problem taste** | did you pick something that actually matters | the gross-vs-incremental split — most recovery tools report the first number |
-| **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 1,257 tests, `mypy --strict` |
+| **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 1,275 tests, `mypy --strict` |
 | **AI judgment** | the right tool in the right place, **and where you chose not to use one** | the rule table answers 158 of 199 diagnoses; the model is consulted on 41 |
-| **Failure recovery** | what broke, and what you did about it | 42 written incidents, each with the reason no test caught it |
+| **Failure recovery** | what broke, and what you did about it | 44 written incidents, each with the reason no test caught it |
 
 And the line that decides the running order: *"The last one is the one we read first."* Answer
 12 is the submission. Everything else supports it.
@@ -170,7 +170,7 @@ Six are facts only you can supply. Six are below, ready to paste.
 > new test now gets sabotage-verified — I break the thing it covers and confirm the test fails,
 > and that step has caught vacuous tests inside the fixes for vacuous tests. Every real bug in
 > this project was found by touching the real provider or by looking at the running product;
-> none was reachable from local testing at any volume. The suite is at 1,257 tests and I trust it
+> none was reachable from local testing at any volume. The suite is at 1,275 tests and I trust it
 > considerably less than I did at 400.
 
 ---
@@ -202,7 +202,7 @@ action is forbidden. It does not choose amounts, it cannot send anything, and it
 to change a rupee figure with.
 
 **"Why not use the model everywhere?"**
-I measured it. 90.6% against the rule table's 96.5% on the golden set. The commitment was
+I measured it. 90.4% against the rule table's 96.4%, over the 83 of 85 golden cases the committed cache covers. The commitment was
 written down before the measurement: if the model doesn't beat the table, ship the table and
 say so. It didn't, so the table ships.
 

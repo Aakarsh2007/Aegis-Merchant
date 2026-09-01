@@ -223,6 +223,49 @@ class TestTheSnapshotIsRight:
     """``EVIDENCE.md`` is the single source of truth, so it is the one file whose
     own numbers have to be checked against the repository rather than against it."""
 
+    def test_the_snapshot_test_count_is_exact(self, request: pytest.FixtureRequest) -> None:
+        """The snapshot's own test count, against the suite that is running.
+
+        This gap was found by cloning the repository fresh and collecting: the
+        clean clone reported 1,260 while `EVIDENCE.md` said 1,257, because the
+        snapshot was regenerated three test-edits before the work finished.
+
+        Nothing caught it. `test_test_count_claims_match_the_snapshot` compares
+        every *document* against the snapshot, and they all agreed -- with each
+        other, and with a stale figure. I had made the incident and decision
+        counts verifiable against the repository and left the test count with no
+        equivalent, because the obvious way to check it is to run pytest inside
+        pytest, which is slow and fragile.
+
+        It turns out not to be needed: pytest already knows. ``session.testscollected``
+        is the exact number, free, from the run in progress.
+
+        Skipped when the invocation is filtered, because then the number is the
+        subset's and comparing it to the full suite's would fail every time
+        anyone ran a single file.
+        """
+        session = request.session
+        if session.config.option.keyword or session.config.option.markexpr:
+            pytest.skip("filtered invocation: -k/-m makes the collected count a subset")
+        # `file_or_dir` is empty for a bare `pytest` run, which takes its paths
+        # from `testpaths` in the config. Anything explicit means a subset.
+        targets = [t for t in session.config.option.file_or_dir if t not in {".", "tests"}]
+        if targets:
+            pytest.skip(f"subset invocation ({targets}): not the whole suite")
+
+        collected = session.testscollected
+        assert collected > 500, (
+            f"only {collected} tests collected; this looks like a subset that "
+            "slipped past the guards above, and asserting on it would be noise"
+        )
+        assert _evidence_figure("Tests collected") == collected, (
+            f"docs/EVIDENCE.md says {_evidence_figure('Tests collected')} tests; "
+            f"this run collected {collected}. Regenerate with "
+            "`python tasks.py snapshot` -- and note that every document is "
+            "checked against the snapshot, so a stale snapshot makes all of them "
+            "agree on the wrong number."
+        )
+
     def test_the_snapshot_incident_count_is_exact(self) -> None:
         assert _evidence_figure("Incidents") == _incident_count(), (
             "docs/EVIDENCE.md disagrees with docs/INCIDENTS.md. Regenerate with "

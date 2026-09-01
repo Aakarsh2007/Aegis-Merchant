@@ -84,8 +84,9 @@ most systems skip — deciding whether the money is ours to claim.
 The rule table settles **159 of 199** diagnoses. The model gets the other 40 — the cases where
 Razorpay sent no error fields at all and there is genuinely nothing to look up.
 
-That split is a measurement, not a preference. On an 85-case golden set the rule table scored
-**96.5%** against the model's **90.6%**. §15.1 committed in advance to shipping the rule table if
+That split is a measurement, not a preference. Over the 83 of 85 golden cases the committed
+response cache covers, the rule table scored
+**96.4%** (80/83) against the model's **90.4%** (75/83). §15.1 committed in advance to shipping the rule table if
 the model lost. It lost.
 
 > **Facts, safety, compliance and money → deterministic code. Ambiguity and strategy → the model.**
@@ -151,8 +152,8 @@ numbers for one.
 
 | Capability | Here | Measured how |
 |---|---|---|
-| Failure diagnosis from provider telemetry | ✓ | 96.5% on an 85-case golden set |
-| Model consulted only where rules are unsure | ✓ | 40 of 199; the model *lost* at 90.6% |
+| Failure diagnosis from provider telemetry | ✓ | 96.4% over the 83 of 85 golden cases the committed cache covers |
+| Model consulted only where rules are unsure | ✓ | 40 of 199; the model *lost* at 90.4% |
 | Deterministic policy authority over money | ✓ | Ablation: removing it → **284** breaches |
 | Capability token — no token, no side effect | ✓ | AST test: execution never reads the proposal |
 | Randomised holdout | **✓** | Ablation: removing it → attribution **impossible** |
@@ -257,7 +258,7 @@ policy and attribution machinery but have no production-integrated delivery path
 
 ## What broke
 
-42 incidents in [`docs/INCIDENTS.md`](docs/INCIDENTS.md), each with the part that matters: why no
+44 incidents in [`docs/INCIDENTS.md`](docs/INCIDENTS.md), each with the part that matters: why no
 test caught it. Three worth reading:
 
 - **[INC-026]** A metrics table with a reader and no writer. The panel showed zero forever, and the
@@ -302,7 +303,7 @@ python tasks.py snapshot     # regenerate docs/EVIDENCE.md
 python tasks.py check        # lint, types, the full suite, the web build
 ```
 
-1,257 tests. Safety properties are tested adversarially: termination, token isolation, idempotency,
+1,275 tests. Safety properties are tested adversarially: termination, token isolation, idempotency,
 attribution, tamper detection, and the absence of wall-clock reads. `mypy --strict` clean.
 
 ## Where the detail lives
@@ -311,7 +312,7 @@ attribution, tamper detection, and the absence of wall-clock reads. `mypy --stri
 |---|---|
 | [`docs/EVIDENCE.md`](docs/EVIDENCE.md) | Every figure, generated from one run |
 | [`docs/PRE-REGISTRATION.md`](docs/PRE-REGISTRATION.md) | The causal experiment, registered before the data |
-| [`docs/INCIDENTS.md`](docs/INCIDENTS.md) | 42 incidents, wrong theories included |
+| [`docs/INCIDENTS.md`](docs/INCIDENTS.md) | 44 incidents, wrong theories included |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | 46 decisions, including what we rejected |
 | [`workflow.md`](workflow.md) | The full design document |
 | [`docs/DEMO-SCRIPT.md`](docs/DEMO-SCRIPT.md) | The five-minute pitch, word for word |

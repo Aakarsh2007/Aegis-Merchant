@@ -34,6 +34,7 @@ from app.core.clock import SystemClock
 from app.db.enums import ExperimentArm, RecoveryVerifier
 from app.db.models import ExperimentAssignment, RecoveryCase
 from app.db.session import create_engine
+from app.llm.gate import gate_scores
 from app.services.attribution import recovery_report
 from app.services.metrics import cost_report, overview, stopping_rule_counts
 from app.services.reconciliation import money_ledger
@@ -142,6 +143,11 @@ async def _gather() -> dict[str, Any]:
         "overview": ov.as_dict(),
         "attribution": attribution.as_dict(),
         "reconciliation": ledger.as_dict(),
+        # Computed, not quoted. These two decimals were hardcoded here and had
+        # drifted to 96.5%/90.6% against a real 96.4%/90.4% -- inside the
+        # generator of the file whose claim is "generated, not written"
+        # (INC-045).
+        "gate": gate_scores().as_dict(),
         "reconciliation_cases": {
             "arrived": ledger.arrived_cases,
             "driven": ledger.driven_cases,
@@ -199,6 +205,7 @@ def _render(data: dict[str, Any], meta: dict[str, Any]) -> str:
     ov, att = data["overview"], data["attribution"]
     cost, bench = data["cost"], data["benchmark"]
     rec = data["reconciliation"]
+    gate = data["gate"]
     rec_cases = data["reconciliation_cases"]["arrived"]
     treated, control = att["treatment"], att["control"]
 
@@ -305,8 +312,12 @@ def _render(data: dict[str, Any], meta: dict[str, Any]) -> str:
         f"- Actual spend **{cost['actual_spend']['display']}**, projected at published paid",
         f"  rates **{cost['projected_spend']['display']}**",
         "",
-        "The rule table scored **96.5%** on the 85-case golden set against the model's",
-        "**90.6%**. So the rule table ships and the model is consulted only where the",
+        f"The rule table scored **{gate['baseline']['accuracy']:.1%}** "
+        f"({gate['baseline']['correct']}/{gate['scored_cases']}) against the model's",
+        f"**{gate['model']['accuracy']:.1%}** ({gate['model']['correct']}/"
+        f"{gate['scored_cases']}) -- over the {gate['scored_cases']} of "
+        f"{gate['golden_cases']} golden cases the committed",
+        "cache covers. So the rule table ships and the model is consulted only where the",
         "classifier declares itself unsure -- which is the whole of our AI judgment claim,",
         "and it is a measurement rather than a preference. See DEC-017.",
         "",

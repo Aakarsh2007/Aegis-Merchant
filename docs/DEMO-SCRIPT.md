@@ -259,7 +259,7 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 2. Stop on **INC-026**. Then scroll to **INC-032**.
 
 **SAY**
-> Forty-two incidents, each with the part that matters: why no test caught it.
+> Forty-four incidents, each with the part that matters: why no test caught it.
 >
 > The one to read is INC-026. A metrics table with a reader and no writer — the panel showed zero
 > forever, and the test passed *because* the feature was missing.
@@ -343,12 +343,12 @@ right** — say what is on screen.
 | Experiment progress | 13.2% overall | 210 of 1,592. Control 4.9% (39/796) · treated 21.5% (171/796). Control is the binding arm |
 | Cases still needed | 1,382 | To reach 1,592 total |
 | Rule table vs model | 159 / 40 | Of 199 diagnoses |
-| Model accuracy measured | 90.6% vs 96.5% | Model lost to the rule table, so the table ships |
+| Model accuracy measured | 90.4% vs 96.4% | 75/83 against 80/83. Model lost, so the table ships |
 | Inferences | 398 | 55.3% served from the committed cache · 0 live calls |
 | Actual spend | ₹0.00 | Projected at paid rates: ₹1.28 |
 | Audit chain | valid | **Don't quote a block count** — it changes on every batch run. Say "valid", and let the screen show the number. |
-| Tests | 1,257 | ruff, mypy --strict, tsc, eslint all clean |
-| Incidents · decisions | 42 · 46 | `docs/INCIDENTS.md` · `docs/DECISIONS.md` |
+| Tests | 1,275 | ruff, mypy --strict, tsc, eslint all clean |
+| Incidents · decisions | 44 · 46 | `docs/INCIDENTS.md` · `docs/DECISIONS.md` |
 | Benchmark: naive breaches | 308 | **Measured**, not simulated — `python tasks.py benchmark` |
 | Benchmark: RevPilot breaches | 0 | Measured |
 | Benchmark: firewall removed | 284 breaches | Same recovery as RevPilot — safety costs nothing |

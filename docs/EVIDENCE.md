@@ -10,12 +10,12 @@ number. Documents now cite this snapshot; this snapshot cites the system.
 
 | | |
 |---|---|
-| Snapshot | `20260901-1824-8201f98` |
-| Generated | 2026-09-01 18:24 UTC |
-| Commit | `8201f98` on `main` |
+| Snapshot | `20260901-1937-0844de3` |
+| Generated | 2026-09-01 19:37 UTC |
+| Commit | `0844de3` on `main` |
 | Corpus seed | `20260905` |
-| Tests collected | 1,257 |
-| Incidents | 42 |
+| Tests collected | 1,275 |
+| Incidents | 44 |
 | Decisions | 46 |
 
 ## The three numbers, and the question that is open
@@ -82,8 +82,9 @@ A fresh clone shows Rs 0.00 here, and that is correct: nothing has been proven o
 - Actual spend **Rs 0.00**, projected at published paid
   rates **Rs 1.28**
 
-The rule table scored **96.5%** on the 85-case golden set against the model's
-**90.6%**. So the rule table ships and the model is consulted only where the
+The rule table scored **96.4%** (80/83) against the model's
+**90.4%** (75/83) -- over the 83 of 85 golden cases the committed
+cache covers. So the rule table ships and the model is consulted only where the
 classifier declares itself unsure -- which is the whole of our AI judgment claim,
 and it is a measurement rather than a preference. See DEC-017.
 
@@ -129,5 +130,5 @@ Full table with breaches by kind, and the limitations, from
 
 ---
 
-*Snapshot `20260901-1824-8201f98`, commit `8201f98`, 2026-09-01 18:24 UTC.*
+*Snapshot `20260901-1937-0844de3`, commit `0844de3`, 2026-09-01 19:37 UTC.*
 *Any figure elsewhere in this repository that disagrees with this file is stale.*

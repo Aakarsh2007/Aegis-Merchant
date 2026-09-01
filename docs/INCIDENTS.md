@@ -1760,3 +1760,114 @@ stronger claim than the implementation could support — the range is thirty sta
 wider, not unbounded. That is now what both the test and the comment say. Fourth time in this
 project that a checking instrument has been wrong before it was right, and the fourth time in the
 same direction: too confident about what it was measuring.
+
+---
+
+## INC-044 · Every document agreed, and every document was wrong
+
+**Symptom.** Found by cloning the repository fresh and collecting the suite — the last step of the
+verification pass, and the only one that looks at what a judge actually gets. The clean clone
+reported **1,260 tests collected**. `docs/EVIDENCE.md` said **1,257**.
+
+I had regenerated the snapshot three test-edits before finishing the work. Three tests is a trivial
+drift and the number was never load-bearing. The interesting part is that **nothing caught it**, one
+commit after a rewrite whose entire subject was numbers not being caught.
+
+**Why the new machinery missed it.** In INC-041 I made the ledger counts verifiable *against the
+repository* — `TestTheSnapshotIsRight` reads `INCIDENTS.md` and compares. The test count got no
+equivalent, because the obvious way to check it is to run pytest inside pytest, which is slow and
+fragile, and I had already written that reasoning down as a justification once.
+
+So the test count was checked only *transitively*: every document was compared against
+`EVIDENCE.md`, and `EVIDENCE.md` was compared against nothing. **All of them agreed. All of them
+were wrong.** A single source of truth with no check on the source is a single point of failure with
+extra steps, and this is the second time in two commits that the generated file has been the one
+telling the lie (see INC-041).
+
+**The fix costs nothing, which is the annoying part.** pytest already knows:
+`request.session.testscollected` is the exact count of the run in progress. No subprocess, no
+estimate, no nesting. I had reasoned my way to "this is expensive to check" and stopped there
+without asking whether the number was already in hand.
+
+**Regression test.** `test_the_snapshot_test_count_is_exact`. It skips on a filtered invocation
+(`-k`, `-m`, or explicit paths), because then the collected count is the subset's and comparing it
+to the full suite's would fail for everyone running a single file. Verified in both directions: it
+skips on a subset run, and on the full run it failed against the stale 1,257 before the snapshot was
+regenerated. The guard `collected > 500` catches a subset that slips past the skip conditions, so
+the assertion cannot pass on a handful of tests.
+
+**The pattern, stated plainly.** Four times now: INC-024 stored a webhook and dropped it, INC-026
+had a reader with no writer, INC-038 had a bus with no publisher, and this one had a comparison with
+nothing on the other side. Every one is *the absence of a link*, and every one was invisible because
+the things on either side of the missing link were both present and both tested.
+
+---
+
+## INC-045 · The AI claim rested on two numbers I typed by hand
+
+**Symptom.** Found by me, not a reviewer, while reading the output of a test run that had just gone
+green. The Phase 6 gate table printed:
+
+```
+  OVERALL                        96.4%        90.4%
+  cases scored: 83
+```
+
+Every document said **96.5% against 90.6% on an 85-case golden set.** README, `docs/PITCH.md`,
+`docs/DEMO-SCRIPT.md` and `docs/EVIDENCE.md` — all four, identically.
+
+**Three things wrong, and the direction is the same each time.** Both rates rounded up by a tenth,
+and the denominator was the size of the golden *file* (85) rather than the number of cases the
+accuracy was computed over (83 — the ones the committed response cache has a model answer for).
+Scoring only the covered cases is correct; an uncached case has no model answer to score. But it
+means "96.5% on an 85-case golden set" was never a sentence the scorer could have produced.
+
+**Where they came from.** `tools/snapshot.py`, lines 308-309, as **string literals**:
+
+```python
+"The rule table scored **96.5%** on the 85-case golden set against the model's",
+"**90.6%**. So the rule table ships and the model is consulted only where the",
+```
+
+Hardcoded, inside the generator of the file that opens with *"Generated, not written. Every figure
+this submission quotes comes from here."* One commit after INC-041, where the same file published a
+wrong incident count. **Twice in two commits the generated file has been the one telling the lie,**
+and both times the hand-maintained documents were downstream of it, which is how a single hand-typed
+number came to appear in four places and read as corroborated.
+
+**Why it matters more than its size.** A tenth of a percentage point changes nothing. But this is
+*the* measurement behind the whole "we used AI where it helped and removed it where deterministic
+logic was better" position — the one the pitch leads with, and the one a technical judge is most
+likely to want reproduced. `python tasks.py warm-cache` prints 96.4%. A judge who runs it and reads
+96.5% in the README has found the submission overstating its own headline claim by a tenth of a
+point, in the direction that flatters it, which is a much worse thing to be caught doing than being
+wrong by a lot about something unimportant.
+
+**Fix.** `app/llm/gate.py` — `gate_scores()`, returning both arms, the golden-file size and the
+scored count as separate fields so the two can never be conflated again. The scoring previously
+lived in `tests/eval/test_model_vs_baseline.py`, which application code cannot import; that was the
+mechanical reason the snapshot had its own copy. The test now imports the module. Same shape as
+`tools/docmeta` from INC-041: one implementation, two readers.
+
+**Regression test.** `tests/test_documented_accuracy.py`:
+
+- every two-decimal percentage on a line mentioning the rule table, the model or the golden set must
+  be a figure the scorer produces — deliberately wide, because a pattern looking for the two known
+  stale values would have found nothing the next time;
+- no document may claim the accuracy was computed over all 85 cases, skipping itself if the cache
+  ever covers everything;
+- `snapshot.py` may not contain a hardcoded accuracy percentage outside a comment, which is the root
+  cause rather than a symptom;
+- and the guard: the rule table must still win, because if that flips, DEC-017's premise is gone and
+  the answer is to rewrite the documents, not relax the test.
+
+**Why no test caught it.** There was no link between the scorer and the prose. The eval test asserted
+the *ordering* — rule table beats model — and a floor of 80%, both of which stayed true while the
+quoted figures drifted. Nothing compared a document against the scorer, because the scorer was
+unreachable from anywhere a document-checking test would live.
+
+That is the fifth instance of one pattern in this project: **INC-024** stored a webhook and dropped
+it, **INC-026** had a reader with no writer, **INC-038** had a bus with no publisher, **INC-044** had
+a comparison with nothing on the other side, and this one had two things worth comparing and no path
+between them. Every one is the absence of a link, and every one was invisible because both ends
+existed and both ends were tested.

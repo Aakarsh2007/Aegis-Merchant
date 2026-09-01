@@ -25,87 +25,58 @@ before either existed, now supported by measurement.
 
 from __future__ import annotations
 
-import json
-from collections import defaultdict
-from pathlib import Path
 from typing import Any
 
 import pytest
 
-from app.agent.classifier import classify
-from app.llm.cache import CACHE_FILE, cache_key
+from app.llm.cache import CACHE_FILE
+from app.llm.gate import (
+    GATE_MODEL,
+    GOLDEN_PATH,
+    gate_scores,
+    load_cached_responses,
+    load_golden,
+)
+from app.llm.gate import model_answer as _gate_model_answer
 from app.llm.prompts import PROMPT_VERSION
 
 pytestmark = pytest.mark.eval
 
-GOLDEN = Path(__file__).parent / "golden_diagnoses.jsonl"
-MODEL = "gemini-3.1-flash-lite"
-
-
-def load_golden() -> list[dict[str, Any]]:
-    return [
-        json.loads(line) for line in GOLDEN.read_text(encoding="utf-8").splitlines() if line.strip()
-    ]
-
-
-def load_cache() -> dict[str, dict[str, Any]]:
-    if not CACHE_FILE.exists():
-        return {}
-    out: dict[str, dict[str, Any]] = {}
-    for line in CACHE_FILE.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            row = json.loads(line)
-            out[row["cache_key"]] = row
-    return out
-
+GOLDEN = GOLDEN_PATH
+MODEL = GATE_MODEL
 
 CASES = load_golden()
-CACHE = load_cache()
-
-
-def context_for(case: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "error_source": case["input"]["error_source"],
-        "error_step": case["input"]["error_step"],
-        "error_reason": case["input"]["error_reason"],
-        "method": case["input"]["method"],
-        "playbook": "PAYMENT_FAILURE",
-    }
+CACHE = load_cached_responses()
 
 
 def model_answer(case: dict[str, Any]) -> str | None:
-    from app.db.enums import LLMTask
-
-    key = cache_key(
-        task=LLMTask.DIAGNOSE,
-        model=MODEL,
-        prompt_version=PROMPT_VERSION,
-        context=context_for(case),
-    )
-    row = CACHE.get(key)
-    return str(row["response"]["category"]) if row else None
+    """The cached model answer for one case, or None if uncached."""
+    return _gate_model_answer(case, CACHE)
 
 
 def scored() -> tuple[dict[str, Any], dict[str, Any]]:
-    """(baseline, model) scores over the cases the cache covers."""
-    covered = [c for c in CASES if model_answer(c) is not None]
-    base_ok = model_ok = 0
-    base_band: dict[str, list[bool]] = defaultdict(list)
-    model_band: dict[str, list[bool]] = defaultdict(list)
+    """(baseline, model) scores over the cases the cache covers.
 
-    for case in covered:
-        expected = case["label"]["category"]
-        b = classify(**case["input"]).category.value == expected
-        m = model_answer(case) == expected
-        base_ok += b
-        model_ok += m
-        base_band[case["difficulty"]].append(b)
-        model_band[case["difficulty"]].append(m)
-
-    n = len(covered) or 1
+    A thin adapter over ``app.llm.gate.gate_scores``. The scoring used to live
+    here, which meant application code could not reach it -- so the snapshot
+    generator carried the accuracy figures as **hardcoded string literals**, and
+    they drifted to 96.5%/90.6% against a real 96.4%/90.4% (INC-045). One
+    implementation, two readers.
+    """
+    g = gate_scores()
     return (
-        {"correct": base_ok, "total": len(covered), "accuracy": base_ok / n, "band": base_band},
-        {"correct": model_ok, "total": len(covered), "accuracy": model_ok / n, "band": model_band},
+        {
+            "correct": g.baseline.correct,
+            "total": g.baseline.total,
+            "accuracy": g.baseline.accuracy,
+            "band": g.baseline.band,
+        },
+        {
+            "correct": g.model.correct,
+            "total": g.model.total,
+            "accuracy": g.model.accuracy,
+            "band": g.model.band,
+        },
     )
 
 
