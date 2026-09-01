@@ -1421,3 +1421,55 @@ tell a reader that these are the cases the agent was forbidden from touching.
 the first version called `setState` synchronously in an effect body — which the lint rule caught,
 correctly: it causes a cascading render on every filter click. Loading is now *derived*
 (`loaded?.index !== active`) rather than tracked in a second piece of state.
+
+---
+
+## INC-037 · The pitch script told the presenter to click the wrong case
+
+**Symptom:** `docs/PITCH.md` instructs the presenter, in the hero-case segment, to click
+`RC-0142` while narrating *"Ananya's four thousand two hundred and ninety-nine rupee order
+failed. Razorpay's own telemetry says `error_source: bank`, `error_step:
+payment_authorization`, reason `bank_timeout`."*
+
+`RC-0142` is a **₹3,551.04 `INTENT_DECAY` abandoned checkout.** The case being described is
+`RC-0001`.
+
+**Why this one matters more than its size suggests.** A wrong number in a document is
+embarrassing. A wrong number a judge can watch being contradicted — the screen showing ₹3,551
+and an abandoned cart while the voice-over says ₹4,299 and a bank timeout — lands in the
+segment whose entire job is establishing that the figures are real. Every number afterwards
+would be read differently.
+
+**Found** by resolving the case ids in the script against the API, rather than by re-reading the
+script. I wrote that script; re-reading my own work was never going to catch it.
+
+**Fix.** The shot names `RC-0001`, verified against the corpus: Ananya, ₹4,299,
+`bank / payment_authorization / payment_failed_due_to_bank_timeout`, diagnosed `RAIL_FAULT` at
+0.95 by the **rule table**, one action, one audit block. The note about the earlier mistake stays
+in the file, because the next person to retime the script needs to know the ids are load-bearing.
+
+**Two more errors in the same document, found by the test written for this one:**
+
+* The script said *"the **Where AI stops** panel"*. The panel is titled *"Where **the** AI
+  stops"*. Small, and it is a presenter hunting for a heading that does not exist.
+* The Test Mode segment still told the presenter to run `python tasks.py testmode-recover` in a
+  terminal. There is a **button** now (INC-033's sibling fix), and a judge watching a button
+  produce a real Razorpay link is a stronger shot than one watching a command. Rewritten to the
+  button, with the command kept as the fallback.
+
+**And the test's own instrument was wrong twice before it was right**, which is worth recording:
+
+1. A raw substring search over `.tsx` reported *"What we have not proven"* as missing from the
+   UI. It is authored as `What we have <span>not</span> proven`. Taken at face value, that false
+   positive would have sent me to "fix" a panel that was correct.
+2. Stripping tags and `{...}` expressions fixed that and immediately broke *"Held as control"*,
+   which lives inside an object literal the brace-stripper ate.
+
+It now searches the raw source **and** a tag-stripped copy, because each form finds what the
+other misses and the question is only ever "is this string present". Two cheap views beat one
+clever one.
+
+**Regression test** also pins the segment timings as monotonic and within five minutes — a
+retimed script with a reversed or overrunning segment is a script that cannot be followed —
+and asserts every panel name the script tells the presenter to click is a string the UI
+actually renders.

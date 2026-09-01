@@ -15,9 +15,9 @@ Four criteria, in their words:
 | Criterion | Their gloss | Where this project answers it |
 |---|---|---|
 | **Problem taste** | did you pick something that actually matters | the gross-vs-incremental split — most recovery tools report the first number |
-| **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 1,113 tests, `mypy --strict` |
+| **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 1,139 tests, `mypy --strict` |
 | **AI judgment** | the right tool in the right place, **and where you chose not to use one** | the rule table answers 158 of 199 diagnoses; the model is consulted on 41 |
-| **Failure recovery** | what broke, and what you did about it | 36 written incidents, each with the reason no test caught it |
+| **Failure recovery** | what broke, and what you did about it | 37 written incidents, each with the reason no test caught it |
 
 And the line that decides the running order: *"The last one is the one we read first."* Answer
 12 is the submission. Everything else supports it.
@@ -48,6 +48,11 @@ thousand two hundred and seventeen rupees, which is **30% of the number a dashbo
 show**. It's the smaller number, it's on the bigger tile, and the confidence intervals overlap,
 so it says 'not statistically significant' right on the screen."
 
+> **Optional, and worth the four seconds:** click **Held as control** on the Cases table.
+> All thirty-nine appear, greyed, with a dash where an action would be. A holdout you can
+> only read about is indistinguishable from one that does not exist — this makes it
+> inspectable on camera.
+
 **Pause here for a beat.** This is the whole pitch. If a judge stops watching at 0:25, this is
 what they keep.
 
@@ -75,7 +80,14 @@ honesty and damage control.
 
 ### 0:50 – 1:30 · One case, end to end
 
-> **Shot:** the Cases table → click `RC-0142` → the decision trace expanding, node by node.
+> **Shot:** the Cases table → click **`RC-0001`** → the decision trace expanding, node by node.
+>
+> Verified before writing this: RC-0001 is Ananya, ₹4,299, `bank / payment_authorization /
+> payment_failed_due_to_bank_timeout`, diagnosed `RAIL_FAULT` at 0.95 confidence by the **rule
+> table** (`DETERMINISTIC_FALLBACK`), with one action and one audit block. An earlier draft of
+> this script said `RC-0142` — which is a ₹3,551 `INTENT_DECAY` abandoned checkout. Clicking it
+> while narrating a bank timeout would have been the single most damaging thirty seconds of the
+> video.
 
 "Ananya's four thousand two hundred and ninety-nine rupee order failed. Razorpay's own
 telemetry says `error_source: bank`, `error_step: payment_authorization`, reason
@@ -91,7 +103,7 @@ the policy firewall has no code path that lets it through."
 
 ### 1:30 – 2:10 · AI proposes, policy disposes
 
-> **Shot:** the "Where AI stops" panel, then the Adversarial panel — run all five attacks live.
+> **Shot:** the "Where the AI stops" panel, then the Adversarial panel — run all five attacks live.
 
 "Here's where the model is, and where it isn't.
 
@@ -108,8 +120,13 @@ number for it to raise. That's not a guardrail, it's an absence."
 
 ### 2:10 – 2:55 · A real rupee, proven by Razorpay
 
-> **Shot:** terminal — `python tasks.py testmode-recover` — then the tunnel log showing the
-> inbound POST, then the dashboard tile flipping to ₹1.00 RAZORPAY VERIFIED.
+> **Shot:** the **“Prove it against real Razorpay”** panel → click *Create a real ₹1 recovery
+> link* → click through to Razorpay and pay → the tunnel log showing the inbound POST → the
+> dashboard tile moving.
+>
+> Use the button, not the terminal. `python tasks.py testmode-recover` does the same thing and
+> is worth showing as a fallback, but a judge watching a button produce a real Razorpay link is
+> a stronger thirty seconds than a judge watching a command.
 
 "Everything so far runs on a seeded corpus. This part doesn't.
 
@@ -316,7 +333,7 @@ Six are facts only you can supply. Six are below, ready to paste.
 > new test now gets sabotage-verified — I break the thing it covers and confirm the test fails,
 > and that step has caught vacuous tests inside the fixes for vacuous tests. Every real bug in
 > this project was found by touching the real provider or by looking at the running product;
-> none was reachable from local testing at any volume. The suite is at 1,113 tests and I trust it
+> none was reachable from local testing at any volume. The suite is at 1,139 tests and I trust it
 > considerably less than I did at 400.
 
 ---

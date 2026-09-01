@@ -58,6 +58,29 @@ def _chain(*results: int) -> int:
 # ---------------------------------------------------------------------------
 # setup
 # ---------------------------------------------------------------------------
+#: Imported by the API before anything else runs. Checked by name rather than
+#: by trying the real import chain, because a partial install fails deep inside
+#: `app.main` with a traceback that says nothing about pip.
+_REQUIRED_MODULES = (
+    ("fastapi", "fastapi"),
+    ("uvicorn", "uvicorn"),
+    ("sqlalchemy", "sqlalchemy"),
+    ("aiosqlite", "aiosqlite"),
+    ("pydantic", "pydantic"),
+    ("pydantic_settings", "pydantic-settings"),
+    ("httpx", "httpx"),
+)
+
+
+def _missing_dependencies() -> list[str]:
+    """Which pip packages are absent. Empty list means good to go."""
+    import importlib.util
+
+    return [
+        package for module, package in _REQUIRED_MODULES if importlib.util.find_spec(module) is None
+    ]
+
+
 @task("install", "Install API (pip) and web (npm) dependencies")
 def install() -> int:
     rc = run([PY, "-m", "pip", "install", "-r", str(API / "requirements.txt")])
@@ -178,6 +201,24 @@ def demo() -> int:
     print("  Add GEMINI_API_KEY for live reasoning; RAZORPAY_* for real Test Mode links.")
     print()
 
+    # Checked before anything else. `demo` is the first command anyone types,
+    # and without this a fresh clone with no `pip install` failed inside the
+    # batch subprocess with a ModuleNotFoundError traceback -- which tells a
+    # reader the project is broken rather than that they have one step to run.
+    missing = _missing_dependencies()
+    if missing:
+        print("  Python dependencies are not installed. Missing:")
+        for package in missing:
+            print(f"    - {package}")
+        print()
+        print("  Run this first:")
+        print("      python tasks.py install")
+        print()
+        print("  Or, if you only want the API and no dashboard:")
+        print(f"      {PY} -m pip install -r apps/api/requirements.txt")
+        print()
+        return 1
+
     runtime_db = API / "revpilot.db"
     if not runtime_db.exists():
         seed_db = ROOT / "data" / "revpilot.seed.db"
@@ -203,7 +244,7 @@ def demo() -> int:
         except sqlite3.OperationalError:
             cases = 0
     if cases == 0:
-        print("  [2/4] running the corpus through the agent (~3 s, no API calls) ...")
+        print("  [2/4] running the corpus through the agent (~5 s, no API calls) ...")
         if run([PY, "-m", "app.workers.batch_cli"], cwd=API) != 0:
             return 1
     else:

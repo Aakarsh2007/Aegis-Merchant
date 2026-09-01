@@ -31,7 +31,7 @@ things that work. `python tasks.py power` prints the arithmetic.
 python tasks.py demo        # no credentials, no Docker, ~40 seconds
 ```
 
-1,113 tests · `mypy --strict` clean · 36 documented incidents · one command to run.
+1,139 tests · `mypy --strict` clean · 37 documented incidents · one command to run.
 
 > **On a fresh clone the verified tile reads ₹0.00, and that is correct.** Nothing has been
 > proven on *your* machine yet. The two recoveries above happened here, on 31 August 2026, with
@@ -60,7 +60,7 @@ than one that cannot.
 gross-versus-incremental argument is [below](#the-number-and-why-it-is-smaller-than-the-one-you-expected),
 and it is the point of the whole project.
 
-**The ₹1 matters more than the ₹60,217.** It is the whole loop on real Razorpay
+**The ₹2 matters more than the ₹60,217.** It is the whole loop on real Razorpay
 infrastructure: agent → policy firewall → capability token → real payment link
 → Razorpay's own signed webhook → HMAC verified → reference matched →
 attributed → audit block. Test Mode proves the *execution path*. It does not
@@ -69,7 +69,7 @@ stays labelled SIMULATED.
 
 **The proof.** 900+ tests · one real signed Razorpay webhook verified end to
 end · tamper-evident audit ledger you can break yourself · 12 stopping rules
-with a property-based termination proof · 36 documented incidents.
+with a property-based termination proof · 37 documented incidents.
 
 ```
                         RAZORPAY
@@ -171,8 +171,8 @@ away from the data without someone noticing.
 | Transactions | **420** — 210 captured · 96 failed checkout · 62 abandoned · 28 overdue invoices · 24 subscription failures |
 | Customers | 140 (6 opted out · 4 DND-registered · ≥22 without marketing consent) |
 | Captured GMV | ₹7,93,199 over a 14-day window (implied ~₹17.0L/month) |
-| Revenue at risk | ₹11,84,629 |
-| Recovered so far | **₹0** — nothing has run against live traffic |
+| Revenue at risk **in the corpus** | ₹8,61,995 — every failed and abandoned attempt. Not the same quantity as the dashboard's *At risk* tile, which counts only cases still **open** after the agent has run (₹6,64,067 over 117). Same words, different populations — distinguished here because a reader comparing the two would otherwise conclude one of them is wrong. |
+| Recovered so far | **₹2.00** `RAZORPAY VERIFIED` — two real Test Mode payments, one proven by a signed webhook and one by API reconciliation after a webhook was lost. No **production** merchant traffic. |
 | Reproducible | Byte-for-byte from `SEED=20260905` against a fixed anchor instant |
 | Declared scenario | A 3-hour `upi/HDFC` outage (41.0% over 39 attempts vs a 65% baseline), so there is a genuinely degraded rail to detect. Scenario design, not metric tuning — see [INC-004](docs/INCIDENTS.md) |
 
