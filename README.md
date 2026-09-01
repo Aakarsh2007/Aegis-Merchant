@@ -1,6 +1,6 @@
 # RevPilot AI
 
-### Recover revenue. Prove causality. Stop safely.
+### Recover revenue. Attribute it honestly. Stop safely.
 
 **Most recovery tools can tell you what they recovered. This one can tell you whether the
 recovery belongs to it.**
@@ -22,18 +22,40 @@ subscription mandates. Every tool that chases it back reports the same misleadin
 money recovered.** Some of those customers would have paid anyway. Billing for them is charging for
 the weather.
 
-## Four numbers, four different questions
+## Three numbers, one of them refused
 
-| | | Question it answers |
+```
+        ₹2,02,760              ₹60,217              ₹1,39,021
+     GROSS RECOVERED    →    CLAIMABLE BY US   +   NOT CLAIMED
+       SIMULATED             NOT SIGNIFICANT      ₹0 CREDITED
+```
+
+**We recovered money. We did not automatically take credit for it.**
+
+The third figure is 17 cases where the customer paid and we credited ourselves nothing — a
+control-arm customer who was never contacted, or a settlement whose reference we never issued. A
+gross-recovery dashboard would have counted all of it.
+
+And separately, the only figure with external evidence behind it:
+
+| | | |
 |---|---|---|
-| **₹2.00** | `RAZORPAY VERIFIED` | *Can it execute and verify a recovery through Razorpay?* **Yes, both ways** — two real Test Mode payments, one proven by a signed webhook, one by API reconciliation after a webhook was lost to a dead tunnel. |
-| **₹60,217** | `SIMULATED` | *What might it recover at scale?* Estimated incremental lift over a 39-case holdout, under a **declared** response model. |
-| **₹1,39,021** | `NOT CLAIMED` | *Money that arrived and we credited ourselves nothing.* 17 cases. A gross-recovery dashboard would have counted all of it. |
-| **—** | `NOT PROVEN` | *Did it cause additional customers to pay?* **No.** That needs 1,592 cases and a DLT-registered merchant. [Pre-registered](docs/PRE-REGISTRATION.md) before any data existed; the dashboard shows we are at **4.9%**. |
+| **₹2.00** | `VERIFIED` | Two real Razorpay Test Mode payments — one proven by a signed webhook, one by API reconciliation after a webhook was lost to a dead tunnel. |
 
-The third row is the one to look at twice. Every figure here is generated into
-[`docs/EVIDENCE.md`](docs/EVIDENCE.md) from one run — commit, timestamp, seed. **Anything in this
-repository that disagrees with that file is stale.**
+### Four questions, and the one we cannot answer
+
+| | | |
+|---|---|---|
+| ✓ | **VERIFIED** | *Did the payment happen?* Razorpay says so, with a signature we checked. |
+| ✓ | **ELIGIBLE** | *Does it satisfy our attribution rules?* All six conditions in [`attribution.py`](apps/api/app/services/attribution.py). |
+| ○ | **INCREMENTAL** | *Did we cause it, across the population?* **Not reached.** Needs 1,592 cases; we have 39 in the control arm against the 796 required. |
+| ✓ | **CLAIMABLE** | *May we take credit?* Only when the levels above hold. A rupee can be verified and eligible and still not claimable. |
+
+Execution and attribution are verified. Population-level incrementality is not, and is not claimed.
+Live at `GET /api/v1/metrics/proof`, and first thing on the dashboard.
+
+Every figure here is generated into [`docs/EVIDENCE.md`](docs/EVIDENCE.md) from one run — commit,
+timestamp, seed. **Anything in this repository that disagrees with that file is stale.**
 
 ## The loop
 
@@ -200,6 +222,7 @@ over it are rates of the sample, not of a real funnel.
 |---|---|
 | **Real** | Razorpay API calls · HMAC webhook verification · the policy firewall · capability tokens · twelve stopping rules · attribution · the hash chain · idempotency and the transactional outbox |
 | **Simulated** | Customer responses. Baseline self-recovery 21%, treated uplift 7–14% by playbook — declared parameters, printed on every batch run. |
+| **Replayed** | Model responses are content-addressed and committed, so the demo reproduces exactly rather than drifting when an external model changes. Live inference spend today is ₹0 **because the responses are replayed, not because the model is absent** — the architecture supports live calls and `--warm` records them. |
 | **Mocked** | Message *delivery*. Template rendering, consent class, DND, quiet hours and every policy check are real; nothing is sent to a phone. |
 | **Not attempted** | Production merchant traffic. Multi-tenancy. |
 
@@ -250,7 +273,7 @@ python tasks.py snapshot     # regenerate docs/EVIDENCE.md
 python tasks.py check        # lint, types, the full suite, the web build
 ```
 
-1,194 tests. Safety properties are tested adversarially: termination, token isolation, idempotency,
+1,199 tests. Safety properties are tested adversarially: termination, token isolation, idempotency,
 attribution, tamper detection, and the absence of wall-clock reads. `mypy --strict` clean.
 
 ## Where the detail lives

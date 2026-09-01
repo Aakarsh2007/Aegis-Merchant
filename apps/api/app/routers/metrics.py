@@ -387,6 +387,121 @@ async def claims(
     }
 
 
+#: The four questions a rupee has to pass, in order. A reviewer proposed this
+#: vocabulary and it resolves a real confusion the project had: "prove
+#: causality" as a tagline sat awkwardly beside "causal lift: not proven", and
+#: the pitch script had drifted into claiming a signed webhook made a payment
+#: "attributable to us and not to luck" -- which contradicts our own six
+#: conditions. These four levels separate what we can each show.
+PROOF_LEVELS = [
+    (
+        "VERIFIED",
+        "Did the payment happen?",
+        "Razorpay says so, with a signature we checked. External evidence, nothing to do with us.",
+    ),
+    (
+        "ELIGIBLE",
+        "Does it satisfy our attribution rules?",
+        "All six conditions in attribution.attribute() -- our reference, our "
+        "action, inside the window, counted once.",
+    ),
+    (
+        "INCREMENTAL",
+        "Did we cause it, across the population?",
+        "Needs the randomised holdout at the pre-registered sample size. This "
+        "is the level we have NOT reached.",
+    ),
+    (
+        "CLAIMABLE",
+        "May we take credit for it?",
+        "Only when the levels above it hold. A rupee can be verified and "
+        "eligible and still not claimable.",
+    ),
+]
+
+
+@router.get("/proof", summary="What is proven, at each of four levels")
+async def proof(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _principal: Annotated[Principal, Depends(require_api_token)],
+) -> dict[str, Any]:
+    """The four levels, and which of them this system has actually reached.
+
+    Written because "prove causality" and "causal lift: not proven" are both
+    true and read as a contradiction. They are answers to different questions,
+    and a reader has no way to see that unless the questions are separated.
+
+    ``INCREMENTAL`` is deliberately reported as **not reached**. It is the only
+    level that needs a sample we do not have, and every other claim in this
+    project is careful not to depend on it.
+    """
+    attribution = recovery_report(await _outcomes(session))
+    verified_count = int(
+        await session.scalar(
+            select(func.count(RecoveryCase.id)).where(
+                RecoveryCase.recovery_verified_via.in_(
+                    [RecoveryVerifier.WEBHOOK, RecoveryVerifier.API_RECONCILIATION]
+                )
+            )
+        )
+        or 0
+    )
+    organic_count = int(
+        await session.scalar(
+            select(func.count(RecoveryCase.id)).where(
+                RecoveryCase.status == CaseStatus.RESOLVED_ORGANIC
+            )
+        )
+        or 0
+    )
+
+    reached = {
+        "VERIFIED": verified_count > 0,
+        "ELIGIBLE": verified_count > 0,
+        # The one we have not reached, and will not at this sample size.
+        "INCREMENTAL": attribution.has_control and attribution.lift_is_significant,
+        "CLAIMABLE": verified_count > 0,
+    }
+    evidence = {
+        "VERIFIED": (
+            f"{verified_count} recovery(ies) confirmed by Razorpay -- signed "
+            "webhook or direct API reconciliation"
+        ),
+        "ELIGIBLE": (
+            f"{verified_count} passed all six attribution conditions; "
+            f"{organic_count} payments arrived and failed at least one, and are "
+            "credited to us at zero"
+        ),
+        "INCREMENTAL": (
+            f"treated {attribution.treatment.conversion:.1%} vs control "
+            f"{attribution.control.conversion:.1%} over "
+            f"{attribution.treatment.cases}/{attribution.control.cases} cases. "
+            "The intervals overlap: directional, not significant. The design "
+            "that would settle it is in docs/PRE-REGISTRATION.md"
+        ),
+        "CLAIMABLE": (
+            "only the verified-and-eligible rupees. Everything else is reported and not claimed"
+        ),
+    }
+
+    return {
+        "levels": [
+            {
+                "level": level,
+                "question": question,
+                "means": means,
+                "reached": reached[level],
+                "evidence": evidence[level],
+            }
+            for level, question, means in PROOF_LEVELS
+        ],
+        "summary": (
+            "Execution and attribution are verified. Population-level "
+            "incrementality is not, and is not claimed."
+        ),
+    }
+
+
 @router.get("/stopping-rules", summary="Firing counts by rule id, including zeroes")
 async def stopping_rules(
     session: Annotated[AsyncSession, Depends(get_db)],

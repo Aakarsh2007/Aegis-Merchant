@@ -337,6 +337,24 @@ export type Claims = {
   note: string;
 };
 
+/**
+ * The four levels a rupee passes through, and which we have reached.
+ *
+ * `INCREMENTAL` is the one we have not, and the type does not pretend
+ * otherwise: `reached` is a plain boolean the API computes from the actual
+ * confidence intervals, not a field a panel can decide for itself.
+ */
+export type Proof = {
+  levels: Array<{
+    level: string;
+    question: string;
+    means: string;
+    reached: boolean;
+    evidence: string;
+  }>;
+  summary: string;
+};
+
 export const api = {
   overview: () => safeFetch<Overview>("/api/v1/metrics/overview"),
   attribution: () => safeFetch<Attribution>("/api/v1/metrics/attribution"),
@@ -345,6 +363,7 @@ export const api = {
   power: () => safeFetch<PowerPlan>("/api/v1/metrics/power"),
   holdout: () => safeFetch<Holdout>("/api/v1/metrics/holdout"),
   claims: () => safeFetch<Claims>("/api/v1/metrics/claims"),
+  proof: () => safeFetch<Proof>("/api/v1/metrics/proof"),
   testmodeStatus: () =>
     safeFetch<{
       razorpay_configured: boolean;

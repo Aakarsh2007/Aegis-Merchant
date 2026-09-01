@@ -15,9 +15,9 @@ Four criteria, in their words:
 | Criterion | Their gloss | Where this project answers it |
 |---|---|---|
 | **Problem taste** | did you pick something that actually matters | the gross-vs-incremental split — most recovery tools report the first number |
-| **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 1,194 tests, `mypy --strict` |
+| **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 1,199 tests, `mypy --strict` |
 | **AI judgment** | the right tool in the right place, **and where you chose not to use one** | the rule table answers 158 of 199 diagnoses; the model is consulted on 41 |
-| **Failure recovery** | what broke, and what you did about it | 39 written incidents, each with the reason no test caught it |
+| **Failure recovery** | what broke, and what you did about it | 40 written incidents, each with the reason no test caught it |
 
 And the line that decides the running order: *"The last one is the one we read first."* Answer
 12 is the submission. Everything else supports it.
@@ -26,181 +26,17 @@ And the line that decides the running order: *"The last one is the one we read f
 
 ## Part 2 — The five-minute video
 
-Screen recording with voice-over. No slides except the one title card. Speak at a normal pace;
-the script below is roughly 700 words, which fits five minutes with room to breathe.
+**The script lives in [`DEMO-SCRIPT.md`](DEMO-SCRIPT.md), word for word.**
 
-Record the segments separately and cut them together — do not try to do this in one take, and
-do not speed anything up. A judge who sees a sped-up terminal assumes it was slow.
+It is kept there and not here because two documents holding two versions of one script is exactly
+the drift `docs/EVIDENCE.md` exists to prevent, one level up. An earlier draft of this file told the
+presenter to click `RC-0142` while narrating facts about `RC-0001`, and pointed at a terminal
+command for a step that now has a button.
 
-### 0:00 – 0:25 · The number that is wrong everywhere else
-
-> **Shot:** the dashboard's three-number table, full screen, still.
-
-"Every recovery tool shows a merchant one number: money recovered. Here it's two lakh two
-thousand seven hundred and sixty rupees.
-
-That number is real, and it is the wrong number. Some of those customers would have come back
-on their own. A tool that bills for them is charging for weather.
-
-So this system holds back thirty-nine cases and never contacts them. Treated arm converts at
-29.2%. Control converts at 23.1%. The honest number — the money we actually caused — is sixty
-thousand two hundred and seventeen rupees, which is **30% of the number a dashboard would
-show**. It's the smaller number, it's on the bigger tile, and the confidence intervals overlap,
-so it says 'not statistically significant' right on the screen."
-
-> **Optional, and worth the four seconds:** click **Held as control** on the Cases table.
-> All thirty-nine appear, greyed, with a dash where an action would be. A holdout you can
-> only read about is indistinguishable from one that does not exist — this makes it
-> inspectable on camera.
-
-**Pause here for a beat.** This is the whole pitch. If a judge stops watching at 0:25, this is
-what they keep.
-
-### 0:25 – 0:50 · And the number that is still missing
-
-> **Shot:** the "What we have not proven" panel. Let the completion bar sit on screen.
-
-"There's a third question, and I haven't answered it. Did RevPilot actually *cause* those
-customers to pay?
-
-No. Not proven. Sixty thousand rupees is a simulation — real machinery, declared responses.
-
-Answering it properly needs 1,592 cases at a balanced split. I have 210, which is 4.9% of the
-control arm. That's not an estimate I made up for this video; the design is pre-registered in
-the repo, committed before any of this data existed, and it says what would make me abandon
-the hypothesis. The panel shows the gap because a gap you can measure is worth more than a
-disclaimer nobody reads.
-
-What's blocking it isn't code. It's a merchant with the traffic, and DLT registration in
-*their* name — which takes weeks."
-
-**Why this is at 0:25 and not 4:30.** A reviewer will find this limitation whether or not I
-mention it. Saying it before showing eight panels of things that work is the difference between
-honesty and damage control.
-
-### 0:50 – 1:30 · One case, end to end
-
-> **Shot:** the Cases table → click **`RC-0001`** → the decision trace expanding, node by node.
->
-> Verified before writing this: RC-0001 is Ananya, ₹4,299, `bank / payment_authorization /
-> payment_failed_due_to_bank_timeout`, diagnosed `RAIL_FAULT` at 0.95 confidence by the **rule
-> table** (`DETERMINISTIC_FALLBACK`), with one action and one audit block. An earlier draft of
-> this script said `RC-0142` — which is a ₹3,551 `INTENT_DECAY` abandoned checkout. Clicking it
-> while narrating a bank timeout would have been the single most damaging thirty seconds of the
-> video.
-
-"Ananya's four thousand two hundred and ninety-nine rupee order failed. Razorpay's own
-telemetry says `error_source: bank`, `error_step: payment_authorization`, reason
-`bank_timeout`.
-
-Seven nodes. Watch what the trace says next to each one — that's provenance, and it names
-which layer answered. The rule table diagnoses this: a bank timeout is a rail fault, not a
-customer problem, so retrying the same rail is the one thing you must not do.
-
-She has no marketing consent. So the message downgrades to transactional, and the discount the
-strategy asked for is clamped to zero — not because a model decided to be careful, but because
-the policy firewall has no code path that lets it through."
-
-### 1:30 – 2:10 · AI proposes, policy disposes
-
-> **Shot:** the "Where the AI stops" panel, then the Adversarial panel — run all five attacks live.
-
-"Here's where the model is, and where it isn't.
-
-The rule table handles 158 of 199 diagnoses. The model is consulted on 41 — the ones where
-Razorpay sent no error fields at all and there is genuinely nothing to look up. That's the
-whole story on AI judgment: I measured the model against the rule table and it scored 90.6%
-against the table's 96.5%, so the table ships and the model gets the cases the table declares
-itself unsure about.
-
-And the model cannot touch money. Five attacks, run live against the real policy engine, not a
-mock. Charge more than owed —" *(click)* "— the answer isn't 'blocked', it's
-`UNREPRESENTABLE`. The proposal object the model fills in **has no amount field**. There is no
-number for it to raise. That's not a guardrail, it's an absence."
-
-### 2:10 – 2:55 · A real rupee, proven by Razorpay
-
-> **Shot:** the **“Prove it against real Razorpay”** panel → click *Create a real ₹1 recovery
-> link* → click through to Razorpay and pay → the tunnel log showing the inbound POST → the
-> dashboard tile moving.
->
-> Use the button, not the terminal. `python tasks.py testmode-recover` does the same thing and
-> is worth showing as a fallback, but a judge watching a button produce a real Razorpay link is
-> a stronger thirty seconds than a judge watching a command.
-
-"Everything so far runs on a seeded corpus. This part doesn't.
-
-That's a real Razorpay Test Mode payment link, created through the live API. I'm paying it
-now." *(pay it)* "That's Razorpay's webhook arriving at my machine from 52.66.76.63.
-HMAC-SHA256 verified. The `reference_id` matches the action we took, so the money is
-attributable to us and not to luck.
-
-One rupee. And it's on its own tile, badged `RAZORPAY VERIFIED`, separate from the two lakh —
-because a signed webhook and a simulation are different kinds of evidence and averaging them
-would make both worthless."
-
-### 2:55 – 3:35 · The brakes, and the audit trail
-
-> **Shot:** the stopping-rules panel, then Audit Verifier → click "Tamper".
-
-"Twelve stopping rules. All twelve listed, including the ones that fired zero times — because
-a brake that didn't fire and a brake that doesn't exist look identical if you only show
-non-zero rows. Quiet hours held 22 actions; eleven customers had opted out, and opt-out is
-permanent and checked before anything else.
-
-Termination isn't asserted, it's proved: a property test generates hostile contexts and checks
-that every case reaches a terminal state.
-
-Every decision is a block in a SHA-256 hash chain. Let me break it." *(click Tamper)* "One
-field, one block. The verifier names the block and the field. You cannot edit history here and
-have it still verify."
-
-### 3:35 – 4:20 · What broke
-
-> **Shot:** `docs/INCIDENTS.md` scrolling, then stop on INC-026.
-
-"Twenty-nine incidents, written up with the reason no test caught each one.
-
-The one I'd want you to read is INC-026. The panel that shows how many model calls were made,
-and what fraction came from cache, showed zero. Forever. On every clone. Because the table had
-a reader and no writer — nothing in the entire codebase ever inserted a row. And the test
-passed *because* the feature was missing: it asserted on an empty table and got the zeros it
-expected.
-
-Fixing it exposed INC-029 immediately: the committed response cache had a **structurally
-guaranteed** 0% hit rate, because two code paths built the model's context differently and the
-cache key is a hash of the whole context. The two bugs had been hiding each other.
-
-Three of my four worst bugs are the same defect: **a green test that cannot tell working from
-absent.** I found all of them by looking at the running product, not by writing more tests."
-
-### 4:20 – 5:00 · Run it yourself
-
-> **Shot:** a clean terminal. `git clone`, then `python tasks.py demo`. Let it run at real speed.
-
-"One command. No Docker, no Postgres, no Redis, no API key. SQLite and a Next.js page.
-
-Forty seconds and you have the dashboard I just showed you, with the same numbers, because the
-model responses are committed to the repo and content-addressed.
-
-Actual inference spend: zero rupees, on a free tier plus that cache. The projection at
-published paid rates is on the dashboard too, labelled `ESTIMATED`, because a price list is
-not a bill.
-
-The gross number is two lakh. The honest number is sixty thousand. Thank you."
-
-### Before you record — a checklist
-
-1. `python tasks.py demo` and confirm the dashboard shows non-zero numbers. A zeroed dashboard
-   was the single worst thing in the last screenshot review.
-2. Do a live ₹1 Test Mode payment for the 2:10 segment. The tile moving
-   **on camera** is the most convincing twenty seconds available, and it needs the tunnel
-   running (`python tasks.py tunnel`) plus the webhook URL updated in the Razorpay dashboard.
-3. Check the audit chain verifies *before* you record the tamper demo, so the "valid" state is
-   real.
-4. Unlisted YouTube is fine. Do not make it private — judges cannot open private videos.
-
----
+`DEMO-SCRIPT.md` is the tested one: `tests/test_pitch_script_is_accurate.py` checks that every case
+id resolves against the committed corpus, every panel name it tells you to click actually renders,
+the segment timings are monotonic and inside five minutes, and — after the narration measured **317
+words per minute** on its first draft — that each segment can be spoken in the time it is given.
 
 ## Part 3 — The twelve form answers
 
@@ -333,7 +169,7 @@ Six are facts only you can supply. Six are below, ready to paste.
 > new test now gets sabotage-verified — I break the thing it covers and confirm the test fails,
 > and that step has caught vacuous tests inside the fixes for vacuous tests. Every real bug in
 > this project was found by touching the real provider or by looking at the running product;
-> none was reachable from local testing at any volume. The suite is at 1,194 tests and I trust it
+> none was reachable from local testing at any volume. The suite is at 1,199 tests and I trust it
 > considerably less than I did at 400.
 
 ---

@@ -1558,3 +1558,48 @@ convention is a defect waiting for a new caller. The remedy for "don't compute t
 **Also from this round:** `tasks.py benchmark`, the ablation table, and `tasks.py snapshot`. Both
 exist because a reviewer asked the two questions this submission could not answer — *does the
 architecture earn its complexity*, and *why do two of your documents quote different numbers*.
+
+---
+
+## INC-040 · A five-minute script that took eleven minutes to say
+
+**Symptom:** none, until it was measured. `docs/DEMO-SCRIPT.md` stated *"The narration is about 700
+words — five minutes at a normal speaking pace."*
+
+It was **1,586 words**. Across five minutes that is **317 words per minute.** Clear speech is
+130–150; a fast presenter reaches about 180. The script was physically unspeakable, and one segment
+— "What broke" — asked for 232 words in thirty seconds, or 464 wpm.
+
+**Cause.** I wrote the sentence *"about 700 words, which fits five minutes with room to breathe"*
+and never counted. Then I retimed the segments twice while adding narration to each, and the two
+edits pushed in the same direction.
+
+**Where it would have surfaced.** On camera, mid-take, four days before the deadline — in a document
+whose entire purpose is that the user does not have to think while recording. The failure was
+invisible in review because prose does not look long; you have to count it.
+
+**Found** because a reviewer said the script felt dense. They were describing a symptom; the fix was
+arithmetic.
+
+**Fix.** Every spoken block rewritten to its time budget. 1,586 words to 676 — a 57% cut — at 135
+wpm, with no segment above 162. The insight stays in the narration and the evidence moved to the
+screen, which is where a viewer can read it anyway.
+
+**Regression test** measures words per segment against its allotted seconds and fails above 170 wpm
+— and below 85, because a segment far under pace means the timings were retimed and the words were
+not. It also asserts the document does not misstate its own length, which is the specific error:
+**a document that misreports its own measurable property is the same defect class as a dashboard
+tile that misreports a figure.** Sabotage-verified.
+
+**Two other things fell out of the same pass.**
+
+The script claimed *"I have two hundred and ten cases, which is 4.9% of the control arm I'd need."*
+Those are different quantities: 210 is the total, and 4.9% is 39/796, the control ratio. A sharp
+judge would have caught the category error in the spoken narration. It now says 39 of the 796
+required.
+
+And `docs/PITCH.md` contained a *second, older copy* of the whole script — including the `RC-0142`
+error, and a sentence claiming a signed webhook made a payment *"attributable to us and not to
+luck"*, which contradicts our own six attribution conditions. Two documents holding two versions of
+one script is exactly the drift `docs/EVIDENCE.md` exists to prevent, one level up. PITCH.md now
+keeps the form answers and points at the tested script.

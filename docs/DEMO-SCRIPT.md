@@ -77,40 +77,37 @@ Two of these will silently ruin a take if skipped.
 
 ## 2 · The script
 
-Nine clips. Timecodes are cumulative so you can check your pace. The narration is about 700 words —
-five minutes at a normal speaking pace. Resist the urge to rush.
+Ten clips. Timecodes are cumulative so you can check your pace.
+
+The narration is **676 words across five minutes — about 135 words a minute**, which is comfortable
+clear speech. That is measured, not estimated: the first draft of this script ran to 1,586 words,
+which is 317 words a minute and physically unspeakable. `tests/test_pitch_script_is_accurate.py`
+now fails if any segment cannot be read in the time it is given.
+
+So do not rush. If you find yourself hurrying, you have drifted off the script.
 
 ---
 
-### `0:00 – 0:20` — This is real Razorpay, right now
+### `0:00 – 0:25` — The number every recovery tool shows you
 
 **DO**
 
-1. Dashboard already scrolled to **"Prove it against real Razorpay"**, with the **Live pipeline**
-   panel visible.
-2. Click **Create a real ₹1 recovery link**. Let the seven nodes fill in.
-3. Cut here. You will pay it in the 2:35 segment — this opener exists to establish, in the first
-   twenty seconds, that the integration is real.
+1. Dashboard scrolled to the top, showing the **proof status** strip and the three figures below it.
+2. Nothing moves. Hold the frame.
 
 **SAY**
-
-> This is a real Razorpay payment link, created two seconds ago through the live API.
+> Every revenue-recovery tool shows you one number: money recovered.
 >
-> Watch the pipeline on the right: enrich, triage — twelve of twelve stopping rules clear —
-> diagnose, and it says *rule table, no model call*. Strategise. Policy: passed, zero clamps.
-> Execute.
+> Here it's two lakh two thousand. But sixty thousand is what we can actually claim — and one lakh
+> thirty-nine thousand arrived and we credited ourselves **nothing**.
 >
-> Every step names which layer decided it. That's the whole architecture, running, in one click.
+> A tool that bills you for that third column is charging you for the weather.
 >
-> Now — here is why the two lakh rupees on this dashboard is **not** the number I'm claiming.
-
-> **Why this is first.** A judge's unconscious first question is *"is any of this real?"*. Answering
-> it in twenty seconds buys you the attention to make the harder argument that follows. This is the
-> one change a reviewer pushed hardest for, and they were right.
+> That distinction is the product.
 
 ---
 
-### `0:20 – 0:50` — The number that is wrong everywhere else
+### `0:25 – 0:55` — Why the second number is smaller
 
 **DO**
 
@@ -118,28 +115,18 @@ five minutes at a normal speaking pace. Resist the urge to rush.
 2. Nothing moves. Hold this frame and talk.
 
 **SAY**
-
-> Every payment-recovery tool shows a merchant one number: money recovered. Here it's two lakh two
-> thousand, seven hundred and sixty rupees.
+> Why is the second number smaller?
 >
-> That figure is gross recovery. It is not the amount we can attribute to RevPilot — because some
-> of those customers would have come back on their own, and a tool that bills you for them is
-> charging you for the weather.
+> Because thirty-nine of these customers were never contacted. That's the control group — and
+> twenty-three percent of them paid anyway.
 >
-> So this system holds back thirty-nine cases and never contacts them at all. The treated group
-> converts at 29.2%. The untouched group converts at **23.1%**. Which means the money we can actually
-> claim is sixty thousand, two hundred and seventeen rupees — **about thirty percent** of what a
-> dashboard would show.
+> So the treated group's twenty-nine percent isn't our achievement. The **six-point gap** is.
 >
-> The smaller number is the one on the bigger tile. And the API will not return the first figure
-> without the second.
-
-> **Pause two seconds before you stop recording.** This is the whole pitch. If a judge stops watching
-> at thirty seconds, this is what they keep.
+> The smaller number is the one a merchant can actually defend.
 
 ---
 
-### `0:50 – 1:18` — And the number that is still missing
+### `0:55 – 1:25` — The question we cannot answer
 
 **DO**
 
@@ -147,27 +134,19 @@ five minutes at a normal speaking pace. Resist the urge to rush.
 2. Let the two progress bars sit on screen — `control 39 / 796` and `treated 171 / 796`.
 
 **SAY**
-
-> There's a third question, and I have not answered it. Did RevPilot actually *cause* additional
-> customers to pay?
+> And there's a question I can't answer. Did we *cause* those payments?
 >
-> No. Not proven. That sixty thousand is a simulation — real machinery, declared customer responses.
+> Look at the four levels. Verified — Razorpay confirms it. Eligible — it passes all six of our
+> attribution rules. Claimable — yes.
 >
-> Answering it properly needs one thousand five hundred and ninety-two cases at a balanced split. I
-> have two hundred and ten, which is **4.9%** of the control arm I'd need. That's not a number I
-> invented for this video: the experiment is pre-registered in the repo, committed *before* any of
-> this data existed, and it states what result would make me abandon the hypothesis.
+> **Incremental — not reached.** The confidence intervals overlap.
 >
-> What's blocking it isn't code. It's a merchant with the traffic, and DLT registration in *their*
-> name — which takes weeks.
-
-> **Why this is at thirty seconds and not four minutes.** A judge will find this limitation whether
-> or not you mention it. Saying it before you show eight panels of things that work is the difference
-> between honesty and damage control. Say it calmly — it is a strength.
+> Settling that needs seven hundred and ninety-six control cases. I have thirty-nine. The design is
+> pre-registered in the repo, committed before any of this data existed.
 
 ---
 
-### `1:18 – 1:52` — One case, and who decided it
+### `1:25 – 2:00` — One case, and who decided it
 
 **DO**
 
@@ -178,27 +157,19 @@ five minutes at a normal speaking pace. Resist the urge to rush.
 4. The case page opens with three numbered sections. Scroll slowly through all three.
 
 **SAY**
-
-> *(on clicking "Held as control")* These are the thirty-nine we deliberately never touched. A
-> holdout you can only read about is indistinguishable from one that doesn't exist, so you can click
-> it.
+> One case. Ananya, four thousand two hundred and ninety-nine rupees.
 >
-> *(on opening RC-0001)* One case. Ananya, four thousand two hundred and ninety-nine rupees.
+> What Razorpay reported: bank, authorization, timeout. Their telemetry, not our guess.
 >
-> Section one: **what Razorpay reported.** Error source, bank. Error step, authorization. Reason,
-> bank timeout. Not our guess — their telemetry.
+> What we concluded, and who concluded it: rail fault, ninety-five percent — decided by the **rule
+> table**, not a model. A bank timeout isn't a customer problem, so retrying the same rail is the one
+> thing you must not do. That's a lookup, not a judgement call.
 >
-> Section two: **what we concluded, and who concluded it.** Rail fault, ninety-five percent
-> confidence, decided by *deterministic fallback*. That means the rule table answered this, not a
-> model. A bank timeout is a rail problem, not a customer problem — so retrying the same rail is the
-> one thing you must not do, and that's a lookup, not a judgement call.
->
-> Section three: **the audit chain for this case.** Every hash there is recomputable, and it records
-> which arm the case was in.
+> And every hash on that page recomputes.
 
 ---
 
-### `1:52 – 2:35` — AI proposes. Policy disposes.
+### `2:00 – 2:40` — AI proposes. Policy disposes.
 
 **DO**
 
@@ -207,61 +178,43 @@ five minutes at a normal speaking pace. Resist the urge to rush.
 3. Click all five buttons, one at a time, waiting for each result before the next.
 
 **SAY**
-
-> Here is where the model is, and where it isn't. Three bands: deterministic facts at the top, the
-> model in the middle, and deterministic authority at the bottom — where the model never reaches.
+> So where is the model? It handles forty of a hundred and ninety-nine diagnoses — the ones where
+> Razorpay sent no error fields at all.
 >
-> Across the seeded corpus the rule table settles a hundred and fifty-nine of a hundred and
-> ninety-nine diagnoses. The model gets the other forty — the ones where Razorpay sent no error
-> fields at all and there is genuinely nothing to look up. I measured the model against the rule
-> table: it scored 90.6% against the table's 96.5%. So the table ships, and the model gets the cases
-> the table admits it's unsure about.
+> We benchmarked it against the rule table. Ninety-point-six against ninety-six-point-five. The
+> model lost, so we didn't use it there.
 >
-> *(clicking through the five attacks)* And the model cannot touch money. Five attacks, through the
-> real policy engine — not a mock. Ninety percent off: **escalated**, clamped to the ceiling and held
-> for a human. Market to a do-not-disturb customer: **neutralised** — the marketing class was
-> stripped to transactional. Act with the kill switch off: **refused**.
+> And it cannot touch money. Five attacks, real policy engine. Ninety percent off — escalated.
+> Market to a do-not-disturb customer — neutralised. Kill switch off — refused.
 >
-> And charge more than the customer owes — the answer isn't "blocked", it's **unrepresentable**. The
-> object the model fills in *has no amount field*. There is no number for it to raise. That's not a
-> guardrail; it's an absence.
->
-> The fifth one passes, and that's deliberate. A firewall that refused all five would score perfectly
-> here and be useless.
+> Charge more than they owe? Not blocked. **Unrepresentable.** The proposal object has no amount
+> field. That's not a guardrail; it's an absence.
 
 ---
 
-### `2:35 – 3:15` — Pay it, and watch Razorpay confirm it
-
-> **This is your best fifty seconds.** Rehearse it twice before recording. Keep the tunnel terminal
-> visible in a corner, or alt-tab to it when the webhook lands.
+### `2:40 – 3:20` — Prove it against real Razorpay
 
 **DO**
 
-1. Back to **"Prove it against real Razorpay"** — the link you created in the opener is still
-   there.
-2. Click **Open the Razorpay link and pay ₹1**.
+1. Scroll to **"Prove it against real Razorpay"**, with the **Live pipeline** panel visible.
+2. Click **Create a real ₹1 recovery link**. Let the seven nodes fill in — pause for them.
+3. Click **Open the Razorpay link and pay ₹1**.
 5. Card `4111 1111 1111 1111`, any future expiry, any CVV → **Success**.
 6. Alt-tab to the tunnel terminal to show the inbound `POST`, then back to the dashboard and reload.
 
 **SAY**
-
-> Back to the link from the opening. Everything since has run on a seeded corpus. This doesn't.
+> Everything so far is a seeded corpus. This isn't.
 >
-> I'm paying it now.
+> *(clicking)* One click — real agent, real firewall. Watch the pipeline name which layer decided
+> each step. Diagnose says *rule table, no model call*.
 >
-> *(after paying, on the tunnel log)* That's Razorpay's webhook arriving at my machine. HMAC
-> verified. The reference ID matches the action we took — so the money is attributable to us and not
-> to luck.
+> And a real Razorpay link. Paying it now.
 >
-> *(reload the dashboard)* One rupee. And it sits on its own tile, badged Razorpay-verified, separate
-> from the two lakh — because a signed webhook and a simulation are different kinds of evidence, and
-> averaging them would make both worthless.
+> *(on the tunnel log)* Razorpay's webhook, arriving here. Signature verified, reference matched.
+> That proves the execution path — not a lift in behaviour.
 >
-> Hover that tile and it tells you *how* each rupee was proven: one by signed webhook, one by direct
-> API reconciliation. That second one is there because a tunnel died mid-test and the webhook was
-> lost. The reconciler asked Razorpay directly and picked the payment up. A lost webhook cost us
-> nothing.
+> Hover the tile: one rupee by webhook, one by reconciliation. That second one is there because a
+> tunnel died and the delivery failed. **A lost webhook cost us nothing.**
 
 **If the webhook does not arrive:** stop the clip and fix it — don't narrate around it. Run
 `python tasks.py reconcile`, which polls Razorpay and records the payment anyway. That is a
@@ -272,7 +225,7 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 
 ---
 
-### `3:15 – 3:45` — What it chose not to do, and breaking it on purpose
+### `3:20 – 3:50` — What it chose not to do, and breaking it on purpose
 
 **DO**
 
@@ -281,29 +234,18 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 3. Then **Audit chain**. Click **Edit a payload**, then **Re-verify**.
 
 **SAY**
-
-> Every other panel shows actions taken. This one shows restraint: *"I did not contact twenty-two
-> customers who were in quiet hours, and eleven who have opted out."* An agent that reports what it
-> refused to do is the only kind you can audit.
+> Every other panel shows actions taken. This one shows restraint — twenty-two held for quiet
+> hours, eleven opted out.
 >
-> Twelve stopping rules, and all twelve are listed *including the ten that fired zero times* —
-> because a brake that didn't fire and a brake that doesn't exist look identical if you only show the
-> non-zero rows. Quiet hours held twenty-two actions. Opt-out is permanent and checked before
-> everything else.
+> Twelve stopping rules, and all twelve are listed including the ten that fired zero times. A brake
+> that didn't fire and a brake that doesn't exist look identical if you only show the non-zero rows.
 >
-> Termination isn't asserted, it's proved — a property test generates hostile inputs and checks every
-> case reaches a terminal state.
->
-> *(clicking Edit a payload, then Re-verify)* And every decision is a block in a SHA-256 hash chain.
-> Let me break it. One field, one block — **valid: false**, and it names the block that diverged. A
-> verifier nobody has watched fail is indistinguishable from one that always returns true.
+> *(clicking Tamper, then Re-verify)* Now let me break the audit chain. One field — **valid: false**,
+> and it names the block.
 
 ---
 
-### `3:45 – 4:20` — What broke
-
-> **This is the segment the judges said they read first.** Their form asks "what broke, and how you
-> got out". Do not rush it and do not soften it.
+### `3:50 – 4:20` — What broke
 
 **DO**
 
@@ -311,31 +253,17 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 2. Stop on **INC-026**. Then scroll to **INC-032**.
 
 **SAY**
-
-> Thirty-eight incidents, each written up with the part that matters: why no test caught it.
+> Thirty-nine incidents, each with the part that matters: why no test caught it.
 >
-> The one I'd point you at is **INC-026**. The panel showing how many model calls were made, and what
-> fraction came from cache, displayed zero. Forever. On every clone. Because the table had a reader
-> and no writer — nothing in the entire codebase ever inserted a row. And the test passed *because*
-> the feature was missing: it queried an empty table and got the zeros it expected.
+> The one to read is INC-026. A metrics table with a reader and no writer — the panel showed zero
+> forever, and the test passed *because* the feature was missing.
 >
-> Fixing it exposed the next one within the hour: the committed response cache had a structurally
-> guaranteed zero percent hit rate, because two code paths built the model's input differently and
-> the cache key is a hash of that input. The two bugs had been hiding each other.
->
-> And **INC-032** is the one that still bothers me. A routine command — `tasks.py batch` — ran an
-> unfiltered delete and destroyed every Razorpay-verified recovery in the database. Silently. That's
-> how this project lost its *first* live verification, which I'd written off as my own carelessness.
-> It was a bug.
->
-> The pattern across most of them is one thing: **a green test that cannot tell working from
-> absent.** So every new test now gets deliberately sabotaged — I break the thing it covers and
-> confirm the test fails. That step has caught vacuous tests *inside* the fixes for vacuous tests,
-> twice.
+> The pattern across most of them: **a green test that can't tell working from absent.** So every
+> new test now gets deliberately broken, to confirm it can fail.
 
 ---
 
-### `4:20 – 4:40` — Does the architecture earn its complexity?
+### `4:20 – 4:50` — Does the architecture earn its complexity?
 
 **DO**
 
@@ -343,20 +271,12 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 2. Let the **MEASURED** table sit on screen while you talk.
 
 **SAY**
-
-> One more thing, because "we built a safety layer" is easy to say. Same corpus, five different
-> decision policies.
+> Does the architecture earn it? Same corpus, five policies.
 >
-> Contacting everyone the way most recovery scripts do breaches a hard bound **three hundred and
-> eight times** — opted-out customers contacted, marketing without consent, messages inside TRAI
-> quiet hours. RevPilot: **zero**.
+> Contacting everyone breaches a hard bound **three hundred and eight times**. RevPilot: **zero** —
+> and both arms recover the same amount, so in this corpus the firewall cost no recovery.
 >
-> And here's the result I expected least. Remove the firewall and recovery doesn't go *up* — both
-> arms recover exactly the same amount. The clamps change *how* an action is taken, not whether. So
-> in this corpus the firewall introduced no recovery cost.
->
-> Last row: remove the holdout and it recovers the most of any policy — and can claim none of it.
-> Attribution: unavailable.
+> Last row: remove the holdout, recover the most of any policy, and claim none of it.
 
 > **The breach counts are measured, not simulated.** They are real counts over the corpus's own
 > consent data. Only the recovery column comes from the response model. Say that if asked; the
@@ -364,7 +284,7 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 
 ---
 
-### `4:40 – 5:00` — Run it yourself
+### `4:50 – 5:00` — Run it yourself
 
 **DO**
 
@@ -373,20 +293,9 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 3. When the dashboard opens, scroll once to the **cost** panel at the bottom, then stop recording.
 
 **SAY**
-
-> One command. No Docker, no Postgres, no Redis, no Kafka, and no API key required.
+> One command. No Docker, no API key, same numbers every run.
 >
-> Forty seconds and you have the dashboard I just showed you, with the same numbers — because the
-> model's responses are committed to the repo and content-addressed, so it replays instead of
-> re-billing.
->
-> Actual inference spend: **zero rupees**, on a free tier plus that cache. The projection at
-> published paid rates is one rupee twenty-eight, and it's labelled *estimated*, because a price list
-> is not a bill.
->
-> Eleven hundred and ninety-four tests. Thirty-nine written incidents.
->
-> We don't claim every payment we see. We claim only what the evidence lets us prove. Thank you.
+> We don't claim every payment we see. We claim only what the evidence lets us prove.
 
 ---
 
@@ -431,7 +340,7 @@ right** — say what is on screen.
 | Actual spend | ₹0.00 | Projected at paid rates: ₹1.28 |
 | Audit chain | valid | **Don't quote a block count** — it changes on every batch run. Say "valid", and let the screen show the number. |
 | Tests | 1,149 | ruff, mypy --strict, tsc, eslint all clean |
-| Incidents · decisions | 39 · 45 | `docs/INCIDENTS.md` · `docs/DECISIONS.md` |
+| Incidents · decisions | 40 · 46 | `docs/INCIDENTS.md` · `docs/DECISIONS.md` |
 | Benchmark: naive breaches | 308 | **Measured**, not simulated — `python tasks.py benchmark` |
 | Benchmark: RevPilot breaches | 0 | Measured |
 | Benchmark: firewall removed | 284 breaches | Same recovery as RevPilot — safety costs nothing |
@@ -496,3 +405,24 @@ already solved.
 Get it in front of one real merchant with enough volume to make the holdout arm significant.
 Everything else — the firewall, the audit chain, the stopping rules — is built to survive that. The
 statistics are the only part that needs traffic I can't simulate.
+
+---
+
+## 6 · Notes to yourself while recording
+
+Kept out of the script above so the narrative reads without interruption. Read these once
+before you start; do not read them on camera.
+
+- **Why this is at thirty seconds and not four minutes.** A judge will find this limitation whether or not you mention it. Saying it before you show eight panels of things that work is the difference between honesty and damage control. Say it calmly — it is a strength.
+
+- **This is your best fifty seconds.** Rehearse it twice before recording. Keep the tunnel terminal visible in a corner, or alt-tab to it when the webhook lands.
+
+- **This is the segment the judges said they read first.** Their form asks "what broke, and how you got out". Do not rush it and do not soften it.
+
+- **Pause two seconds before you stop recording.** This is the whole pitch. If a judge stops watching at thirty seconds, this is what they keep.
+
+- **Let the screen carry the numbers.** Speak the insight; the dashboard shows the evidence.
+  If a figure is legible on screen, you do not need to read it aloud.
+
+- **Pause after each segment's last sentence** before you stop recording. Half a second of
+  silence cuts cleanly; a clipped word does not.

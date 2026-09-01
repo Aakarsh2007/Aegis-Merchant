@@ -22,6 +22,7 @@ import { AdversarialPanel } from "@/components/AdversarialPanel";
 import { AuthModeBanner } from "@/components/AuthModeBanner";
 import { CausalGap } from "@/components/CausalGap";
 import { ClaimsPanel } from "@/components/ClaimsPanel";
+import { ProofStatus } from "@/components/ProofStatus";
 import { CasesTable } from "@/components/CasesTable";
 import { ChaosPanel } from "@/components/ChaosPanel";
 import { CostPanel } from "@/components/CostPanel";
@@ -82,19 +83,28 @@ export default function Page() {
 
       <StartHere />
 
-      {/* 1. The question a judge actually has, answered first. */}
+      {/* 1. The shape of the claim, before a single number. Three ticks and
+             one open circle tells a reader what kind of evidence this is
+             faster than any caption can. */}
+      <div className="mt-6">
+        <Suspense fallback={<Skeleton label="proof status" />}>
+          <ProofStatus />
+        </Suspense>
+      </div>
+
+      {/* 2. The question a judge actually has, answered first. */}
       <Suspense fallback={<Skeleton label="the headline result" />}>
         <HeadlineResult />
       </Suspense>
 
-      {/* 2. The tiles behind it. */}
+      {/* 3. The tiles behind it. */}
       <div className="mt-6">
         <Suspense fallback={<Skeleton label="metrics" />}>
           <MetricsBar />
         </Suspense>
       </div>
 
-      {/* 3. The argument, immediately after the numbers it is about: six
+      {/* 4. The argument, immediately after the numbers it is about: six
              conditions for what we claim, and the larger figure we don't. */}
       <div className="mt-6">
         <Suspense fallback={<Skeleton label="claims" />}>
@@ -102,14 +112,14 @@ export default function Page() {
         </Suspense>
       </div>
 
-      {/* 4. The one button that touches real Razorpay. Directly under the
+      {/* 5. The one button that touches real Razorpay. Directly under the
              tile it moves, because the tile's honest zero is otherwise a dead
              end -- the instruction used to be a curl string in a caption. */}
       <div className="mt-6">
         <TestModePanel />
       </div>
 
-      {/* 5. The limitation, stated before the features rather than after.
+      {/* 6. The limitation, stated before the features rather than after.
              Placed here deliberately: a reader who sees Rs 2,02,760 and then
              Rs 60,217 should learn what neither number proves BEFORE they are
              shown eight panels of things that work. Burying it at the bottom
@@ -120,13 +130,13 @@ export default function Page() {
         </Suspense>
       </div>
 
-      {/* 6. Why it is an AI project, and where the AI is not allowed. */}
+      {/* 7. Why it is an AI project, and where the AI is not allowed. */}
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <WhereAIStops />
         <AdversarialPanel />
       </div>
 
-      {/* 7. What it chose not to do, and whether any of it can be checked. */}
+      {/* 8. What it chose not to do, and whether any of it can be checked. */}
       <div className="mt-6">
         <Suspense fallback={<Skeleton label="briefing" />}>
           <MorningBriefing />
@@ -156,7 +166,7 @@ export default function Page() {
         </div>
       </div>
 
-      {/* 8. Follow one case end to end. */}
+      {/* 9. Follow one case end to end. */}
       <div className="mt-6">
         <CasesTable />
       </div>

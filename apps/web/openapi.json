@@ -1573,6 +1573,58 @@
         ]
       }
     },
+    "/api/v1/metrics/proof": {
+      "get": {
+        "description": "The four levels, and which of them this system has actually reached.\n\nWritten because \"prove causality\" and \"causal lift: not proven\" are both\ntrue and read as a contradiction. They are answers to different questions,\nand a reader has no way to see that unless the questions are separated.\n\n``INCREMENTAL`` is deliberately reported as **not reached**. It is the only\nlevel that needs a sample we do not have, and every other claim in this\nproject is careful not to depend on it.",
+        "operationId": "proof_api_v1_metrics_proof_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Proof Api V1 Metrics Proof Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "What is proven, at each of four levels",
+        "tags": [
+          "metrics"
+        ]
+      }
+    },
     "/api/v1/metrics/stopping-rules": {
       "get": {
         "operationId": "stopping_rules_api_v1_metrics_stopping_rules_get",
