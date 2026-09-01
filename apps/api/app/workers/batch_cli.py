@@ -33,7 +33,7 @@ from app.db.session import create_engine, init_db
 from app.llm.cache import CachedAdapter, ResponseCache
 from app.llm.gemini_adapter import GeminiAdapter
 from app.llm.rate_limit import RateLimiter
-from app.workers.batch import run_batch
+from app.workers.batch import EmptyCorpusError, run_batch
 
 
 async def _main(limit: int | None, warm: bool = False) -> int:
@@ -82,7 +82,16 @@ async def _main(limit: int | None, warm: bool = False) -> int:
             control_arm_fraction=settings.control_arm_fraction,
             experiment_key="revpilot_recovery_v1",
         )
-        result = await run_batch(factory, clock=clock, deps=deps, limit=limit)
+        try:
+            result = await run_batch(factory, clock=clock, deps=deps, limit=limit)
+        except EmptyCorpusError as empty:
+            # A clean clone where `batch` was run before `demo`. Printing the
+            # fix beats a traceback, and beats the old behaviour of reporting
+            # "BATCH COMPLETE -- 0 cases" and exiting zero (INC-046).
+            print()
+            print(f"  {empty}")
+            print()
+            return 1
         if warm:
             # Saved even on a partial run. A quota ceiling mid-way leaves the
             # cache with fewer entries, not with none: the remaining

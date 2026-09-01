@@ -258,7 +258,7 @@ policy and attribution machinery but have no production-integrated delivery path
 
 ## What broke
 
-44 incidents in [`docs/INCIDENTS.md`](docs/INCIDENTS.md), each with the part that matters: why no
+45 incidents in [`docs/INCIDENTS.md`](docs/INCIDENTS.md), each with the part that matters: why no
 test caught it. Three worth reading:
 
 - **[INC-026]** A metrics table with a reader and no writer. The panel showed zero forever, and the
@@ -303,7 +303,7 @@ python tasks.py snapshot     # regenerate docs/EVIDENCE.md
 python tasks.py check        # lint, types, the full suite, the web build
 ```
 
-1,275 tests. Safety properties are tested adversarially: termination, token isolation, idempotency,
+1,282 tests. Safety properties are tested adversarially: termination, token isolation, idempotency,
 attribution, tamper detection, and the absence of wall-clock reads. `mypy --strict` clean.
 
 ## Where the detail lives
@@ -312,7 +312,7 @@ attribution, tamper detection, and the absence of wall-clock reads. `mypy --stri
 |---|---|
 | [`docs/EVIDENCE.md`](docs/EVIDENCE.md) | Every figure, generated from one run |
 | [`docs/PRE-REGISTRATION.md`](docs/PRE-REGISTRATION.md) | The causal experiment, registered before the data |
-| [`docs/INCIDENTS.md`](docs/INCIDENTS.md) | 44 incidents, wrong theories included |
+| [`docs/INCIDENTS.md`](docs/INCIDENTS.md) | 45 incidents, wrong theories included |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | 46 decisions, including what we rejected |
 | [`workflow.md`](workflow.md) | The full design document |
 | [`docs/DEMO-SCRIPT.md`](docs/DEMO-SCRIPT.md) | The five-minute pitch, word for word |

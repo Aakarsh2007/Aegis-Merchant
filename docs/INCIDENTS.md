@@ -1871,3 +1871,79 @@ it, **INC-026** had a reader with no writer, **INC-038** had a bus with no publi
 a comparison with nothing on the other side, and this one had two things worth comparing and no path
 between them. Every one is the absence of a link, and every one was invisible because both ends
 existed and both ends were tested.
+
+---
+
+## INC-046 · A container mistaken for its contents, twice, on the judge's first command
+
+**Symptom.** Found by cloning the repository fresh and running the commands in the order a curious
+reader might rather than the order the README lists them. On a clean clone, `python tasks.py batch`
+printed:
+
+```
+======================================================================
+BATCH COMPLETE -- 0 cases
+======================================================================
+  treated     0
+  control     0   (never contacted -- the counterfactual)
+  settled     0
+  simulated recovery   Rs 0
+```
+
+and **exited zero.** There was no corpus — SQLAlchemy had created the schema on connect and nothing
+had seeded it — so there was nothing to process, and the run reported success at processing nothing.
+
+**The second half is the dangerous one.** That run left an empty `revpilot.db` behind, and `demo`
+decided whether to seed by asking whether the *file* existed:
+
+```python
+runtime_db = API / "revpilot.db"
+if not runtime_db.exists():
+    ...seed...
+else:
+    print("  [1/4] database present")
+```
+
+An empty database is a database that exists. So the next `python tasks.py demo` printed **"database
+present"**, ran a batch over an empty corpus, and served a dashboard of zeroes with nothing
+anywhere indicating what had gone wrong. `demo` is the command whose entire job is *"everything a
+judge needs, in one command"*, and it was one stray earlier invocation away from silently producing
+nothing — with the README, the pitch and the demo script all quoting figures the screen would not
+show.
+
+Both halves are the same mistake in two places: **treating the presence of a container as evidence
+of its contents.** A file that exists. A schema that has tables.
+
+**Fix.**
+
+* `run_batch` raises `EmptyCorpusError` when `payment_attempts` is empty. Its own exception type, so
+  `batch_cli` prints the one command that fixes it rather than a traceback, and returns 1.
+* `demo` counts `payment_attempts` instead of stat-ing the file, and reseeds when the count is zero.
+
+**A regression I introduced while fixing it, and the reason to always run the thing.** The first
+version of the reseed called `runtime_db.unlink()` before copying. On Windows that raises
+`WinError 32` whenever anything still holds the file open — a stray `tasks.py api`, a previous
+`demo`, a SQLite browser — which is exactly the situation this code path exists to recover from. I
+had turned a recoverable state into a traceback, on the platform this project is developed on, in
+the command called Judge Mode. `shutil.copy` truncates and overwrites in place and needs no unlink;
+`PermissionError` is now caught and answered with the specific processes to stop.
+
+That regression was found by running the sequence again on the clean clone. It would not have been
+found by reading the diff, and no test I would plausibly have written would have caught it either —
+the lock only appears when a real process holds the file.
+
+**Regression test.** `tests/test_empty_corpus_is_not_success.py`: the batch raises on an empty
+corpus, the message names both `seed` and `demo`, and — the guard that makes those mean anything —
+**a seeded corpus still runs and produces cases**, because a check that refused every corpus would
+satisfy the first two. Plus assertions that `demo` counts attempts and no longer branches on file
+existence, and that the committed seed database really holds ≥400 attempts: if it were empty, every
+other check here would pass and a fresh clone would still show zeroes.
+
+**Why no test caught it.** Every test builds its own database through the `engine` or
+`seeded_engine` fixture, so no test had ever *been* a clean clone. The suite was green on a
+repository state that no judge would ever have, and the failure was reachable only by running the
+project the way a stranger runs it. Verified end to end after the fix: on the clean clone, the
+broken state now reseeds and produces the 210 cases every document quotes.
+
+Sixth instance of the pattern in INC-045's list: something present, something absent, and no link
+asserting the first implies the second.

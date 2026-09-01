@@ -38,7 +38,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.agent.graph import run_case
@@ -178,6 +178,20 @@ def _at(deps: AgentDeps, moment: datetime) -> AgentDeps:
     )
 
 
+class EmptyCorpusError(RuntimeError):
+    """No payment attempts to work from.
+
+    Its own type rather than a bare RuntimeError so the CLI can print the one
+    command that fixes it instead of a traceback.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "no payment attempts in the database: there is nothing to build cases from. "
+            "Run `python tasks.py seed` (or `python tasks.py demo`, which seeds for you)."
+        )
+
+
 async def _clear(session: AsyncSession) -> None:
     """Make the batch re-runnable, without destroying real evidence.
 
@@ -288,8 +302,19 @@ async def run_batch(
     deps: AgentDeps,
     limit: int | None = None,
 ) -> BatchResult:
-    """Put the corpus through the agent."""
+    """Put the corpus through the agent.
+
+    Raises ``EmptyCorpusError`` when there is nothing to process. A clean clone
+    where somebody ran ``batch`` before ``demo`` has an empty schema and no
+    corpus, and this used to print "BATCH COMPLETE -- 0 cases" and exit zero:
+    a zero reported as a success, which is the defect class this project has hit
+    five times (INC-046). Worse, it left an empty ``revpilot.db`` behind, so the
+    next ``demo`` saw "database present" and produced a dashboard of zeroes.
+    """
     async with factory() as session:
+        attempts = int(await session.scalar(select(func.count(PaymentAttempt.id))) or 0)
+        if attempts == 0:
+            raise EmptyCorpusError
         await _clear(session)
         carried = await _record_carried_over(session, clock=clock)
         # Merchant-level facts, loaded once. Without these the stopping context

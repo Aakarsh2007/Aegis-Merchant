@@ -221,17 +221,46 @@ def demo() -> int:
         return 1
 
     runtime_db = API / "revpilot.db"
-    if not runtime_db.exists():
+    # The file existing is not the same as the corpus existing. Running
+    # `batch` on a clean clone creates an empty schema, and this used to see the
+    # file, print "database present", and hand a judge a dashboard of zeroes
+    # with no hint why (INC-046). Ask for the corpus instead of the file.
+    attempts = 0
+    if runtime_db.exists():
+        with sqlite3.connect(runtime_db) as conn:
+            try:
+                attempts = conn.execute("select count(*) from payment_attempts").fetchone()[0]
+            except sqlite3.OperationalError:
+                attempts = 0
+    if attempts == 0:
+        if runtime_db.exists():
+            print("  [1/4] database is present but empty -- reseeding the corpus")
         seed_db = ROOT / "data" / "revpilot.seed.db"
-        if seed_db.exists():
-            shutil.copy(seed_db, runtime_db)
-            print("  [1/4] copied the committed demo database")
-        else:
-            print("  [1/4] seeding the 420-transaction corpus ...")
-            if seed() != 0:
-                return 1
+        # `shutil.copy` truncates and overwrites in place, so the existing file
+        # does not need deleting first. That matters on Windows: the first
+        # version of this called `unlink()` and raised WinError 32 whenever
+        # anything still held the file open -- a stray `api` process, an open
+        # DB browser -- turning a recoverable state into a traceback. A command
+        # called "Judge Mode" must not do that.
+        try:
+            if seed_db.exists():
+                shutil.copy(seed_db, runtime_db)
+                print("  [1/4] copied the committed demo database")
+            else:
+                print("  [1/4] seeding the 420-transaction corpus ...")
+                if seed() != 0:
+                    return 1
+        except PermissionError:
+            print()
+            print("  The database file is open in another process, so it cannot be")
+            print("  replaced. Stop anything already running against it -- another")
+            print("  `tasks.py api`, a previous `demo`, a SQLite browser -- and")
+            print("  run this again. Or delete it by hand:")
+            print(f"      {runtime_db}")
+            print()
+            return 1
     else:
-        print("  [1/4] database present")
+        print(f"  [1/4] database present ({attempts} payment attempts)")
 
     with sqlite3.connect(runtime_db) as conn:
         try:
