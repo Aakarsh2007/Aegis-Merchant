@@ -1315,6 +1315,58 @@
         ]
       }
     },
+    "/api/v1/metrics/claims": {
+      "get": {
+        "description": "The attribution receipt, and its mirror image.\n\nTwo halves, and the second is the one that makes the first mean anything:\n\n**Claimed.** For each Razorpay-verified recovery, the six conditions\n``services/attribution.attribute`` requires, each shown as satisfied. A\nreader can see *why* a rupee is claimable rather than being told that it is.\n\n**Not claimed.** Cases where money arrived and we credited ourselves\nnothing -- a control-arm customer who paid without being contacted, or a\nsettlement whose reference we never issued. This is the harder half of the\nthesis: a system that only ever explains its successes is indistinguishable\nfrom one that claims everything.",
+        "operationId": "claims_api_v1_metrics_claims_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Claims Api V1 Metrics Claims Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Why each rupee is claimed, and what was left unclaimed",
+        "tags": [
+          "metrics"
+        ]
+      }
+    },
     "/api/v1/metrics/cost": {
       "get": {
         "operationId": "cost_api_v1_metrics_cost_get",

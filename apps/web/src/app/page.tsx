@@ -21,6 +21,7 @@ import { AuditVerifier } from "@/components/AuditVerifier";
 import { AdversarialPanel } from "@/components/AdversarialPanel";
 import { AuthModeBanner } from "@/components/AuthModeBanner";
 import { CausalGap } from "@/components/CausalGap";
+import { ClaimsPanel } from "@/components/ClaimsPanel";
 import { CasesTable } from "@/components/CasesTable";
 import { ChaosPanel } from "@/components/ChaosPanel";
 import { CostPanel } from "@/components/CostPanel";
@@ -93,14 +94,22 @@ export default function Page() {
         </Suspense>
       </div>
 
-      {/* 3. The one button that touches real Razorpay. Directly under the
+      {/* 3. The argument, immediately after the numbers it is about: six
+             conditions for what we claim, and the larger figure we don't. */}
+      <div className="mt-6">
+        <Suspense fallback={<Skeleton label="claims" />}>
+          <ClaimsPanel />
+        </Suspense>
+      </div>
+
+      {/* 4. The one button that touches real Razorpay. Directly under the
              tile it moves, because the tile's honest zero is otherwise a dead
              end -- the instruction used to be a curl string in a caption. */}
       <div className="mt-6">
         <TestModePanel />
       </div>
 
-      {/* 4. The limitation, stated before the features rather than after.
+      {/* 5. The limitation, stated before the features rather than after.
              Placed here deliberately: a reader who sees Rs 2,02,760 and then
              Rs 60,217 should learn what neither number proves BEFORE they are
              shown eight panels of things that work. Burying it at the bottom
@@ -111,13 +120,13 @@ export default function Page() {
         </Suspense>
       </div>
 
-      {/* 5. Why it is an AI project, and where the AI is not allowed. */}
+      {/* 6. Why it is an AI project, and where the AI is not allowed. */}
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <WhereAIStops />
         <AdversarialPanel />
       </div>
 
-      {/* 6. What it chose not to do, and whether any of it can be checked. */}
+      {/* 7. What it chose not to do, and whether any of it can be checked. */}
       <div className="mt-6">
         <Suspense fallback={<Skeleton label="briefing" />}>
           <MorningBriefing />
@@ -147,7 +156,7 @@ export default function Page() {
         </div>
       </div>
 
-      {/* 7. Follow one case end to end. */}
+      {/* 8. Follow one case end to end. */}
       <div className="mt-6">
         <CasesTable />
       </div>

@@ -122,8 +122,9 @@ five minutes at a normal speaking pace. Resist the urge to rush.
 > Every payment-recovery tool shows a merchant one number: money recovered. Here it's two lakh two
 > thousand, seven hundred and sixty rupees.
 >
-> That number is real, and it is the wrong number — because some of those customers would have come
-> back on their own. A tool that bills you for them is charging you for the weather.
+> That figure is gross recovery. It is not the amount we can attribute to RevPilot — because some
+> of those customers would have come back on their own, and a tool that bills you for them is
+> charging you for the weather.
 >
 > So this system holds back thirty-nine cases and never contacts them at all. The treated group
 > converts at 29.2%. The untouched group converts at **23.1%**. Which means the money we can actually
@@ -352,7 +353,7 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 >
 > And here's the result I expected least. Remove the firewall and recovery doesn't go *up* — both
 > arms recover exactly the same amount. The clamps change *how* an action is taken, not whether. So
-> the safety layer costs nothing.
+> in this corpus the firewall introduced no recovery cost.
 >
 > Last row: remove the holdout and it recovers the most of any policy — and can claim none of it.
 > Attribution: unavailable.
@@ -383,7 +384,7 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 > published paid rates is one rupee twenty-eight, and it's labelled *estimated*, because a price list
 > is not a bill.
 >
-> Eleven hundred and ninety-two tests. Thirty-nine written incidents.
+> Eleven hundred and ninety-four tests. Thirty-nine written incidents.
 >
 > We don't claim every payment we see. We claim only what the evidence lets us prove. Thank you.
 
@@ -428,7 +429,7 @@ right** — say what is on screen.
 | Model accuracy measured | 90.6% vs 96.5% | Model lost to the rule table, so the table ships |
 | Inferences | 398 | 55.3% served from the committed cache · 0 live calls |
 | Actual spend | ₹0.00 | Projected at paid rates: ₹1.28 |
-| Audit chain | 213 blocks | Valid before you tamper with it |
+| Audit chain | valid | **Don't quote a block count** — it changes on every batch run. Say "valid", and let the screen show the number. |
 | Tests | 1,149 | ruff, mypy --strict, tsc, eslint all clean |
 | Incidents · decisions | 39 · 45 | `docs/INCIDENTS.md` · `docs/DECISIONS.md` |
 | Benchmark: naive breaches | 308 | **Measured**, not simulated — `python tasks.py benchmark` |

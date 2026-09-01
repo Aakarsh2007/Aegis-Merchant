@@ -15,7 +15,7 @@ Four criteria, in their words:
 | Criterion | Their gloss | Where this project answers it |
 |---|---|---|
 | **Problem taste** | did you pick something that actually matters | the gross-vs-incremental split — most recovery tools report the first number |
-| **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 1,192 tests, `mypy --strict` |
+| **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 1,194 tests, `mypy --strict` |
 | **AI judgment** | the right tool in the right place, **and where you chose not to use one** | the rule table answers 158 of 199 diagnoses; the model is consulted on 41 |
 | **Failure recovery** | what broke, and what you did about it | 39 written incidents, each with the reason no test caught it |
 
@@ -193,7 +193,7 @@ The gross number is two lakh. The honest number is sixty thousand. Thank you."
 
 1. `python tasks.py demo` and confirm the dashboard shows non-zero numbers. A zeroed dashboard
    was the single worst thing in the last screenshot review.
-2. Do a live ₹1 Test Mode payment for the 2:10 segment. The tile flipping from ₹0.00 to ₹1.00
+2. Do a live ₹1 Test Mode payment for the 2:10 segment. The tile moving
    **on camera** is the most convincing twenty seconds available, and it needs the tunnel
    running (`python tasks.py tunnel`) plus the webhook URL updated in the Razorpay dashboard.
 3. Check the audit chain verifies *before* you record the tamper demo, so the "valid" state is
@@ -333,7 +333,7 @@ Six are facts only you can supply. Six are below, ready to paste.
 > new test now gets sabotage-verified — I break the thing it covers and confirm the test fails,
 > and that step has caught vacuous tests inside the fixes for vacuous tests. Every real bug in
 > this project was found by touching the real provider or by looking at the running product;
-> none was reachable from local testing at any volume. The suite is at 1,192 tests and I trust it
+> none was reachable from local testing at any volume. The suite is at 1,194 tests and I trust it
 > considerably less than I did at 400.
 
 ---

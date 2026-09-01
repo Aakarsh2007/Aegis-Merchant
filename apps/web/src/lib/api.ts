@@ -306,6 +306,37 @@ export function rupees(paise: number): string {
   });
 }
 
+/** A rupee we claim, and the six conditions that let us. */
+export type Claim = {
+  case_id: string;
+  amount: Figure;
+  verified_by: string | null;
+  mechanism: string | null;
+  arm: string;
+  conditions: Array<{
+    n: number;
+    name: string;
+    detail: string;
+    satisfied: boolean;
+  }>;
+};
+
+/** Money that arrived and was credited to us at zero. */
+export type Claims = {
+  claimed: Claim[];
+  claimed_total: Figure;
+  not_claimed: Array<{
+    case_id: string;
+    amount: Figure;
+    arm: string | null;
+    credited_to_us_paise: number;
+    reason: string;
+  }>;
+  not_claimed_total: Figure;
+  not_claimed_count: number;
+  note: string;
+};
+
 export const api = {
   overview: () => safeFetch<Overview>("/api/v1/metrics/overview"),
   attribution: () => safeFetch<Attribution>("/api/v1/metrics/attribution"),
@@ -313,6 +344,7 @@ export const api = {
   stoppingRules: () => safeFetch<StoppingRules>("/api/v1/metrics/stopping-rules"),
   power: () => safeFetch<PowerPlan>("/api/v1/metrics/power"),
   holdout: () => safeFetch<Holdout>("/api/v1/metrics/holdout"),
+  claims: () => safeFetch<Claims>("/api/v1/metrics/claims"),
   testmodeStatus: () =>
     safeFetch<{
       razorpay_configured: boolean;

@@ -60,13 +60,26 @@ class TestTheSnapshotIsIdentifiable:
 class TestNoFigureIsSilentlyZero:
     """The failure mode that actually happened, twice."""
 
-    def test_the_test_count_is_not_zero(self) -> None:
+    def test_the_test_count_is_real(self) -> None:
+        """The committed snapshot must carry an actual count.
+
+        Two failure modes, and this rejects both. A silent zero, which is what
+        happened twice and is the worse one because zero is plausible. And
+        "skipped (--fast)", which is honest but useless in the file a judge
+        reads -- `--fast` exists for iteration, and this test is what stops a
+        fast snapshot reaching a commit.
+        """
         raw = _row("Tests collected").replace(",", "")
+        assert "skipped" not in raw, (
+            "this is a --fast snapshot. Regenerate with `python tasks.py "
+            "snapshot` before committing -- the file judges read needs the "
+            "real number."
+        )
         assert raw.isdigit(), f"unparseable test count: {raw!r}"
         assert int(raw) > 500, (
             f"the snapshot reports {raw} tests. The collector fell through to "
-            "its except branch and returned zero -- which is a plausible-looking "
-            "wrong number in the one file that exists to be trusted."
+            "its except branch and returned zero -- a plausible-looking wrong "
+            "number in the one file that exists to be trusted."
         )
 
     def test_the_incident_count_is_not_zero(self) -> None:

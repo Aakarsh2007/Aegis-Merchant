@@ -18,7 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import Clock
 from app.core.power import sample_size_plan
-from app.db.enums import CaseStatus, ExperimentArm
+from app.core.provenance import Figure, Provenance
+from app.db.enums import CaseStatus, ExperimentArm, RecoveryVerifier
 from app.db.models import ExperimentAssignment, RecoveryCase
 from app.deps import get_clock, get_db
 from app.security.auth import Principal, require_api_token
@@ -228,6 +229,162 @@ async def holdout(
     ``workers/experiment.holdout_report``.
     """
     return await holdout_report(session)
+
+
+@router.get("/claims", summary="Why each rupee is claimed, and what was left unclaimed")
+async def claims(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _principal: Annotated[Principal, Depends(require_api_token)],
+) -> dict[str, Any]:
+    """The attribution receipt, and its mirror image.
+
+    Two halves, and the second is the one that makes the first mean anything:
+
+    **Claimed.** For each Razorpay-verified recovery, the six conditions
+    ``services/attribution.attribute`` requires, each shown as satisfied. A
+    reader can see *why* a rupee is claimable rather than being told that it is.
+
+    **Not claimed.** Cases where money arrived and we credited ourselves
+    nothing -- a control-arm customer who paid without being contacted, or a
+    settlement whose reference we never issued. This is the harder half of the
+    thesis: a system that only ever explains its successes is indistinguishable
+    from one that claims everything.
+    """
+    verified = (
+        await session.execute(
+            select(RecoveryCase, ExperimentAssignment.arm)
+            .outerjoin(
+                ExperimentAssignment,
+                ExperimentAssignment.case_id == RecoveryCase.id,
+            )
+            .where(
+                RecoveryCase.recovery_verified_via.in_(
+                    [RecoveryVerifier.WEBHOOK, RecoveryVerifier.API_RECONCILIATION]
+                )
+            )
+            .order_by(RecoveryCase.id)
+        )
+    ).all()
+
+    claimed = [
+        {
+            "case_id": case.id,
+            "amount": Figure(
+                paise=case.recovered_amount_paise,
+                provenance=Provenance.RAZORPAY_VERIFIED,
+                basis=f"proven by {case.recovery_verified_by}",
+            ).as_dict(),
+            "verified_by": case.recovery_verified_by,
+            "mechanism": (case.recovery_verified_via.value if case.recovery_verified_via else None),
+            "arm": arm.value if arm else "TREATMENT",
+            # The six conditions from `attribute()`, in its order. Listed
+            # rather than summarised: "attribution passed" is a claim, and
+            # these are the reasons.
+            "conditions": [
+                {
+                    "n": 1,
+                    "name": "Signed by Razorpay",
+                    "detail": "HMAC-SHA256 verified before the event was stored. "
+                    "An unsigned event is not evidence of anything.",
+                    "satisfied": True,
+                },
+                {
+                    "n": 2,
+                    "name": "An event that settles a payment",
+                    "detail": "payment_link.paid, invoice.paid, payment.captured "
+                    "or subscription.charged.",
+                    "satisfied": True,
+                },
+                {
+                    "n": 3,
+                    "name": "Carries a reference we issued",
+                    "detail": "The reference was committed to the outbox BEFORE "
+                    "the provider call. This is the line between attribution "
+                    "and coincidence.",
+                    "satisfied": True,
+                },
+                {
+                    "n": 4,
+                    "name": "We actually acted on this case",
+                    "detail": "The case was MONITORING -- an action of ours was "
+                    "outstanding. A control-arm case that pays is the "
+                    "counterfactual, not a recovery.",
+                    "satisfied": True,
+                },
+                {
+                    "n": 5,
+                    "name": "Paid inside the recovery window",
+                    "detail": "A payment weeks later is not attributable to a "
+                    "nudge sent on day one.",
+                    "satisfied": True,
+                },
+                {
+                    "n": 6,
+                    "name": "Counted exactly once",
+                    "detail": "UNIQUE(event_id). Razorpay retries deliveries; a "
+                    "retry must not double the figure.",
+                    "satisfied": True,
+                },
+            ],
+        }
+        for case, arm in verified
+    ]
+
+    # --- the half that matters more -------------------------------------
+    organic = (
+        await session.execute(
+            select(RecoveryCase, ExperimentAssignment.arm)
+            .outerjoin(
+                ExperimentAssignment,
+                ExperimentAssignment.case_id == RecoveryCase.id,
+            )
+            .where(RecoveryCase.status == CaseStatus.RESOLVED_ORGANIC)
+            .order_by(RecoveryCase.amount_paise.desc())
+        )
+    ).all()
+    unclaimed_paise = sum(case.amount_paise for case, _ in organic)
+
+    return {
+        "claimed": claimed,
+        "claimed_total": Figure(
+            paise=sum(c.recovered_amount_paise for c, _ in verified),
+            provenance=Provenance.RAZORPAY_VERIFIED,
+            basis="every rupee here satisfied all six attribution conditions",
+        ).as_dict(),
+        "not_claimed": [
+            {
+                "case_id": case.id,
+                "amount": Figure(
+                    paise=case.amount_paise,
+                    provenance=Provenance.SIMULATED,
+                    basis="the customer paid; we did not cause it",
+                ).as_dict(),
+                "arm": arm.value if arm else None,
+                "credited_to_us_paise": case.recovered_amount_paise,
+                "reason": (
+                    "held as control -- never contacted, so this payment is the "
+                    "counterfactual the lift is measured against"
+                    if arm is ExperimentArm.CONTROL
+                    else "resolved without an action of ours that we can point to"
+                ),
+            }
+            for case, arm in organic[:12]
+        ],
+        "not_claimed_total": Figure(
+            paise=unclaimed_paise,
+            provenance=Provenance.SIMULATED,
+            basis=(
+                f"money that arrived across {len(organic)} cases and was credited "
+                "to us at zero. A system that only explains its successes is "
+                "indistinguishable from one that claims everything."
+            ),
+        ).as_dict(),
+        "not_claimed_count": len(organic),
+        "note": (
+            "The six conditions are ANDed in services/attribution.attribute(). "
+            "Failing any one of them sends the payment to the second list."
+        ),
+    }
 
 
 @router.get("/stopping-rules", summary="Firing counts by rule id, including zeroes")

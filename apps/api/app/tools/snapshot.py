@@ -214,7 +214,12 @@ def _render(data: dict[str, Any], meta: dict[str, Any]) -> str:
         f"| Generated | {meta['generated']} |",
         f"| Commit | `{meta['commit']}` on `{meta['branch']}` |",
         f"| Corpus seed | `{meta['seed']}` |",
-        f"| Tests collected | {meta['tests']:,} |",
+        "| Tests collected | "
+        + (
+            f"{meta['tests']:,} |"
+            if meta["tests"] is not None
+            else "skipped (--fast); rerun `python tasks.py snapshot` |"
+        ),
         f"| Incidents | {meta['incidents']} |",
         f"| Decisions | {meta['decisions']} |",
         "",
@@ -335,7 +340,9 @@ def main(argv: list[str] | None = None) -> int:
         "commit": commit,
         "branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
         "seed": CORPUS_SEED,
-        "tests": _test_count() if "--fast" not in args else 0,
+        # 0 would be a silent falsehood in the file that exists to be trusted.
+        # `--fast` says so instead.
+        "tests": None if "--fast" in args else _test_count(),
         "incidents": _count(r"^## INC-", ROOT / "docs" / "INCIDENTS.md"),
         "decisions": _count(r"^## DEC-", ROOT / "docs" / "DECISIONS.md"),
     }
@@ -347,7 +354,10 @@ def main(argv: list[str] | None = None) -> int:
     OUT.write_text(_render(data, meta), encoding="utf-8", newline="\n")
     print(f"wrote {OUT.relative_to(ROOT)}")
     print(f"  snapshot   {meta['id']}")
-    print(f"  tests      {meta['tests']:,}")
+    print(
+        "  tests      "
+        + (f"{meta['tests']:,}" if meta["tests"] is not None else "skipped (--fast)")
+    )
     print(f"  incidents  {meta['incidents']}")
     print(f"  decisions  {meta['decisions']}")
     return 0

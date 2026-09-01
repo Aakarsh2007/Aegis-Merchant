@@ -10,13 +10,13 @@ number. Documents now cite this snapshot; this snapshot cites the system.
 
 | | |
 |---|---|
-| Snapshot | `20260901-1158-24e43ad` |
-| Generated | 2026-09-01 11:58 UTC |
-| Commit | `24e43ad` on `main` |
+| Snapshot | `20260901-1307-79b847a` |
+| Generated | 2026-09-01 13:07 UTC |
+| Commit | `79b847a` on `main` |
 | Corpus seed | `20260905` |
-| Tests collected | 1,192 |
+| Tests collected | 1,194 |
 | Incidents | 39 |
-| Decisions | 45 |
+| Decisions | 46 |
 
 ## The three numbers, and the question that is open
 
@@ -107,5 +107,5 @@ Full table with breaches by kind, and the limitations, from
 
 ---
 
-*Snapshot `20260901-1158-24e43ad`, commit `24e43ad`, 2026-09-01 11:58 UTC.*
+*Snapshot `20260901-1307-79b847a`, commit `79b847a`, 2026-09-01 13:07 UTC.*
 *Any figure elsewhere in this repository that disagrees with this file is stale.*

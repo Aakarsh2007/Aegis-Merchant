@@ -1145,3 +1145,54 @@ recovery before the thesis, make the "the model lost to the rule table, so we sh
 table" finding prominent rather than buried, an external audit checkpoint to close the tail-
 truncation limitation, and a single generated evidence snapshot so no two documents can disagree
 about a figure.
+
+---
+
+## DEC-046 · 2026-09-01 · Compress, and lead with what we refuse to claim
+
+**Context.** A second reviewer scored the submission 8.5–9/10 and diagnosed the remaining gap as
+presentational rather than technical: *"over-explaining the technical machinery and making the judge
+work too hard to understand the killer idea."* Their closing instruction was explicit — **stop
+adding, compress and sharpen.** So this round removes more than it adds.
+
+**Decision: the README is 51% shorter.** 4,077 words to 2,022. Cut hardest where the bulk was: the
+corpus walkthrough, the judging-criteria mapping, the repository tour, the product-versus-demo
+essay. Every one of those still exists in `workflow.md`, `docs/EVIDENCE.md` or the incident log —
+the README's job is sixty seconds, not completeness.
+
+**Limitations are now stated once, confidently, in one section.** The previous version said some
+variant of *"this is not proven"* in eleven places. Repetition read as defensiveness rather than
+rigour; the reviewer was right that the dashboard printing `NOT PROVEN` is stronger than prose
+insisting on honesty.
+
+**Decision: `/metrics/claims` and the panel above it, showing both halves.** The six attribution
+conditions, each satisfied, for every claimed rupee — and beside them **₹1,39,021 that arrived
+across 17 cases and was credited to us at zero.** That second figure already existed in the data
+and was invisible in the interface, which is the exact defect this project keeps finding.
+
+It is the strongest artefact here. Every recovery tool can show money coming back. *"The customer
+paid and we claimed nothing"* is a sentence almost no recovery product can produce, and it is what
+makes the ₹60,217 believable.
+
+**Rejected: a fourth headline number for "false credit prevented".** The unclaimed figure belongs
+beside the claim it qualifies, not as another tile competing for attention. The reviewer's own
+point about metric overload applies to their own suggestion.
+
+**Decision: `tasks.py judge`.** One command: seed, batch, verify the chain, run the ablation, price
+the causal question, write the snapshot, then print what the run proved *and what it did not*. It
+deliberately does not start the servers — `demo` does that, and this one should finish.
+
+It runs the **full** snapshot, not `--fast`. A `--fast` snapshot writes no test count, and the one
+command whose purpose is producing a trustworthy figure must not skip the figure.
+
+**Also rejected, from the reviewer's list:** an "autonomy ladder" abstraction over the escalation
+rungs we already have; a per-case AI-confidence router; a claim-ledger table duplicating
+`EVIDENCE.md`. Each adds a layer of presentation over machinery that already exists, which is the
+opposite of the instruction they closed with.
+
+**Wording changed on their advice, and they were right about both:**
+
+* *"That number is real, and it is the wrong number"* → *"₹2.02 lakh is gross recovery. It is not
+  the amount we can attribute to RevPilot."* The first was gimmicky.
+* *"The safety layer costs nothing"* → *"In this corpus the firewall introduced no recovery cost."*
+  Safety can have opportunity costs in a real system; the benchmark measured one corpus.

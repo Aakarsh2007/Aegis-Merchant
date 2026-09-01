@@ -409,6 +409,92 @@ def testmode_experiment() -> int:
     return run([PY, "-m", "app.workers.experiment_cli", *sys.argv[2:]], cwd=API)
 
 
+@task("judge", "One command: reproduce every headline claim, then print the evidence")
+def judge() -> int:
+    """Everything a judge needs to check, in order, with no arguments.
+
+    Seeds if needed, runs the corpus through the agent, verifies the audit
+    chain, runs the ablation, prints what proving causality would cost, and
+    writes the evidence snapshot. Then prints a summary that names every
+    headline figure and the one claim we do NOT make.
+
+    Deliberately does not start the servers -- `demo` does that. This is the
+    reproducibility check, which should be readable in a terminal and finish.
+    """
+    print()
+    print("  " + "=" * 70)
+    print("  REVPILOT -- EVIDENCE CHECK")
+    print("  Reproducing every headline claim from a clean run.")
+    print("  " + "=" * 70)
+    print()
+
+    missing = _missing_dependencies()
+    if missing:
+        print("  Python dependencies are not installed. Missing:")
+        for package in missing:
+            print(f"    - {package}")
+        print()
+        print("  Run `python tasks.py install` first.")
+        return 1
+
+    runtime_db = API / "revpilot.db"
+    if not runtime_db.exists():
+        seed_db = ROOT / "data" / "revpilot.seed.db"
+        if seed_db.exists():
+            shutil.copy(seed_db, runtime_db)
+            print("  [1/6] copied the committed corpus")
+        elif seed() != 0:
+            return 1
+    else:
+        print("  [1/6] corpus present")
+
+    print("  [2/6] running the corpus through the agent ...")
+    if run([PY, "-m", "app.workers.batch_cli"], cwd=API) != 0:
+        return 1
+
+    print("  [3/6] verifying the audit chain ...")
+    if run([PY, "-m", "app.tools.verify_cli"], cwd=API) != 0:
+        print("  ! the audit chain did not verify. That is a finding, not a flake.")
+        return 1
+
+    print("  [4/6] the ablation -- does the architecture earn its complexity ...")
+    if run([PY, "-m", "app.workers.benchmark_cli"], cwd=API) != 0:
+        return 1
+
+    print("  [5/6] what proving causality would cost ...")
+    if run([PY, "-m", "app.tools.power_cli"], cwd=API) != 0:
+        return 1
+
+    print("  [6/6] writing the evidence snapshot ...")
+    # Not --fast. That skips the test collection and writes `tests: 0`, which is
+    # the silent zero tests/test_snapshot.py exists to forbid -- and this is the
+    # one command whose entire purpose is producing a trustworthy figure.
+    if run([PY, "-m", "app.tools.snapshot"], cwd=API) != 0:
+        return 1
+
+    print()
+    print("  " + "=" * 70)
+    print("  Every figure above is in docs/EVIDENCE.md with a commit and a seed.")
+    print()
+    print("  What this run proved:")
+    print("    - the corpus goes through the agent and the policy firewall")
+    print("    - the audit chain recomputes and verifies")
+    print("    - removing the firewall causes hard-bound breaches; keeping it")
+    print("      cost no recovery in this corpus")
+    print("    - removing the holdout makes attribution impossible")
+    print()
+    print("  What it did NOT prove, and cannot:")
+    print("    - that RevPilot CAUSED additional customers to pay. That needs")
+    print("      1,592 cases and a DLT-registered merchant. The design is in")
+    print("      docs/PRE-REGISTRATION.md, committed before any of this data.")
+    print()
+    print("  For a real Razorpay recovery:  python tasks.py testmode-recover")
+    print("  For the dashboard:             python tasks.py demo")
+    print("  " + "=" * 70)
+    print()
+    return 0
+
+
 @task("snapshot", "Generate docs/EVIDENCE.md -- one source for every quoted figure")
 def snapshot() -> int:
     """Write the evidence snapshot.
