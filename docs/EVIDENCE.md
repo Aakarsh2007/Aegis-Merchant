@@ -10,11 +10,11 @@ number. Documents now cite this snapshot; this snapshot cites the system.
 
 | | |
 |---|---|
-| Snapshot | `20260901-1157-069fbc1` |
-| Generated | 2026-09-01 11:57 UTC |
-| Commit | `069fbc1` on `main` |
+| Snapshot | `20260901-1158-24e43ad` |
+| Generated | 2026-09-01 11:58 UTC |
+| Commit | `24e43ad` on `main` |
 | Corpus seed | `20260905` |
-| Tests collected | 0 |
+| Tests collected | 1,192 |
 | Incidents | 39 |
 | Decisions | 45 |
 
@@ -107,5 +107,5 @@ Full table with breaches by kind, and the limitations, from
 
 ---
 
-*Snapshot `20260901-1157-069fbc1`, commit `069fbc1`, 2026-09-01 11:57 UTC.*
+*Snapshot `20260901-1158-24e43ad`, commit `24e43ad`, 2026-09-01 11:58 UTC.*
 *Any figure elsewhere in this repository that disagrees with this file is stale.*

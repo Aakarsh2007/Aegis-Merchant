@@ -58,7 +58,7 @@ being traded against results here, and that was the result we expected least.
 python tasks.py demo        # no credentials, no Docker, ~40 seconds
 ```
 
-1,179 tests · `mypy --strict` clean · 39 documented incidents · one command to run.
+1,192 tests · `mypy --strict` clean · 39 documented incidents · one command to run.
 
 > **On a fresh clone the verified tile reads ₹0.00, and that is correct.** Nothing has been
 > proven on *your* machine yet. The two recoveries above happened here, on 31 August 2026, with

@@ -383,7 +383,7 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 > published paid rates is one rupee twenty-eight, and it's labelled *estimated*, because a price list
 > is not a bill.
 >
-> Eleven hundred and seventy-nine tests. Thirty-nine written incidents.
+> Eleven hundred and ninety-two tests. Thirty-nine written incidents.
 >
 > We don't claim every payment we see. We claim only what the evidence lets us prove. Thank you.
 

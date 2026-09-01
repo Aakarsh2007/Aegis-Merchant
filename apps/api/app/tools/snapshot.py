@@ -64,8 +64,14 @@ def _test_count() -> int:
     of truth would defeat the purpose, so this asks pytest.
     """
     try:
+        # No `-q`. The quiet formatter prints one line per test id and omits
+        # the "N tests collected" summary this parses -- so with `-q` the count
+        # silently came out zero, and the snapshot published "Tests collected:
+        # 0" into the file whose job is being the single source of truth. The
+        # second time in one commit that a figure defaulted to zero rather
+        # than failing loudly.
         done = subprocess.run(
-            [sys.executable, "-m", "pytest", "--collect-only", "-q"],
+            [sys.executable, "-m", "pytest", "--collect-only"],
             cwd=ROOT,
             capture_output=True,
             text=True,
