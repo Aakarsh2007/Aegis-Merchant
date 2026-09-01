@@ -1524,3 +1524,37 @@ the word inside the comment *explaining why provenance mattered* — so deleting
 code left the test green. It now matches the narrowing expression, `typeof data.provenance ===
 "string"`. A test satisfied by its own documentation, which is a new variety of the INC-006 pattern
 and the fourth instance of that pattern in this repository.
+
+---
+
+## INC-039 · A field that was always wrong unless you knew to overwrite it
+
+**Symptom:** `docs/EVIDENCE.md` — the file whose entire job is being the single source of truth for
+every figure in the submission — published **Net incremental: Rs 0.00**, three lines above an
+attribution table reporting a 6.16% lift. The dashboard said ₹60,216.66.
+
+**Cause.** `services/metrics.overview()` returned `net_incremental` as `Figure(paise=0)` with a
+basis reading *"computed by /metrics/attribution"*. The router overwrote it after the fact. The
+reasoning was sound and is in the original comment: recomputing the lift inside `overview` would be
+two implementations of one number, which is the INC-007 shape.
+
+Sound reasoning, wrong remedy. It left a field that is **always wrong unless the caller knows to
+replace it**. The router knew. The morning briefing knew, and computed attribution itself. The
+snapshot tool, written months later by someone who had read neither, did not — and published the
+placeholder into the one document that exists to stop figures disagreeing.
+
+Found within a minute of the snapshot's first run, by reading its output against the dashboard.
+Which is the point of the snapshot.
+
+**Fix.** `attribution` is a **required** argument to `overview()`. There is still exactly one
+implementation of the lift, and no caller can obtain a placeholder. `mypy --strict` reported all
+four call sites the moment the signature changed — a comment could not have done that, and the
+comment had been there the whole time.
+
+**The general lesson, which this project keeps relearning:** a correct invariant enforced by
+convention is a defect waiting for a new caller. The remedy for "don't compute this twice" is not
+"return a zero and hope"; it is to make the correct value the only obtainable one.
+
+**Also from this round:** `tasks.py benchmark`, the ablation table, and `tasks.py snapshot`. Both
+exist because a reviewer asked the two questions this submission could not answer — *does the
+architecture earn its complexity*, and *why do two of your documents quote different numbers*.

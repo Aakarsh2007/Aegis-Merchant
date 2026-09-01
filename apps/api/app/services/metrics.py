@@ -41,6 +41,7 @@ from app.db.models import (
     Outbox,
     RecoveryCase,
 )
+from app.services.attribution import RecoveryReport
 
 __all__ = ["CostReport", "OverviewReport", "cost_report", "overview", "stopping_rule_counts"]
 
@@ -94,7 +95,9 @@ class OverviewReport:
         }
 
 
-async def overview(session: AsyncSession, *, clock: Clock) -> OverviewReport:
+async def overview(
+    session: AsyncSession, *, clock: Clock, attribution: RecoveryReport
+) -> OverviewReport:
     """The headline tiles.
 
     ``gross_recovered`` is RAZORPAY_VERIFIED because the schema will not let it
@@ -191,16 +194,26 @@ async def overview(session: AsyncSession, *, clock: Clock) -> OverviewReport:
     ) or 0
 
     # Net incremental needs the control arm, which lives in the attribution
-    # service. Rather than recompute the lift here -- two implementations of
-    # one number is the INC-007 shape -- the router composes them. Overview
-    # reports gross with an explicit pointer, so a client that renders only
-    # this endpoint still cannot show gross as though it were the whole story.
+    # INC-039. This used to return `paise=0` with a basis pointing at
+    # /metrics/attribution, on the reasoning that recomputing the lift here
+    # would be two implementations of one number -- correct reasoning, wrong
+    # remedy. It left a field that is *always wrong* unless the caller knows to
+    # overwrite it. The router knew. The briefing knew. `tools/snapshot.py` did
+    # not, and published a Rs 0.00 net incremental into the file whose entire
+    # job is being the single source of truth.
+    #
+    # `attribution` is now a required argument, so there is still exactly one
+    # implementation of the lift and no caller can obtain a placeholder. mypy
+    # enforces it at every call site, which a comment could not.
     net = Figure(
-        paise=0,
+        paise=attribution.net_incremental_paise,
         provenance=Provenance.SIMULATED,
         basis=(
-            "computed by /metrics/attribution against the holdout control arm; "
-            "gross alone overstates our contribution roughly threefold"
+            f"lift {attribution.absolute_lift:.1%} over a "
+            f"{attribution.control.cases}-case holdout, less discounts and inference"
+            if attribution.has_control
+            else "no control arm in this population: incremental cannot be "
+            "computed and is not claimed"
         ),
     )
 

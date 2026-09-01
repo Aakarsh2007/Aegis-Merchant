@@ -1093,3 +1093,55 @@ drops anything not on it with a log line nobody reads, so a derived name would v
 **Cost of being wrong.** Publishing happens on the request path, sometimes inside a transaction, so
 `publish` swallows every error: failing to notify a browser must never fail a recovery. That was
 already true of the bus; it matters more now that something actually calls it.
+
+---
+
+## DEC-045 · 2026-09-01 · An ablation, not a competitor benchmark — and two recommendations declined
+
+**Context.** A reviewer scored the submission 8.5–9/10 and identified the gap precisely: *"LLM
+proposes, deterministic policy disposes"* is becoming a category pattern, so architecture alone
+cannot be the differentiator. They recommended a benchmark, and several other additions.
+
+**Decision: build the ablation.** `tasks.py benchmark` runs the same 182-case corpus through five
+decision policies and reports what each did. The table is split in two, and the split is the point:
+
+* **MEASURED** — contacts, opt-out breaches, marketing without consent, quiet-hours contacts,
+  over-cap contacts, discounts above the ceiling. Real counts over the corpus's own consent data.
+  No simulation.
+* **DECLARED** — recovery amounts, from the same response model the batch uses. Identical across
+  arms, so the comparison is meaningful and the absolute figures are not observations.
+
+The headline finding was the one we expected least: **the firewall prevents 284 hard-bound breaches
+and costs nothing in recovery.** Safety is normally presented as a trade-off; here the clamps change
+*how* an action is taken, not *whether*, so both arms recover the same amount. That is a stronger
+claim than "we have a firewall", and it is now a test — if a future change makes it a trade-off, the
+suite says so.
+
+The `no_holdout` row is the thesis in one line: highest recovery of any arm, and `attribution:
+UNAVAILABLE`.
+
+**Rejected: an LLM-only arm.** An honest one needs the model run over all 182 cases; a fabricated
+one is worse than none. The model's contribution is measured separately on the golden set (rule
+table 96.5%, model 90.6%), and the report says so where the arm would have been rather than leaving
+its absence to be noticed.
+
+**Rejected: per-case counterfactual replay** — *"what would have happened if RevPilot did nothing"*
+for a specific case. This was recommended as the most impressive possible demo, and it contradicts
+the project's central claim. A per-case counterfactual is **not knowable**: that is precisely why
+the holdout is statistical and why the lift carries a confidence interval. Building a UI that shows
+"without RevPilot: payment likely remains failed" would be inventing the one number the entire
+design exists to refuse to invent. Declining it is not a scope decision.
+
+**Rejected: expected-net-recovered-value prioritisation.** Recommended to strengthen the business
+case, and it requires a per-case recovery probability we cannot validate. It would add a fabricated
+model to the one project whose distinguishing feature is not fabricating models, and it would sit
+next to figures we are careful to label. The playbooks already differ by leak type, which is the
+defensible part of that idea and is already built.
+
+**Also declined, and the reviewer agreed:** voice, RAG, multi-agent, blockchain, online learning.
+
+**What we took from the review beyond the benchmark:** lead the video with the real Razorpay
+recovery before the thesis, make the "the model lost to the rule table, so we shipped the rule
+table" finding prominent rather than buried, an external audit checkpoint to close the tail-
+truncation limitation, and a single generated evidence snapshot so no two documents can disagree
+about a figure.

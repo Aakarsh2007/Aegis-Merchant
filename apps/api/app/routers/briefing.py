@@ -88,7 +88,11 @@ async def today(
     cannot disagree — a briefing that rounded differently from the dashboard
     would undermine both.
     """
-    overview = await metrics_service.overview(session, clock=clock)
+    # Imported and computed before the overview, which now requires it.
+    from app.routers.metrics import _outcomes
+
+    attribution = recovery_report(await _outcomes(session))
+    overview = await metrics_service.overview(session, clock=clock, attribution=attribution)
 
     recovered_rows = (
         await session.execute(

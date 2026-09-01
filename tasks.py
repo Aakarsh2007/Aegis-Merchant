@@ -409,6 +409,30 @@ def testmode_experiment() -> int:
     return run([PY, "-m", "app.workers.experiment_cli", *sys.argv[2:]], cwd=API)
 
 
+@task("snapshot", "Generate docs/EVIDENCE.md -- one source for every quoted figure")
+def snapshot() -> int:
+    """Write the evidence snapshot.
+
+    Every document cites the snapshot; the snapshot cites the system. A reviewer
+    found the README and the demo script quoting different test counts, and the
+    cause was that each document held its own copy of every number.
+
+    `--fast` skips the test collection, which is the slow part.
+    """
+    return run([PY, "-m", "app.tools.snapshot", *sys.argv[2:]], cwd=API)
+
+
+@task("benchmark", "Same corpus, six decision policies: does the architecture earn it?")
+def benchmark() -> int:
+    """The ablation table.
+
+    Answers the question an architecture diagram cannot: what does each
+    component actually prevent. Contacts, breaches and escalations are real
+    counts; recovery is the declared response model, identical across arms.
+    """
+    return run([PY, "-m", "app.workers.benchmark_cli", *sys.argv[2:]], cwd=API)
+
+
 @task("power", "How many cases the causal question needs, and how far short we are")
 def power() -> int:
     """Print the arithmetic behind PRE-REGISTRATION.md section 5.

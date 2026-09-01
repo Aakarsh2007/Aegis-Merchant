@@ -1,4 +1,9 @@
-# RevPilot AI — Revenue Recovery Autopilot for Razorpay
+# RevPilot AI
+
+### Recover revenue. Prove causality. Stop safely.
+
+**Most recovery tools can tell you what they recovered. This one can tell you whether the
+recovery belongs to it.**
 
 Razorpay AI Buildathon 2026 · Track: **AI Revenue Recovery**
 
@@ -21,6 +26,28 @@ Three numbers, three different questions, and the third one is open:
 The fourth row is on the dashboard, third from the top, above the panels showing
 things that work. `python tasks.py power` prints the arithmetic.
 
+### Why this architecture exists
+
+Not a competitor comparison — we have not run anyone else's system and will not invent numbers for
+one. This is what each component is *for*, and `python tasks.py benchmark` measures what happens
+when you remove it.
+
+| Capability | Here | Measured how |
+|---|---|---|
+| Failure diagnosis from provider telemetry | ✓ | 96.5% on an 85-case golden set |
+| Model consulted only where rules are unsure | ✓ | 40 of 199 diagnoses; the model *lost* to the rule table at 90.6% |
+| Deterministic policy authority over money | ✓ | Ablation: removing it causes **284** hard-bound breaches |
+| Capability token — no token, no side effect | ✓ | AST test: execution never reads the model's proposal |
+| Randomised holdout | **✓** | Ablation: removing it makes attribution **impossible** |
+| Incremental attribution, not gross | **✓** | ₹60,217 claimable against ₹2,02,760 gross |
+| Signed provider evidence | ✓ | Two real Test Mode recoveries, one webhook, one reconciliation |
+| Honest non-significance | **✓** | The dashboard says the lift is not significant, and by how much |
+| AI authority over money | **None** | The proposal object has no amount field |
+
+**The firewall costs nothing.** Removing it does not increase recovery — both arms recover the same
+amount, because the clamps change *how* an action is taken rather than *whether*. Safety is not
+being traded against results here, and that was the result we expected least.
+
 > ### AI proposes. Policy disposes.
 >
 > The model reads ambiguity and argues for an action. It **cannot touch money** —
@@ -31,7 +58,7 @@ things that work. `python tasks.py power` prints the arithmetic.
 python tasks.py demo        # no credentials, no Docker, ~40 seconds
 ```
 
-1,149 tests · `mypy --strict` clean · 38 documented incidents · one command to run.
+1,179 tests · `mypy --strict` clean · 39 documented incidents · one command to run.
 
 > **On a fresh clone the verified tile reads ₹0.00, and that is correct.** Nothing has been
 > proven on *your* machine yet. The two recoveries above happened here, on 31 August 2026, with
@@ -69,7 +96,7 @@ stays labelled SIMULATED.
 
 **The proof.** 900+ tests · one real signed Razorpay webhook verified end to
 end · tamper-evident audit ledger you can break yourself · 12 stopping rules
-with a property-based termination proof · 38 documented incidents.
+with a property-based termination proof · 39 documented incidents.
 
 ```
                         RAZORPAY

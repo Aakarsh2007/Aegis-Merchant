@@ -31,6 +31,7 @@ from app.core.clock import FakeClock
 from app.db.enums import CaseStatus, Playbook, RecoveryVerifier
 from app.db.ids import idempotency_hash
 from app.db.models import Customer, Merchant, RecoveryCase
+from app.services.attribution import RecoveryReport, recovery_report
 from app.services.metrics import overview
 
 MOMENT = datetime(2026, 9, 1, 11, 0, tzinfo=UTC)
@@ -89,6 +90,20 @@ async def _case(
     await session.flush()
 
 
+def _no_attribution() -> RecoveryReport:
+    """An empty attribution population.
+
+    These tests are about the *verified* tile, not the lift. An empty population
+    has no control arm, so `net_incremental` is correctly zero and the basis says
+    so -- which is what we want here rather than a fabricated lift.
+
+    `overview()` requires this argument since INC-039: it used to return a
+    placeholder net incremental that every caller had to remember to overwrite,
+    and `tools/snapshot.py` did not.
+    """
+    return recovery_report([])
+
+
 # ===========================================================================
 class TestTheEnum:
     def test_three_mechanisms(self) -> None:
@@ -118,7 +133,7 @@ class TestSimulatedNeverReachesTheVerifiedTile:
         )
         await session.commit()
 
-        report = await overview(session, clock=FakeClock(MOMENT))
+        report = await overview(session, clock=FakeClock(MOMENT), attribution=_no_attribution())
         assert report.gross_recovered.paise == 0
         assert report.gross_simulated.paise == 999_999
 
@@ -141,7 +156,7 @@ class TestSimulatedNeverReachesTheVerifiedTile:
         )
         await session.commit()
 
-        report = await overview(session, clock=FakeClock(MOMENT))
+        report = await overview(session, clock=FakeClock(MOMENT), attribution=_no_attribution())
         assert report.gross_recovered.paise == 0, (
             "a SIMULATOR row with a realistic id reached the verified tile -- this "
             "is the precise overclaim the badge exists to prevent"
@@ -165,7 +180,7 @@ class TestSimulatedNeverReachesTheVerifiedTile:
         )
         await session.commit()
 
-        report = await overview(session, clock=FakeClock(MOMENT))
+        report = await overview(session, clock=FakeClock(MOMENT), attribution=_no_attribution())
         assert report.gross_recovered.paise == 0
 
 
@@ -187,7 +202,7 @@ class TestBothRealMechanismsCount:
         await _case(session, "RC-R1", verified_by=verified_by, verified_via=verifier, paise=100)
         await session.commit()
 
-        report = await overview(session, clock=FakeClock(MOMENT))
+        report = await overview(session, clock=FakeClock(MOMENT), attribution=_no_attribution())
         assert report.gross_recovered.paise == 100
 
     async def test_a_lost_webhook_does_not_cost_a_recovery(self, session: AsyncSession) -> None:
@@ -205,7 +220,7 @@ class TestBothRealMechanismsCount:
             paise=100,
         )
         await session.commit()
-        report = await overview(session, clock=FakeClock(MOMENT))
+        report = await overview(session, clock=FakeClock(MOMENT), attribution=_no_attribution())
         assert report.gross_recovered.paise == 100
 
 
@@ -231,7 +246,9 @@ class TestTheBasisTellsTheTruth:
         )
         await session.commit()
 
-        basis = (await overview(session, clock=FakeClock(MOMENT))).gross_recovered.basis
+        basis = (
+            await overview(session, clock=FakeClock(MOMENT), attribution=_no_attribution())
+        ).gross_recovered.basis
         assert "1 by signed webhook" in basis
         assert "1 by direct API reconciliation" in basis
 
@@ -251,7 +268,9 @@ class TestTheBasisTellsTheTruth:
         )
         await session.commit()
 
-        basis = (await overview(session, clock=FakeClock(MOMENT))).gross_recovered.basis
+        basis = (
+            await overview(session, clock=FakeClock(MOMENT), attribution=_no_attribution())
+        ).gross_recovered.basis
         assert "0 by signed webhook" in basis
         assert "1 by direct API reconciliation" in basis
         # The old text asserted this unconditionally.
@@ -262,7 +281,9 @@ class TestTheBasisTellsTheTruth:
         though something had been measured."""
         await _fixtures(session)
         await session.commit()
-        basis = (await overview(session, clock=FakeClock(MOMENT))).gross_recovered.basis
+        basis = (
+            await overview(session, clock=FakeClock(MOMENT), attribution=_no_attribution())
+        ).gross_recovered.basis
         assert "nothing has been proven by Razorpay yet" in basis
 
 

@@ -43,7 +43,7 @@ You are on Windows 11, so you already have both tools you need.
 - Close every other tab. Windows **Focus assist** on, so no notifications appear.
 - Terminal font size **up two or three steps**. What is readable to you at 30 cm is unreadable in a
   1080p video.
-- Dark or light theme — either is fine, but pick one and stay in it for all eight clips.
+- Dark or light theme — either is fine, but pick one and stay in it for all nine clips.
 
 ### Pre-flight, in this order
 
@@ -66,9 +66,9 @@ Two of these will silently ruin a take if skipped.
 - [ ] **Read the whole script aloud once** without recording. You will find two sentences that don't
       sit right in your mouth. Change those words — they are yours to change.
 
-> **Record eight separate clips, one per segment. Do not attempt one take.** Fluff a line → stop,
+> **Record nine separate clips, one per segment. Do not attempt one take.** Fluff a line → stop,
 > breathe, redo that clip only. Then join them in Clipchamp in order. Nobody can tell, and it turns a
-> stressful hour into eight easy minutes.
+> stressful hour into nine easy minutes.
 
 > **Do not speed anything up.** A sped-up terminal tells a judge the real thing was slow. Every
 > command here finishes in under ten seconds; the batch takes about five.
@@ -77,12 +77,40 @@ Two of these will silently ruin a take if skipped.
 
 ## 2 · The script
 
-Eight clips. Timecodes are cumulative so you can check your pace. The narration is about 700 words —
+Nine clips. Timecodes are cumulative so you can check your pace. The narration is about 700 words —
 five minutes at a normal speaking pace. Resist the urge to rush.
 
 ---
 
-### `0:00 – 0:32` — The number that is wrong everywhere else
+### `0:00 – 0:20` — This is real Razorpay, right now
+
+**DO**
+
+1. Dashboard already scrolled to **"Prove it against real Razorpay"**, with the **Live pipeline**
+   panel visible.
+2. Click **Create a real ₹1 recovery link**. Let the seven nodes fill in.
+3. Cut here. You will pay it in the 2:35 segment — this opener exists to establish, in the first
+   twenty seconds, that the integration is real.
+
+**SAY**
+
+> This is a real Razorpay payment link, created two seconds ago through the live API.
+>
+> Watch the pipeline on the right: enrich, triage — twelve of twelve stopping rules clear —
+> diagnose, and it says *rule table, no model call*. Strategise. Policy: passed, zero clamps.
+> Execute.
+>
+> Every step names which layer decided it. That's the whole architecture, running, in one click.
+>
+> Now — here is why the two lakh rupees on this dashboard is **not** the number I'm claiming.
+
+> **Why this is first.** A judge's unconscious first question is *"is any of this real?"*. Answering
+> it in twenty seconds buys you the attention to make the harder argument that follows. This is the
+> one change a reviewer pushed hardest for, and they were right.
+
+---
+
+### `0:20 – 0:50` — The number that is wrong everywhere else
 
 **DO**
 
@@ -110,7 +138,7 @@ five minutes at a normal speaking pace. Resist the urge to rush.
 
 ---
 
-### `0:32 – 1:02` — And the number that is still missing
+### `0:50 – 1:18` — And the number that is still missing
 
 **DO**
 
@@ -138,7 +166,7 @@ five minutes at a normal speaking pace. Resist the urge to rush.
 
 ---
 
-### `1:02 – 1:42` — One case, and who decided it
+### `1:18 – 1:52` — One case, and who decided it
 
 **DO**
 
@@ -169,7 +197,7 @@ five minutes at a normal speaking pace. Resist the urge to rush.
 
 ---
 
-### `1:42 – 2:22` — AI proposes. Policy disposes.
+### `1:52 – 2:35` — AI proposes. Policy disposes.
 
 **DO**
 
@@ -202,31 +230,24 @@ five minutes at a normal speaking pace. Resist the urge to rush.
 
 ---
 
-### `2:22 – 3:12` — A real rupee, through real Razorpay
+### `2:35 – 3:15` — Pay it, and watch Razorpay confirm it
 
 > **This is your best fifty seconds.** Rehearse it twice before recording. Keep the tunnel terminal
 > visible in a corner, or alt-tab to it when the webhook lands.
 
 **DO**
 
-1. Scroll to **"Prove it against real Razorpay"**. Make sure the **Live pipeline** panel is also
-   visible — split the window, or scroll between them.
-2. Click **Create a real ₹1 recovery link**.
-3. Watch the Live pipeline fill with seven named nodes. **Pause and let it.**
-4. Click **Open the Razorpay link and pay ₹1**.
+1. Back to **"Prove it against real Razorpay"** — the link you created in the opener is still
+   there.
+2. Click **Open the Razorpay link and pay ₹1**.
 5. Card `4111 1111 1111 1111`, any future expiry, any CVV → **Success**.
 6. Alt-tab to the tunnel terminal to show the inbound `POST`, then back to the dashboard and reload.
 
 **SAY**
 
-> Everything so far runs on a seeded corpus. This part doesn't.
+> Back to the link from the opening. Everything since has run on a seeded corpus. This doesn't.
 >
-> *(clicking the button)* One click. That's a real case going through the real agent and the real
-> policy firewall — and watch the pipeline on the right. Enrich. Triage: twelve of twelve stopping
-> rules clear. Diagnose: *rule table, no model call*. Strategise. Policy: passed, zero clamps, fully
-> autonomous. Execute. Every step says which layer answered it.
->
-> And at the end, a real Razorpay payment link. I'm paying it now.
+> I'm paying it now.
 >
 > *(after paying, on the tunnel log)* That's Razorpay's webhook arriving at my machine. HMAC
 > verified. The reference ID matches the action we took — so the money is attributable to us and not
@@ -250,7 +271,7 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 
 ---
 
-### `3:12 – 3:52` — What it chose not to do, and breaking it on purpose
+### `3:15 – 3:45` — What it chose not to do, and breaking it on purpose
 
 **DO**
 
@@ -278,7 +299,7 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 
 ---
 
-### `3:52 – 4:32` — What broke
+### `3:45 – 4:20` — What broke
 
 > **This is the segment the judges said they read first.** Their form asks "what broke, and how you
 > got out". Do not rush it and do not soften it.
@@ -313,7 +334,36 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 
 ---
 
-### `4:32 – 5:00` — Run it yourself
+### `4:20 – 4:40` — Does the architecture earn its complexity?
+
+**DO**
+
+1. Terminal: `python tasks.py benchmark`. It finishes instantly.
+2. Let the **MEASURED** table sit on screen while you talk.
+
+**SAY**
+
+> One more thing, because "we built a safety layer" is easy to say. Same corpus, five different
+> decision policies.
+>
+> Contacting everyone the way most recovery scripts do breaches a hard bound **three hundred and
+> eight times** — opted-out customers contacted, marketing without consent, messages inside TRAI
+> quiet hours. RevPilot: **zero**.
+>
+> And here's the result I expected least. Remove the firewall and recovery doesn't go *up* — both
+> arms recover exactly the same amount. The clamps change *how* an action is taken, not whether. So
+> the safety layer costs nothing.
+>
+> Last row: remove the holdout and it recovers the most of any policy — and can claim none of it.
+> Attribution: unavailable.
+
+> **The breach counts are measured, not simulated.** They are real counts over the corpus's own
+> consent data. Only the recovery column comes from the response model. Say that if asked; the
+> command prints it too.
+
+---
+
+### `4:40 – 5:00` — Run it yourself
 
 **DO**
 
@@ -333,14 +383,15 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 > published paid rates is one rupee twenty-eight, and it's labelled *estimated*, because a price list
 > is not a bill.
 >
-> Eleven hundred and forty-nine tests. Thirty-eight written incidents. The gross number is two lakh.
-> The honest number is sixty thousand. Thank you.
+> Eleven hundred and seventy-nine tests. Thirty-nine written incidents.
+>
+> We don't claim every payment we see. We claim only what the evidence lets us prove. Thank you.
 
 ---
 
 ## 3 · After the recording
 
-1. Open **Clipchamp**. Drag the eight clips onto the timeline in order.
+1. Open **Clipchamp**. Drag the nine clips onto the timeline in order.
 2. Trim the dead air at the start and end of each clip — leave about half a second.
 3. **No music, no titles, no transitions.** A cut is fine. Music competes with your voice and judges
    are listening to the words.
@@ -379,7 +430,12 @@ right** — say what is on screen.
 | Actual spend | ₹0.00 | Projected at paid rates: ₹1.28 |
 | Audit chain | 213 blocks | Valid before you tamper with it |
 | Tests | 1,149 | ruff, mypy --strict, tsc, eslint all clean |
-| Incidents · decisions | 38 · 44 | `docs/INCIDENTS.md` · `docs/DECISIONS.md` |
+| Incidents · decisions | 39 · 45 | `docs/INCIDENTS.md` · `docs/DECISIONS.md` |
+| Benchmark: naive breaches | 308 | **Measured**, not simulated — `python tasks.py benchmark` |
+| Benchmark: RevPilot breaches | 0 | Measured |
+| Benchmark: firewall removed | 284 breaches | Same recovery as RevPilot — safety costs nothing |
+| Benchmark: holdout removed | ₹2,86,013 | Highest recovery of any arm · attribution **unavailable** |
+| Evidence snapshot | `docs/EVIDENCE.md` | Every figure above, generated from one run |
 
 ---
 
@@ -421,7 +477,21 @@ assumption and I can't validate it without real traffic. Second is tail truncati
 chain: the hash chain detects any edit to history, but a chain cut short at the end verifies clean.
 That's written down in `audit.py` rather than left for someone to find.
 
-**"What would you do next?"**
+**"How is this different from any other payment-recovery agent?"**
+Most of them can tell you what they recovered. This one can tell you whether the recovery belongs to
+it. Thirty-nine cases are deliberately never contacted, so there is a counterfactual; the gross
+figure and the claimable figure are different numbers on the same screen; and `tasks.py benchmark`
+shows what happens when you remove that holdout — recovery goes up and attribution becomes
+impossible. The architecture pattern is becoming common. The evidence discipline is the part that
+isn't.
+
+**"You could just add a voice agent like the others."**
+I could, and I deliberately didn't. Delivery is not the hard problem here — attribution and safe
+autonomous financial action are. Adding voice would mean DLT and telephony dependencies, more
+compliance surface, and demo risk, in exchange for feature parity on the part of the problem that is
+already solved.
+
+**"What would you do next?"
 Get it in front of one real merchant with enough volume to make the holdout arm significant.
 Everything else — the firewall, the audit chain, the stopping rules — is built to survive that. The
 statistics are the only part that needs traffic I can't simulate.

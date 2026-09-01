@@ -18,7 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import Clock
 from app.core.power import sample_size_plan
-from app.core.provenance import Figure, Provenance
 from app.db.enums import CaseStatus, ExperimentArm
 from app.db.models import ExperimentAssignment, RecoveryCase
 from app.deps import get_clock, get_db
@@ -67,25 +66,16 @@ async def overview(
     clock: Annotated[Clock, Depends(get_clock)],
     _principal: Annotated[Principal, Depends(require_api_token)],
 ) -> dict[str, Any]:
-    report = await metrics_service.overview(session, clock=clock)
+    # Computed before the overview, because the overview now requires it: the
+    # lift has one implementation and no caller can get a placeholder (INC-039).
+    attribution = recovery_report(await _outcomes(session))
+    report = await metrics_service.overview(session, clock=clock, attribution=attribution)
     body = report.as_dict()
 
     # Fill in net incremental from the attribution service rather than
     # recomputing it. If there is no control arm the figure stays zero and the
     # basis says why, which is the honest answer -- claiming gross as
     # incremental is exactly the overstatement the control group prevents.
-    attribution = recovery_report(await _outcomes(session))
-    body["net_incremental"] = Figure(
-        paise=attribution.net_incremental_paise,
-        provenance=Provenance.SIMULATED,
-        basis=(
-            f"lift {attribution.absolute_lift:.1%} over a {attribution.control.cases}-case "
-            "holdout, less discounts and inference"
-            if attribution.has_control
-            else "no control arm in this population: incremental cannot be computed "
-            "and is not claimed"
-        ),
-    ).as_dict()
     body["lift_is_significant"] = attribution.lift_is_significant
     body["notes"] = list(attribution.notes)
     return body
