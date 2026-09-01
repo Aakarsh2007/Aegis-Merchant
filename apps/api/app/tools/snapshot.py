@@ -36,6 +36,8 @@ from app.db.models import ExperimentAssignment, RecoveryCase
 from app.db.session import create_engine
 from app.services.attribution import recovery_report
 from app.services.metrics import cost_report, overview, stopping_rule_counts
+from app.services.reconciliation import money_ledger
+from app.tools.docmeta import decision_count, incident_count
 from app.workers.benchmark import run_benchmark
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -49,12 +51,6 @@ def _git(*args: str) -> str:
         return done.stdout.strip() or "unknown"
     except Exception:
         return "unknown"
-
-
-def _count(pattern: str, path: Path) -> int:
-    if not path.is_file():
-        return 0
-    return len(re.findall(pattern, path.read_text(encoding="utf-8"), re.M))
 
 
 def _test_count() -> int:
@@ -95,6 +91,7 @@ async def _gather() -> dict[str, Any]:
 
         async with factory() as session:
             attribution = recovery_report(await _outcomes(session))
+            ledger = await money_ledger(session, attribution=attribution)
             ov = await overview(session, clock=clock, attribution=attribution)
             cost = await cost_report(session)
             rules = await stopping_rule_counts(session)
@@ -144,6 +141,12 @@ async def _gather() -> dict[str, Any]:
     return {
         "overview": ov.as_dict(),
         "attribution": attribution.as_dict(),
+        "reconciliation": ledger.as_dict(),
+        "reconciliation_cases": {
+            "arrived": ledger.arrived_cases,
+            "driven": ledger.driven_cases,
+            "organic": ledger.organic_cases,
+        },
         "cost": cost.as_dict(),
         "stopping_rules": rules,
         "verified_recoveries": verified,
@@ -195,6 +198,8 @@ def _benchmark_table(bench: dict[str, Any]) -> list[str]:
 def _render(data: dict[str, Any], meta: dict[str, Any]) -> str:
     ov, att = data["overview"], data["attribution"]
     cost, bench = data["cost"], data["benchmark"]
+    rec = data["reconciliation"]
+    rec_cases = data["reconciliation_cases"]["arrived"]
     treated, control = att["treatment"], att["control"]
 
     out: list[str] = [
@@ -242,8 +247,36 @@ def _render(data: dict[str, Any], meta: dict[str, Any]) -> str:
         f"{control['conversion']:.1%} | "
         f"{control['ci95'][0]:.1%} to {control['ci95'][1]:.1%} |",
         "",
-        f"Absolute lift **{att['absolute_lift']:.2%}**. Statistically significant:",
-        f"**{att['lift_is_significant']}**. The intervals overlap, so it is directional.",
+        f"Absolute lift **{att['absolute_lift'] * 100:.2f} percentage points**. Two-proportion",
+        f"z-test: **z = {att['significance']['z']:.2f}, p = {att['significance']['p_value']:.4f}**, "
+        f"95% CI on the difference "
+        f"**{att['significance']['diff_ci95'][0] * 100:+.1f} to "
+        f"{att['significance']['diff_ci95'][1] * 100:+.1f} points**.",
+        "",
+        f"Statistically significant: **{att['lift_is_significant']}**. The interval on the",
+        "difference contains zero, so the observed lift is indistinguishable from chance at",
+        'this sample size. Reported as a p-value rather than as "the intervals overlap":',
+        "interval non-overlap is a stricter criterion than the hypothesis actually needs, and",
+        "it was answering a question nobody asked.",
+        "",
+        "## Reconciliation",
+        "",
+        "The one identity that has to balance. `arrived = driven + organic`, to the paise.",
+        "",
+        "| | Amount | Cases |",
+        "|---|---|---|",
+        f"| Money that arrived | {rec['arrived']['display']} | {rec_cases} |",
+        f"| ├ recovered on a path we drove | {rec['driven']['display']} | "
+        f"{data['reconciliation_cases']['driven']} |",
+        f"| └ arrived organically, credited zero | {rec['organic']['display']} | "
+        f"{data['reconciliation_cases']['organic']} |",
+        f"| **Residual** | **Rs {rec['residual_paise'] / 100:,.2f}** | balances: "
+        f"**{rec['balances']}** |",
+        "",
+        f"Separately, {rec['incremental_estimate']['display']} is the share of the driven figure",
+        "we can defend as incremental. It is an **estimate** over the treated arm's exposure and",
+        "deliberately not a term in the sum above -- an earlier README presented the three as",
+        "`gross -> claimable + not claimed`, which reads as a partition and is not one.",
         "",
         "## Razorpay-verified recoveries",
         "",
@@ -343,8 +376,11 @@ def main(argv: list[str] | None = None) -> int:
         # 0 would be a silent falsehood in the file that exists to be trusted.
         # `--fast` says so instead.
         "tests": None if "--fast" in args else _test_count(),
-        "incidents": _count(r"^## INC-", ROOT / "docs" / "INCIDENTS.md"),
-        "decisions": _count(r"^## DEC-", ROOT / "docs" / "DECISIONS.md"),
+        # Via `tools.docmeta`, shared with the consistency test. These used to
+        # be `^## INC-` / `^## DEC-` inline, which also matched each file's own
+        # format-template heading and published 40/46 for 39/45. See docmeta.
+        "incidents": incident_count(ROOT),
+        "decisions": decision_count(ROOT),
     }
 
     if "--json" in args:

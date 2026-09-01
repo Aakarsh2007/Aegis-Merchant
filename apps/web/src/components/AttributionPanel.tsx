@@ -124,6 +124,51 @@ export async function AttributionPanel() {
         </div>
       ) : null}
 
+      {/*
+        The actual test, spelled out. This panel used to lean on
+        `lift_is_significant` plus a note saying the intervals overlapped --
+        which is a weaker statement than the data supports and, as a reviewer
+        pointed out, a weak thing to say out loud. The honest sentence is
+        available: here is the lift, here is the p-value, here is the interval
+        on the difference, and it contains zero.
+      */}
+      {a.has_control_arm && a.significance.well_defined ? (
+        <div className="mt-3 rounded-lg border border-ink-700 bg-ink-800/40 p-2.5">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <span className="text-[11px] text-paper-300">
+              Two-proportion z-test
+            </span>
+            <span className="numeric text-[11px] text-paper-100">
+              z = {a.significance.z.toFixed(2)} · p ={" "}
+              <span
+                className={
+                  a.significance.is_significant
+                    ? "font-semibold text-verified-500"
+                    : "font-semibold text-simulated-500"
+                }
+              >
+                {a.significance.p_value.toFixed(4)}
+              </span>
+            </span>
+          </div>
+          <p className="mt-1.5 text-[10px] leading-relaxed text-paper-500">
+            Lift{" "}
+            <span className="numeric text-paper-300">
+              {(a.significance.diff * 100).toFixed(2)} points
+            </span>
+            , 95% interval on the difference{" "}
+            <span className="numeric text-paper-300">
+              {(a.significance.diff_ci95[0] * 100).toFixed(1)} to{" "}
+              {(a.significance.diff_ci95[1] * 100).toFixed(1)} points
+            </span>
+            .{" "}
+            {a.significance.is_significant
+              ? "The interval excludes zero."
+              : "The interval contains zero, so the observed lift is indistinguishable from chance at this sample size."}
+          </p>
+        </div>
+      ) : null}
+
       {!a.has_control_arm ? (
         <p className="mt-3 text-[11px] text-danger-500">
           No control arm in this population: incremental cannot be computed and

@@ -151,6 +151,11 @@ class TestTheShotsPointAtThingsThatExist:
             "What we have not proven",
             "Held as control",
             "Where the AI stops",
+            # The reconciliation panel, added after a reviewer added up the
+            # headline figures and found them short. The shot list points at it
+            # first, so it has to exist.
+            "Where the money went",
+            "MONEY THAT ARRIVED",
         ],
     )
     def test_named_ui_elements_exist_in_the_components(self, phrase: str) -> None:

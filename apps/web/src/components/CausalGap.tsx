@@ -11,7 +11,12 @@
  * reports something it has not shown, and says exactly what showing it would
  * cost. That is a deliberate inclusion: "not statistically significant" is a
  * disclaimer, and a disclaimer invites the reader to guess how close we are. A
- * completion bar at 4.9% and a count of 1,382 missing cases does not.
+ * completion bar and a count of 1,382 missing cases does not.
+ *
+ * Two percentages, both labelled: 13.2% of all cases needed, and 4.9% of the
+ * control arm, which is the one that governs power. A reviewer read the lone
+ * 4.9% as the experiment's overall progress, which is a fair reading of an
+ * unlabelled number and the reason both now carry their names.
  *
  * Two things this panel will never render, because the API does not send them:
  * a p-value, and a projected completion date computed from seeded traffic. The
@@ -87,12 +92,25 @@ export async function CausalGap() {
       </ul>
 
       <div className="mt-4 rounded-lg border border-ink-700 bg-ink-900/60 p-3">
-        <div className="flex items-baseline justify-between">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <span className="text-[11px] font-medium text-paper-100">
             Progress toward a powered test
           </span>
-          <span className="numeric text-sm font-semibold text-paper-50">
-            {percent(p.completion)}
+          {/* Both figures, each named. A reviewer read a lone "4.9%" as the
+              whole experiment's progress; it was the binding arm's. Neither
+              number was wrong -- the missing label was. */}
+          <span className="flex items-baseline gap-2">
+            <span className="numeric text-sm font-semibold text-paper-50">
+              {percent(p.progress.overall)}
+            </span>
+            <span className="text-[10px] text-paper-500">overall</span>
+            <span className="text-paper-700">·</span>
+            <span className="numeric text-sm font-semibold text-amber-300">
+              {percent(p.completion)}
+            </span>
+            <span className="text-[10px] text-paper-500">
+              {p.progress.binding_arm} arm, which governs
+            </span>
           </span>
         </div>
 

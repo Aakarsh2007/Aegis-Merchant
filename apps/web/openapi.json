@@ -1625,6 +1625,58 @@
         ]
       }
     },
+    "/api/v1/metrics/reconciliation": {
+      "get": {
+        "description": "Where the money went, with the residual shown rather than assumed.\n\nA reviewer added up the README's three headline figures and found they did\nnot sum. They were right, and the diagnosis matters more than the fix: the\nnumbers were each correct, but laid out as ``gross -> claimable + not\nclaimed``, which reads as a partition. Incremental is an *estimate* over the\ntreated arm's exposure, not a slice of gross.\n\nThis endpoint returns the identity that does hold -- ``arrived = driven +\norganic`` -- with the estimate reported beneath it and never inside it, plus\na ``residual_paise`` that a reader can check is zero. See\n``services/reconciliation``.",
+        "operationId": "reconciliation_api_v1_metrics_reconciliation_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reconciliation Api V1 Metrics Reconciliation Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Every rupee, as an identity that balances",
+        "tags": [
+          "metrics"
+        ]
+      }
+    },
     "/api/v1/metrics/stopping-rules": {
       "get": {
         "operationId": "stopping_rules_api_v1_metrics_stopping_rules_get",

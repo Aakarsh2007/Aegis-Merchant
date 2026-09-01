@@ -1196,3 +1196,68 @@ opposite of the instruction they closed with.
   the amount we can attribute to RevPilot."* The first was gimmicky.
 * *"The safety layer costs nothing"* → *"In this corpus the firewall introduced no recovery cost."*
   Safety can have opportunity costs in a real system; the benchmark measured one corpus.
+
+---
+
+## DEC-047 · 2026-09-01 · Publish the identity, keep the pessimistic percentage, decline the rest
+
+Acting on a reviewer's judge's-eye pass. Six "must fix" items, all six real, plus a list of
+additions. What was adopted and what was declined, with reasons.
+
+### Adopted
+
+**One counter for the ledgers, in one module.** `app/tools/docmeta.py`, imported by both the
+snapshot and the consistency test. The alternative — fix the regex in `snapshot.py` and separately in
+the test — is how the two got to disagree in the first place. See INC-041.
+
+**The identity, computed and published.** `arrived = driven + organic`, with `residual_paise`
+returned even though it is zero by construction. The reviewer's instinct was *"Gross = Claimable +
+Not Claimed + any explicitly named residual category — if there is another category, show it."* We
+looked for the residual and there wasn't one: the three figures were never a partition, so the fix
+is a corrected relationship rather than a fourth bucket. Publishing a category called "residual" to
+absorb ₹3,522.54 would have made the arithmetic close and the meaning worse. See INC-042.
+
+**The proper significance test.** Two-proportion z, with the interval on the difference. See
+INC-043.
+
+**Both progress percentages, each labelled.** The reviewer objected to "Power completion 4.9%" as
+misleading when 210 of 1,592 cases are in hand, and proposed 13.2% overall. Both are now returned
+and rendered — `progress.overall` and `completion`, the latter still tracking the binding arm.
+
+**The population explanation.** 420 attempts → 182 failed-or-abandoned (the benchmark's population)
+→ 210 recovery cases (the experiment's, adding the 28 overdue receivables). The reviewer offered
+wording and said *"only use that wording if that's actually true"*, which was the right caution —
+their guess was close but not exact, and the real difference is the receivables. Now a table in the
+README.
+
+### Declined, with reasons
+
+**Keeping `completion` as the *only* percentage, or replacing it with the overall figure.** Neither.
+The reviewer suggested "don't call the entire experiment 4.9% complete", which is correct, and
+"Experiment progress: 13.2% overall", which alone would be optimistic in the wrong direction: power
+is governed by the smaller arm, and a study with 5,000 treated and 12 control cases is not 99% of
+the way to an answer. Reporting only the pessimistic figure was misleading; reporting only the
+optimistic one would be worse. Both, named, is the honest answer, and the label was always the
+actual defect.
+
+**Regenerating every screenshot and number from one final run, before recording.** Adopted in
+substance, declined as a manual ritual. The reviewer's version — *"run the complete demo and make a
+final-number sheet, then update narration, README, demo script, evidence, screenshots"* — is exactly
+right about the goal and would reintroduce the failure mode by hand. `docs/EVIDENCE.md` is that
+sheet, generated; the tests now compare documents against it rather than against a transcription of
+it. The remaining manual step is running `python tasks.py snapshot`, which is one command and is in
+the pre-flight.
+
+**Deleting `intervals_overlap`.** Kept and labelled. When the conservative criterion and the correct
+one disagree, that disagreement is worth being able to see.
+
+**An architecture visual for the video, and a more dramatic UNREPRESENTABLE demo.** Both are good
+suggestions about presentation and both were declined *now*, for the reviewer's own stated reason:
+*"I would NOT keep adding features. Your biggest risk is introducing one more feature and creating
+another inconsistency or demo failure."* Three days out, with the numerical work just finished, that
+advice outranks their own feature list. The existing panel already shows the proposal schema and the
+script already says *"charge more than they owe? Not blocked. Unrepresentable."*
+
+**A "safe recovery efficiency" metric.** The reviewer raised and dismissed this themselves. Agreed —
+manufacturing a composite metric to summarise the trade-off would replace two measured numbers with
+one invented one.

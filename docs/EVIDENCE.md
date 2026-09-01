@@ -10,12 +10,12 @@ number. Documents now cite this snapshot; this snapshot cites the system.
 
 | | |
 |---|---|
-| Snapshot | `20260901-1358-57676b2` |
-| Generated | 2026-09-01 13:58 UTC |
-| Commit | `57676b2` on `main` |
+| Snapshot | `20260901-1824-8201f98` |
+| Generated | 2026-09-01 18:24 UTC |
+| Commit | `8201f98` on `main` |
 | Corpus seed | `20260905` |
-| Tests collected | 1,199 |
-| Incidents | 40 |
+| Tests collected | 1,257 |
+| Incidents | 42 |
 | Decisions | 46 |
 
 ## The three numbers, and the question that is open
@@ -38,8 +38,30 @@ at this sample size. The design that would settle it is pre-registered in
 | Treated | 171 | 50 | 29.2% | 22.9% to 36.4% |
 | Control | 39 | 9 | 23.1% | 12.7% to 38.3% |
 
-Absolute lift **6.16%**. Statistically significant:
-**False**. The intervals overlap, so it is directional.
+Absolute lift **6.16 percentage points**. Two-proportion
+z-test: **z = 0.77, p = 0.4397**, 95% CI on the difference **-8.7 to +21.0 points**.
+
+Statistically significant: **False**. The interval on the
+difference contains zero, so the observed lift is indistinguishable from chance at
+this sample size. Reported as a p-value rather than as "the intervals overlap":
+interval non-overlap is a stricter criterion than the hypothesis actually needs, and
+it was answering a question nobody asked.
+
+## Reconciliation
+
+The one identity that has to balance. `arrived = driven + organic`, to the paise.
+
+| | Amount | Cases |
+|---|---|---|
+| Money that arrived | Rs 3,41,780.70 | 59 |
+| ├ recovered on a path we drove | Rs 2,02,759.95 | 42 |
+| └ arrived organically, credited zero | Rs 1,39,020.75 | 17 |
+| **Residual** | **Rs 0.00** | balances: **True** |
+
+Separately, Rs 60,216.66 is the share of the driven figure
+we can defend as incremental. It is an **estimate** over the treated arm's exposure and
+deliberately not a term in the sum above -- an earlier README presented the three as
+`gross -> claimable + not claimed`, which reads as a partition and is not one.
 
 ## Razorpay-verified recoveries
 
@@ -107,5 +129,5 @@ Full table with breaches by kind, and the limitations, from
 
 ---
 
-*Snapshot `20260901-1358-57676b2`, commit `57676b2`, 2026-09-01 13:58 UTC.*
+*Snapshot `20260901-1824-8201f98`, commit `8201f98`, 2026-09-01 18:24 UTC.*
 *Any figure elsewhere in this repository that disagrees with this file is stale.*

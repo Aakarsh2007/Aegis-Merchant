@@ -23,6 +23,7 @@ import { AuthModeBanner } from "@/components/AuthModeBanner";
 import { CausalGap } from "@/components/CausalGap";
 import { ClaimsPanel } from "@/components/ClaimsPanel";
 import { ProofStatus } from "@/components/ProofStatus";
+import { ReconciliationPanel } from "@/components/ReconciliationPanel";
 import { CasesTable } from "@/components/CasesTable";
 import { ChaosPanel } from "@/components/ChaosPanel";
 import { CostPanel } from "@/components/CostPanel";
@@ -104,7 +105,18 @@ export default function Page() {
         </Suspense>
       </div>
 
-      {/* 4. The argument, immediately after the numbers it is about: six
+      {/* 4. Where the money went, before any argument about it. A reviewer
+             added up our three headline figures and found them Rs 3,522.54
+             short -- because they were laid out as a partition and are not
+             one. This shows the sum that does hold, prints the residual, and
+             puts the estimate below the line. */}
+      <div className="mt-6">
+        <Suspense fallback={<Skeleton label="reconciliation" />}>
+          <ReconciliationPanel />
+        </Suspense>
+      </div>
+
+      {/* 5. The argument, immediately after the numbers it is about: six
              conditions for what we claim, and the larger figure we don't. */}
       <div className="mt-6">
         <Suspense fallback={<Skeleton label="claims" />}>
@@ -112,14 +124,14 @@ export default function Page() {
         </Suspense>
       </div>
 
-      {/* 5. The one button that touches real Razorpay. Directly under the
+      {/* 6. The one button that touches real Razorpay. Directly under the
              tile it moves, because the tile's honest zero is otherwise a dead
              end -- the instruction used to be a curl string in a caption. */}
       <div className="mt-6">
         <TestModePanel />
       </div>
 
-      {/* 6. The limitation, stated before the features rather than after.
+      {/* 7. The limitation, stated before the features rather than after.
              Placed here deliberately: a reader who sees Rs 2,02,760 and then
              Rs 60,217 should learn what neither number proves BEFORE they are
              shown eight panels of things that work. Burying it at the bottom
@@ -130,13 +142,13 @@ export default function Page() {
         </Suspense>
       </div>
 
-      {/* 7. Why it is an AI project, and where the AI is not allowed. */}
+      {/* 8. Why it is an AI project, and where the AI is not allowed. */}
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <WhereAIStops />
         <AdversarialPanel />
       </div>
 
-      {/* 8. What it chose not to do, and whether any of it can be checked. */}
+      {/* 9. What it chose not to do, and whether any of it can be checked. */}
       <div className="mt-6">
         <Suspense fallback={<Skeleton label="briefing" />}>
           <MorningBriefing />
@@ -166,7 +178,7 @@ export default function Page() {
         </div>
       </div>
 
-      {/* 9. Follow one case end to end. */}
+      {/* 10. Follow one case end to end. */}
       <div className="mt-6">
         <CasesTable />
       </div>

@@ -1603,3 +1603,160 @@ error, and a sentence claiming a signed webhook made a payment *"attributable to
 luck"*, which contradicts our own six attribution conditions. Two documents holding two versions of
 one script is exactly the drift `docs/EVIDENCE.md` exists to prevent, one level up. PITCH.md now
 keeps the form answers and points at the tested script.
+
+---
+
+## INC-041 · A counter that counted the instructions for writing an entry
+
+**Symptom.** A reviewer read the README against the demo script and found three numbers
+disagreeing: **1,199 vs 1,149 tests, 39 vs 40 incidents, 45 vs 46 decisions.** They said the fair
+thing — *a judge can immediately notice this* — and asked for one authoritative number everywhere.
+
+**The cause was one regex, and it was in the generated file.** `tools/snapshot.py` counted with
+`^## INC-` and `^## DEC-`. Both ledgers open with a **format template** showing contributors the
+heading shape:
+
+```
+## INC-00N · YYYY-MM-DD HH:MM IST · One-line symptom
+```
+
+That matched. So `docs/EVIDENCE.md` — the file whose entire stated purpose is being the single
+source of truth, the file that says *"anything that disagrees with this is stale"* — published 40
+and 46 when the answer was 39 and 45. It counted the instructions for writing an entry as an entry.
+
+**The direction is what stings.** The hand-maintained README was right. The generated file was
+wrong, and I had already "corrected" the demo script *toward* the generated figure. A snapshot
+exists so documents stop drifting; this one propagated its own error into a document that had been
+correct. An automated source of truth that is wrong is worse than no automation, because it
+launders a mistake as a measurement.
+
+**A second trap in the same data**, found while fixing the first and worth recording because it
+would have produced a plausible-looking wrong answer in the opposite direction: **`INC-014` and
+`DEC-043` do not exist.** The ids run to 040 and 046 with one gap each. Anything deriving a count
+from the highest id — which is the obvious shortcut — is off by one and looks right doing it.
+
+**Fix.** `app/tools/docmeta.py`, one canonical pattern requiring three digits and a space, which
+`00N` cannot satisfy. Imported by the snapshot *and* by the consistency test, so the two cannot
+drift. It returns a count of real headings and never a maximum id.
+
+**Regression test.** `test_the_heading_pattern_excludes_the_format_templates` asserts the loose
+pattern finds exactly one more per file than the strict one — so if a future template stops
+matching the loose pattern too, the test says so instead of passing quietly. Plus
+`TestTheSnapshotIsRight`, which checks `EVIDENCE.md` against the repository rather than the other
+way round: it is the one file whose own numbers cannot be validated against itself.
+
+**Why no test caught it.** `tests/test_documented_counts.py` was green throughout, for two reasons
+that are both worse than a missing assertion:
+
+1. **Its `DOCS` list did not include `docs/DEMO-SCRIPT.md`.** All three stale figures were in that
+   file — the one a presenter reads on camera. The list was hand-maintained and the script was
+   written after it. *A consistency check whose scope excludes a document is worse than no check,
+   because it reports safety over ground it never looked at.* `DOCS` is now derived from the
+   filesystem.
+2. **The test-count assertion was a one-sided bound, not a comparison.** It checked only that no
+   document claimed *more* tests than a crude estimate supported, with a 1.6× ceiling — because the
+   old estimator counted `def test_` by hand and undercounted badly. 1,149 against a real 1,199
+   sailed through. The snapshot now runs `pytest --collect-only`, so an exact comparison is
+   available and there was no longer any reason to accept less.
+
+The three exclusions that remain — `INCIDENTS.md`, `DECISIONS.md`, `workflow.md` — are append-only
+or frozen, and their stale figures are *dated facts*. INC-006 says the suite had 1,040 tests when it
+was written; that was true, and rewriting it would falsify the record. The list is itself pinned by
+a test so it cannot quietly grow to cover up a real drift.
+
+---
+
+## INC-042 · Three correct numbers that did not add up
+
+**Symptom.** A reviewer added up the README's headline:
+
+```
+₹2,02,760  GROSS RECOVERED  →  ₹60,217 CLAIMABLE BY US  +  ₹1,39,021 NOT CLAIMED
+```
+
+₹60,216.66 + ₹1,39,020.75 = **₹1,99,237.41**, not ₹2,02,759.95. Short by ₹3,522.54. Their question
+was the one that matters: *if the headline numbers don't reconcile, can I trust the attribution
+system?*
+
+**Every figure was correct.** The arrow and the plus sign were wrong. The three quantities are not a
+partition:
+
+* **Gross** is a rupee sum over 42 cases that settled on a path we drove.
+* **Not claimed** is a rupee sum over a **disjoint** 17 cases that settled organically.
+* **Incremental** is not a rupee sum at all. It is an estimate — the measured lift applied to the
+  treated arm's *exposure*, net of costs. It is smaller than gross, which is precisely what made it
+  look like a slice of gross.
+
+So the layout implied a subtraction that no code performs. **Presenting an estimate as a slice of a
+total is the exact overstatement this project exists to refuse**, and it had gotten into our own
+headline — the most visible place available and, it turns out, the least examined. Every reviewer
+before this one read that block and nobody added it up, including me.
+
+**Fix.** `app/services/reconciliation.py`. There is a real identity underneath and it balances to
+the paise:
+
+```
+arrived (₹3,41,780.70, 59 cases) = driven (₹2,02,759.95, 42) + organic (₹1,39,020.75, 17)
+```
+
+`residual_paise` is computed and published rather than asserted, so a reader can *see* the zero. The
+estimate is reported below the line, outside the addition, with `ESTIMATE, not a slice` in the
+`basis` string where a front end cannot drop it. Live at `GET /api/v1/metrics/reconciliation` and
+first on the dashboard after the tiles.
+
+**Regression test.** `tests/test_money_ledger.py` — the identity in paise with no tolerance, open
+cases in neither term, demo rupees excluded, the two populations asserted disjoint against the
+database, and `driven` cross-checked against `attribution.gross_recovered_paise`, which is computed
+by a completely separate code path in Python rather than SQL. Sabotage-verified: removing the
+`is_demo` filter fails five of them, including the cross-check.
+
+**Why no test caught it.** No test had an opinion about how the three figures related to each other.
+Each was individually correct and individually tested. The defect lived in the *arrangement*, in a
+fenced code block in the README, which is the one place in this repository where a claim can be made
+without going through a `Figure`. The type system that makes an unprovenanced rupee unrepresentable
+has no jurisdiction over ASCII art.
+
+---
+
+## INC-043 · A significance criterion that answered a question nobody asked
+
+**Symptom.** The dashboard, the snapshot and the spoken script all justified "not statistically
+significant" the same way: **"the confidence intervals overlap."** A reviewer said that is not the
+cleanest statistical explanation for non-significance, and that if a proper test had been run we
+should show it instead.
+
+They were right twice. `lift_is_significant` was implemented as `treatment.bounds[0] >
+control.bounds[1]` — non-overlap of the two arms' Wilson intervals. That is a real test of
+*something*, but not of the hypothesis. Non-overlap is **strictly more conservative** than a test on
+the difference, so the criterion could report "not significant" for a result a correct test would
+reject. Its own docstring called it "the right direction of crude", which was me noticing the
+weakness and filing it as a virtue.
+
+The second half is about what it sounds like out loud. "The intervals overlap" is a fact about two
+intervals. The finding was available and stronger: **the observed lift is 6.16 percentage points,
+z = 0.77, p = 0.44, and the 95% interval on the difference runs from −8.7 to +21.0 points.** One
+describes the plot; the other states the result.
+
+**Fix.** `core/stats.two_proportion_test` — pooled variance for the test statistic (the null says
+the proportions are equal, so pooling is correct under it) and unpooled for the interval (which must
+not assume the null it describes). Using one for both is a common and silent error. No SciPy;
+`math.erfc` rather than `1 - math.erf`, because past about z = 9 the subtraction loses every
+significant digit and returns exactly 0.0, and a p-value of 0.0 on a dashboard is a number a reader
+would believe.
+
+`intervals_overlap` is kept and labelled rather than deleted, because when the two criteria disagree
+that disagreement is informative.
+
+**Regression test.** `tests/test_money_reconciles.py`. The one that earns its place searches for a
+population where the z-test rejects but the intervals still overlap, and **fails if no such
+population exists** — because if that region were empty, swapping the criterion changed nothing and
+the test should be deleted rather than kept as decoration. Sabotage-verified by restoring the old
+criterion, which fails it.
+
+**A note on my own testing.** The first version of the tail-underflow test asserted
+`normal_sf(40.0) > 0.0`, on the assumption that `erfc` simply does not underflow. **It does, at
+z = 38.** The test failed against correct code, and the useful part is that the docstring had made a
+stronger claim than the implementation could support — the range is thirty standard deviations
+wider, not unbounded. That is now what both the test and the comment say. Fourth time in this
+project that a checking instrument has been wrong before it was right, and the fourth time in the
+same direction: too confident about what it was measuring.

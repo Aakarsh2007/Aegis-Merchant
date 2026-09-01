@@ -68,6 +68,19 @@ export interface Attribution {
   inference_cost_micro_inr: number;
   net_incremental_paise: number;
   lift_is_significant: boolean;
+  /** The pooled two-sided two-proportion z-test. Replaced an interval-overlap
+   * check, which was stricter than the hypothesis needed. */
+  significance: {
+    z: number;
+    p_value: number;
+    diff: number;
+    /** On the *difference*, which is the interval that answers the question. */
+    diff_ci95: [number, number];
+    is_significant: boolean;
+    well_defined: boolean;
+  };
+  /** The old, more conservative criterion, kept visible and labelled. */
+  intervals_overlap: boolean;
   has_control_arm: boolean;
   excluded_demo_cases: number;
   notes: string[];
@@ -259,6 +272,14 @@ export type PowerPlan = {
   };
   have: { control: number; treatment: number };
   need: { control: number; treatment: number };
+  /** Three named figures. One unlabelled percentage here was read as the whole
+   * experiment's progress when it was the binding arm's. */
+  progress: {
+    overall: number;
+    control: number;
+    treatment: number;
+    binding_arm: string;
+  };
   completion: number;
   completion_basis: string;
   cases_remaining: number;
@@ -355,8 +376,33 @@ export type Proof = {
   summary: string;
 };
 
+/**
+ * The money identity. `arrived = driven + organic`, and `residual_paise` is
+ * published so a reader can see it is zero rather than trust that it is.
+ *
+ * `incremental_estimate` is deliberately NOT a term in that sum. An earlier
+ * README laid the three figures out as `gross -> claimable + not claimed`; a
+ * reviewer added them up and found them short, because incremental is an
+ * estimate over the treated arm's exposure and not a slice of gross.
+ */
+export type Reconciliation = {
+  identity: string;
+  balances: boolean;
+  residual_paise: number;
+  arrived: Figure;
+  driven: Figure;
+  organic: Figure;
+  demo_verified: Figure;
+  incremental_estimate: Figure;
+  cost_paise: number;
+  claimed_share: number;
+  note: string;
+};
+
 export const api = {
   overview: () => safeFetch<Overview>("/api/v1/metrics/overview"),
+  reconciliation: () =>
+    safeFetch<Reconciliation>("/api/v1/metrics/reconciliation"),
   attribution: () => safeFetch<Attribution>("/api/v1/metrics/attribution"),
   cost: () => safeFetch<CostReport>("/api/v1/metrics/cost"),
   stoppingRules: () => safeFetch<StoppingRules>("/api/v1/metrics/stopping-rules"),

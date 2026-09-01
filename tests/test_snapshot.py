@@ -92,7 +92,11 @@ class TestNoFigureIsSilentlyZero:
         """INC-039. The snapshot published Rs 0.00 three lines above an
         attribution table reporting a 6.16% lift."""
         text = _evidence()
-        lift = re.search(r"Absolute lift \*\*([\d.]+)%\*\*", text)
+        # "percentage points", not "%", since DEC-047: a lift between two
+        # proportions is a difference in points, and calling it a percentage
+        # invites the reader to divide it by something. The guard clause below
+        # caught this rename, which is what a guard clause is for.
+        lift = re.search(r"Absolute lift \*\*([\d.]+) percentage points\*\*", text)
         net = re.search(r"\| Net incremental \| Rs ([\d,]+\.\d\d) \|", text)
         assert lift and net, "the snapshot's shape has changed"
         if float(lift.group(1)) > 0:

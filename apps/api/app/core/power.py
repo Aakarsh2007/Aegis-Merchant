@@ -145,6 +145,44 @@ class PowerPlan:
         )
 
     @property
+    def control_completion(self) -> float:
+        """The control arm's own progress."""
+        if self.control_required <= 0:
+            return 0.0
+        return min(1.0, self.control_now / self.control_required)
+
+    @property
+    def treatment_completion(self) -> float:
+        """The treated arm's own progress."""
+        if self.treatment_required <= 0:
+            return 0.0
+        return min(1.0, self.treatment_now / self.treatment_required)
+
+    @property
+    def overall_completion(self) -> float:
+        """Cases collected over cases needed, both arms pooled.
+
+        Added because a reviewer read "Power completion 4.9%" beside "39 of 796
+        control, 171 of 796 treated" and objected -- correctly -- that calling
+        the *whole experiment* 4.9% complete is misleading when 210 of the 1,592
+        cases are in hand.
+
+        :attr:`completion` is still the figure that governs, and the reasoning in
+        its docstring stands. But the two were never in conflict; the label was
+        doing the lying. Both are now returned and both are named, so no reader
+        has to guess which arm a single percentage refers to.
+        """
+        total_required = self.control_required + self.treatment_required
+        if total_required <= 0:
+            return 0.0
+        return min(1.0, (self.control_now + self.treatment_now) / total_required)
+
+    @property
+    def binding_arm(self) -> str:
+        """Which arm is holding the study back. The one to report progress on."""
+        return "control" if self.control_completion <= self.treatment_completion else "treatment"
+
+    @property
     def is_powered(self) -> bool:
         return (
             self.control_now >= self.control_required

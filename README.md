@@ -22,19 +22,30 @@ subscription mandates. Every tool that chases it back reports the same misleadin
 money recovered.** Some of those customers would have paid anyway. Billing for them is charging for
 the weather.
 
-## Three numbers, one of them refused
+## Where the money went, and what we refuse to claim
 
 ```
-        ₹2,02,760              ₹60,217              ₹1,39,021
-     GROSS RECOVERED    →    CLAIMABLE BY US   +   NOT CLAIMED
-       SIMULATED             NOT SIGNIFICANT      ₹0 CREDITED
+   ₹3,41,780.70   MONEY THAT ARRIVED                      59 cases
+   ────────────────────────────────────────────────────────────────
+   ₹2,02,759.95   ├─ recovered on a path we drove          42 cases
+   ₹1,39,020.75   └─ arrived organically, credited ₹0.00   17 cases
+   ────────────────────────────────────────────────────────────────
+                     residual: ₹0.00   ✓ balances
+
+   ₹60,216.66     of the ₹2,02,759.95, the share we can defend as
+                  incremental — an ESTIMATE, not a slice. p = 0.44.
 ```
 
-**We recovered money. We did not automatically take credit for it.**
+**We recovered money. We did not automatically take credit for it.** 17 cases where the customer
+paid and we credited ourselves nothing — a control-arm customer who was never contacted, or a
+settlement whose reference we never issued. A gross-recovery dashboard would have counted all of it.
 
-The third figure is 17 cases where the customer paid and we credited ourselves nothing — a
-control-arm customer who was never contacted, or a settlement whose reference we never issued. A
-gross-recovery dashboard would have counted all of it.
+Only the first two lines are a sum, and they balance to the paise. The fourth figure is deliberately
+**outside** the addition: incremental is the measured lift applied to the treated arm's exposure, not
+a subset of gross. An earlier version of this README laid all three out as `gross → claimable + not
+claimed`; a reviewer added them up and found them ₹3,522.54 short. The arithmetic was right and the
+**arrow was wrong** — so the identity is now computed, the residual is published, and a test fails if
+it ever stops balancing. Live at `GET /api/v1/metrics/reconciliation`.
 
 And separately, the only figure with external evidence behind it:
 
@@ -216,6 +227,21 @@ Reproducible byte-for-byte from `SEED=20260905` against a fixed anchor instant.
 Failures are deliberately over-sampled — a corpus with three failures exercises nothing — so rates
 over it are rates of the sample, not of a real funnel.
 
+### Three populations, and why the numbers differ
+
+A reviewer asked why the benchmark says 182 and attribution says 210. Both are right; they are
+counting different things, and the README had never said so.
+
+| Population | Size | What it is |
+|---|---|---|
+| Seeded transactions | **420** | Every payment attempt in the corpus. 210 were captured and need nothing. |
+| Benchmark population | **182** | The attempts that **failed or were abandoned** — read straight from `payment_attempts`. This is the set a contact policy could act on, so it is the fair basis for comparing five policies. |
+| Attribution population | **210** | The recovery **cases** the batch created: those same 182 plus the **28 overdue invoices**, where the leak is an unpaid receivable rather than a failed charge. Split 171 treated / 39 control. |
+
+So 210 − 182 = the 28 receivables. The benchmark excludes them because it scores *contact* policies
+against attempt-level consent data; the experiment includes them because they are recoverable revenue
+and randomisation does not care which playbook produced the case.
+
 ## What is real, and what is not
 
 | | |
@@ -231,7 +257,7 @@ policy and attribution machinery but have no production-integrated delivery path
 
 ## What broke
 
-39 incidents in [`docs/INCIDENTS.md`](docs/INCIDENTS.md), each with the part that matters: why no
+42 incidents in [`docs/INCIDENTS.md`](docs/INCIDENTS.md), each with the part that matters: why no
 test caught it. Three worth reading:
 
 - **[INC-026]** A metrics table with a reader and no writer. The panel showed zero forever, and the
@@ -252,8 +278,11 @@ test caught it. Three worth reading:
 
 Stated once.
 
-- **The lift is not statistically significant** at 171 treated against 39 control, and the dashboard
-  says so. Reaching significance needs 1,592 cases and merchant traffic we do not have.
+- **The lift is not statistically significant.** 6.16 percentage points on 171 treated against 39
+  control: two-proportion **z = 0.77, p = 0.44**, and a 95% interval on the difference of
+  **−8.7 to +21.0 points** — which contains zero. The dashboard says so. Reaching significance needs
+  1,592 cases and merchant traffic we do not have. Progress is 13.2% overall, and 4.9% on the
+  control arm, which is the arm that governs.
 - **The response model is ours.** ₹60,217 is only as good as that assumption, and it cannot be
   validated without real traffic.
 - **The audit chain detects in-place modification and corruption. It does not detect truncation of
@@ -273,7 +302,7 @@ python tasks.py snapshot     # regenerate docs/EVIDENCE.md
 python tasks.py check        # lint, types, the full suite, the web build
 ```
 
-1,199 tests. Safety properties are tested adversarially: termination, token isolation, idempotency,
+1,257 tests. Safety properties are tested adversarially: termination, token isolation, idempotency,
 attribution, tamper detection, and the absence of wall-clock reads. `mypy --strict` clean.
 
 ## Where the detail lives
@@ -282,8 +311,8 @@ attribution, tamper detection, and the absence of wall-clock reads. `mypy --stri
 |---|---|
 | [`docs/EVIDENCE.md`](docs/EVIDENCE.md) | Every figure, generated from one run |
 | [`docs/PRE-REGISTRATION.md`](docs/PRE-REGISTRATION.md) | The causal experiment, registered before the data |
-| [`docs/INCIDENTS.md`](docs/INCIDENTS.md) | 39 incidents, wrong theories included |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | 45 decisions, including what we rejected |
+| [`docs/INCIDENTS.md`](docs/INCIDENTS.md) | 42 incidents, wrong theories included |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | 46 decisions, including what we rejected |
 | [`workflow.md`](workflow.md) | The full design document |
 | [`docs/DEMO-SCRIPT.md`](docs/DEMO-SCRIPT.md) | The five-minute pitch, word for word |
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Deployment options |

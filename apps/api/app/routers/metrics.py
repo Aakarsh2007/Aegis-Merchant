@@ -25,6 +25,7 @@ from app.deps import get_clock, get_db
 from app.security.auth import Principal, require_api_token
 from app.services import metrics as metrics_service
 from app.services.attribution import CaseOutcome, recovery_report
+from app.services.reconciliation import money_ledger
 from app.workers.experiment import holdout_report
 
 router = APIRouter(prefix="/api/v1/metrics", tags=["metrics"])
@@ -184,11 +185,23 @@ async def power(
             "control": plan.control_required,
             "treatment": plan.treatment_required,
         },
+        # Three figures, each named, because one unlabelled percentage here was
+        # read as the experiment's overall progress when it was the binding
+        # arm's. Reporting only the pessimistic one is not more honest if the
+        # reader cannot tell which it is.
+        "progress": {
+            "overall": round(plan.overall_completion, 4),
+            "control": round(plan.control_completion, 4),
+            "treatment": round(plan.treatment_completion, 4),
+            "binding_arm": plan.binding_arm,
+        },
         "completion": round(plan.completion, 4),
         "completion_basis": (
-            "the fraction of the BINDING arm, not of the total: power is "
-            "governed by the smaller arm, and a study with 5,000 treated and "
-            "12 control cases is not 99% of the way to an answer"
+            "`completion` is the fraction of the BINDING arm and is the figure "
+            "that governs: power is set by the smaller arm, and a study with "
+            "5,000 treated and 12 control cases is not 99% of the way to an "
+            "answer. `progress.overall` is all cases over all cases needed. "
+            "Quote whichever you like, but quote its name with it."
         ),
         "cases_remaining": plan.cases_remaining,
         "attempts_remaining": {
@@ -211,6 +224,29 @@ async def power(
         ],
         "today": clock.now_utc().date().isoformat(),
     }
+
+
+@router.get("/reconciliation", summary="Every rupee, as an identity that balances")
+async def reconciliation(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    _principal: Annotated[Principal, Depends(require_api_token)],
+) -> dict[str, Any]:
+    """Where the money went, with the residual shown rather than assumed.
+
+    A reviewer added up the README's three headline figures and found they did
+    not sum. They were right, and the diagnosis matters more than the fix: the
+    numbers were each correct, but laid out as ``gross -> claimable + not
+    claimed``, which reads as a partition. Incremental is an *estimate* over the
+    treated arm's exposure, not a slice of gross.
+
+    This endpoint returns the identity that does hold -- ``arrived = driven +
+    organic`` -- with the estimate reported beneath it and never inside it, plus
+    a ``residual_paise`` that a reader can check is zero. See
+    ``services/reconciliation``.
+    """
+    attribution = recovery_report(await _outcomes(session))
+    ledger = await money_ledger(session, attribution=attribution)
+    return ledger.as_dict()
 
 
 @router.get("/holdout", summary="The real-provider randomised holdout, arm by arm")

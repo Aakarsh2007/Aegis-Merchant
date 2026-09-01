@@ -79,7 +79,7 @@ Two of these will silently ruin a take if skipped.
 
 Ten clips. Timecodes are cumulative so you can check your pace.
 
-The narration is **676 words across five minutes — about 135 words a minute**, which is comfortable
+The narration is **695 words across five minutes — about 139 words a minute**, which is comfortable
 clear speech. That is measured, not estimated: the first draft of this script ran to 1,586 words,
 which is 317 words a minute and physically unspeakable. `tests/test_pitch_script_is_accurate.py`
 now fails if any segment cannot be read in the time it is given.
@@ -92,22 +92,25 @@ So do not rush. If you find yourself hurrying, you have drifted off the script.
 
 **DO**
 
-1. Dashboard scrolled to the top, showing the **proof status** strip and the three figures below it.
-2. Nothing moves. Hold the frame.
+1. Dashboard scrolled to the panel headed **"Where the money went"**. The **MONEY THAT ARRIVED**
+   row, the two rows beneath it, and the `residual: ₹0.00 ✓ balances` line should all be in frame
+   at once.
+2. Nothing moves. Hold the frame — the viewer is reading four numbers, and one of them is a zero
+   that matters.
 
 **SAY**
-> Every revenue-recovery tool shows you one number: money recovered.
+> Every recovery tool shows one number: money recovered.
 >
-> Here it's two lakh two thousand. But sixty thousand is what we can actually claim — and one lakh
-> thirty-nine thousand arrived and we credited ourselves **nothing**.
+> Three lakh forty-one thousand arrived here. Two lakh came in on a path we drove. One lakh
+> thirty-nine thousand arrived on its own — and we credited ourselves **nothing**.
 >
-> A tool that bills you for that third column is charging you for the weather.
+> Of that two lakh, sixty thousand is what we can defend.
 >
-> That distinction is the product.
+> A tool that bills you for the rest is charging for the weather.
 
 ---
 
-### `0:25 – 0:55` — Why the second number is smaller
+### `0:25 – 0:55` — Why the smaller number is the honest one
 
 **DO**
 
@@ -115,14 +118,16 @@ So do not rush. If you find yourself hurrying, you have drifted off the script.
 2. Nothing moves. Hold this frame and talk.
 
 **SAY**
-> Why is the second number smaller?
+> Why is that number smaller?
 >
-> Because thirty-nine of these customers were never contacted. That's the control group — and
-> twenty-three percent of them paid anyway.
+> **Because people pay without us.** Thirty-nine of these customers were never contacted — that's
+> the control group — and twenty-three percent of them paid anyway.
 >
 > So the treated group's twenty-nine percent isn't our achievement. The **six-point gap** is.
 >
-> The smaller number is the one a merchant can actually defend.
+> We can't claim every payment we saw. Only the difference. And holding that control group back
+> costs the merchant real recovery — we give up money on purpose, so the number we do report means
+> something.
 
 ---
 
@@ -136,13 +141,14 @@ So do not rush. If you find yourself hurrying, you have drifted off the script.
 **SAY**
 > And there's a question I can't answer. Did we *cause* those payments?
 >
-> Look at the four levels. Verified — Razorpay confirms it. Eligible — it passes all six of our
-> attribution rules. Claimable — yes.
+> Four levels. Verified — Razorpay confirms it. Eligible — it passes all six attribution rules.
+> Claimable — yes.
 >
-> **Incremental — not reached.** The confidence intervals overlap.
+> **Incremental — not reached.** The lift is six points, but p equals nought point four four —
+> indistinguishable from chance at this sample size.
 >
-> Settling that needs seven hundred and ninety-six control cases. I have thirty-nine. The design is
-> pre-registered in the repo, committed before any of this data existed.
+> Settling it needs seven hundred and ninety-six control cases. I have thirty-nine, and the design
+> was pre-registered before any of this data existed.
 
 ---
 
@@ -253,7 +259,7 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 2. Stop on **INC-026**. Then scroll to **INC-032**.
 
 **SAY**
-> Thirty-nine incidents, each with the part that matters: why no test caught it.
+> Forty-two incidents, each with the part that matters: why no test caught it.
 >
 > The one to read is INC-026. A metrics table with a reader and no writer — the panel showed zero
 > forever, and the test passed *because* the feature was missing.
@@ -323,24 +329,26 @@ right** — say what is on screen.
 
 | Figure | Value | Note |
 |---|---|---|
-| Gross recovered | ₹2,02,759.95 | Say "two lakh two thousand seven hundred and sixty" |
-| Net incremental | ₹60,216.66 | Say "sixty thousand two hundred and seventeen" |
+| Money that arrived | ₹3,41,780.70 | Say "three lakh forty-one thousand seven hundred and eighty" — the total, and the only figure that is a sum |
+| ├ recovered on our path | ₹2,02,759.95 | 42 cases. Say "two lakh two thousand seven hundred and sixty" |
+| └ arrived organically | ₹1,39,020.75 | 17 cases, credited ₹0.00. The two rows above add to the total exactly |
+| Incremental estimate | ₹60,216.66 | Say "sixty thousand two hundred and seventeen". **An estimate, not a slice** — 17.6% of what arrived |
 | Razorpay verified | ₹2.00 | **Becomes ₹3.00 after your demo payment** |
 | Treated conversion | 29.2% | 50 of 171 · CI 22.9–36.4% |
 | Control conversion | 23.1% | 9 of 39 · CI 12.7–38.3% |
-| Absolute lift | 6.16 pp | Not statistically significant — the panel says so |
+| Absolute lift | 6.16 pp | **p = 0.44**, CI on the difference −8.7 to +21.0 pp. Not significant, and say the p-value, not "the intervals overlap" |
 | Cases held as control | 39 | Clickable via the "Held as control" filter |
 | Unsafe proposals intercepted | 33 | S-07 opt-out: 11 · S-09 quiet hours: 22 |
 | Awaiting a human | 19 | Only if the batch ran within four hours |
-| Power completion | 4.9% | 39 of 796 control · 171 of 796 treated |
+| Experiment progress | 13.2% overall | 210 of 1,592. Control 4.9% (39/796) · treated 21.5% (171/796). Control is the binding arm |
 | Cases still needed | 1,382 | To reach 1,592 total |
 | Rule table vs model | 159 / 40 | Of 199 diagnoses |
 | Model accuracy measured | 90.6% vs 96.5% | Model lost to the rule table, so the table ships |
 | Inferences | 398 | 55.3% served from the committed cache · 0 live calls |
 | Actual spend | ₹0.00 | Projected at paid rates: ₹1.28 |
 | Audit chain | valid | **Don't quote a block count** — it changes on every batch run. Say "valid", and let the screen show the number. |
-| Tests | 1,149 | ruff, mypy --strict, tsc, eslint all clean |
-| Incidents · decisions | 40 · 46 | `docs/INCIDENTS.md` · `docs/DECISIONS.md` |
+| Tests | 1,257 | ruff, mypy --strict, tsc, eslint all clean |
+| Incidents · decisions | 42 · 46 | `docs/INCIDENTS.md` · `docs/DECISIONS.md` |
 | Benchmark: naive breaches | 308 | **Measured**, not simulated — `python tasks.py benchmark` |
 | Benchmark: RevPilot breaches | 0 | Measured |
 | Benchmark: firewall removed | 284 breaches | Same recovery as RevPilot — safety costs nothing |

@@ -46,3 +46,10 @@ next-env.d.ts
 
 # generated from ../../apps/web/openapi.json — regenerate with: npm run types
 src/lib/api.generated.ts
+
+# Written by `next dev` on every run (Next.js 16 writes agent instruction files
+# into the app directory). Regenerated artifacts, like api.generated.ts above --
+# committing tool-generated instruction files into a submission repo is noise
+# for a reader, and gitignoring keeps `git status` clean without adding it.
+AGENTS.md
+CLAUDE.md

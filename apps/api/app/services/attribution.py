@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
-from app.core.stats import wilson_bounds
+from app.core.stats import TwoProportionTest, two_proportion_test, wilson_bounds
 from app.db.enums import CaseStatus, ExperimentArm
 
 __all__ = [
@@ -250,16 +250,53 @@ class RecoveryReport:
         return self.incremental_revenue_paise - self.discount_cost_paise - inference_paise
 
     @property
-    def lift_is_significant(self) -> bool:
-        """Non-overlapping 95% intervals.
+    def significance(self) -> TwoProportionTest:
+        """The pooled two-sided two-proportion z-test on the two arms.
 
-        Crude — a proper test would be two-proportion — but it is the right
-        *direction* of crude: with the sample sizes a hackathon batch produces,
-        this will usually say "no", and saying "no" is the honest answer.
+        This used to be a one-line check for non-overlapping Wilson intervals,
+        with a docstring calling it "the right direction of crude". A reviewer
+        pointed out that the *spoken* form of it -- "the confidence intervals
+        overlap" -- is a weak thing to say when the real finding is available,
+        and following that back showed the criterion was answering a question
+        nobody had asked: interval non-overlap is strictly more conservative
+        than a test on the difference, so it could report "not significant" for
+        a result a correct test would reject.
+
+        Both are now reported. Each arm keeps its Wilson interval, because that
+        is the honest way to show a single small-sample proportion; the
+        difference gets its own interval and a p-value, because that is the
+        hypothesis the holdout was built to test.
+        """
+        return two_proportion_test(
+            treated_paid=self.treatment.paid,
+            treated_cases=self.treatment.cases,
+            control_paid=self.control.paid,
+            control_cases=self.control.cases,
+        )
+
+    @property
+    def lift_is_significant(self) -> bool:
+        """``p < 0.05`` on :attr:`significance`.
+
+        Kept under its original name: it is read by the dashboard, the snapshot
+        and several tests, and the meaning is unchanged -- only the criterion is
+        now the correct one.
         """
         if not self.has_control:
             return False
-        return self.treatment.bounds[0] > self.control.bounds[1]
+        return self.significance.is_significant
+
+    @property
+    def intervals_overlap(self) -> bool:
+        """The old, more conservative criterion, retained and labelled.
+
+        Worth keeping visible: when the two disagree, the disagreement is
+        informative, and deleting the weaker check would leave no way to see
+        that the significance verdict had changed for a reason.
+        """
+        if not self.has_control:
+            return True
+        return not self.treatment.bounds[0] > self.control.bounds[1]
 
     def as_dict(self) -> dict[str, Any]:
         """The shape `/api/v1/metrics/attribution` returns.
@@ -287,6 +324,8 @@ class RecoveryReport:
             "inference_cost_micro_inr": self.inference_cost_micro_inr,
             "net_incremental_paise": self.net_incremental_paise,
             "lift_is_significant": self.lift_is_significant,
+            "significance": self.significance.as_dict(),
+            "intervals_overlap": self.intervals_overlap,
             "has_control_arm": self.has_control,
             "excluded_demo_cases": self.excluded_demo,
             "notes": list(self.notes),

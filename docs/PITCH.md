@@ -15,9 +15,9 @@ Four criteria, in their words:
 | Criterion | Their gloss | Where this project answers it |
 |---|---|---|
 | **Problem taste** | did you pick something that actually matters | the gross-vs-incremental split — most recovery tools report the first number |
-| **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 1,199 tests, `mypy --strict` |
+| **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 1,257 tests, `mypy --strict` |
 | **AI judgment** | the right tool in the right place, **and where you chose not to use one** | the rule table answers 158 of 199 diagnoses; the model is consulted on 41 |
-| **Failure recovery** | what broke, and what you did about it | 40 written incidents, each with the reason no test caught it |
+| **Failure recovery** | what broke, and what you did about it | 42 written incidents, each with the reason no test caught it |
 
 And the line that decides the running order: *"The last one is the one we read first."* Answer
 12 is the submission. Everything else supports it.
@@ -75,8 +75,9 @@ Six are facts only you can supply. Six are below, ready to paste.
 > **It measures what it actually caused.** A holdout arm of 39 cases is deliberately never
 > contacted. Treated converts at 29.2%, control at 23.1%, so the incremental lift is
 > ₹60,217 against a ₹2,02,760 gross figure — 30% of what a dashboard would claim. Both numbers
-> are on screen, the smaller one is dominant, and it reports its own confidence intervals as
-> overlapping and the result as not statistically significant at this sample size.
+> are on screen, the smaller one is dominant, and it reports the result as not statistically
+> significant at this sample size — z = 0.77, p = 0.44, with the 95% interval on the difference
+> running from −8.7 to +21.0 points.
 >
 > **The model cannot touch money.** It diagnoses ambiguity and argues for an action; a
 > deterministic firewall clamps every number and mints an HMAC-signed capability token, and the
@@ -169,7 +170,7 @@ Six are facts only you can supply. Six are below, ready to paste.
 > new test now gets sabotage-verified — I break the thing it covers and confirm the test fails,
 > and that step has caught vacuous tests inside the fixes for vacuous tests. Every real bug in
 > this project was found by touching the real provider or by looking at the running product;
-> none was reachable from local testing at any volume. The suite is at 1,199 tests and I trust it
+> none was reachable from local testing at any volume. The suite is at 1,257 tests and I trust it
 > considerably less than I did at 400.
 
 ---
@@ -189,7 +190,8 @@ Correct, and I'd rather say that than inflate it. Two lakh of machinery, one rup
 and the two are on separate tiles so you can tell which is which.
 
 **"Why is the lift not significant?"**
-39 control cases isn't enough. The intervals overlap and the panel says so rather than hiding
+39 control cases isn't enough. The observed lift is 6.16 percentage points, but p = 0.44 — at
+this sample size that is indistinguishable from chance, and the panel says so rather than hiding
 it. Getting to significance needs a real merchant's traffic volume, which I don't have and
 didn't fake.
 
