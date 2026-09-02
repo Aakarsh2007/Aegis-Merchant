@@ -205,7 +205,10 @@ So do not rush. If you find yourself hurrying, you have drifted off the script.
 1. Scroll to **"Prove it against real Razorpay"**, with the **Live pipeline** panel visible.
 2. Click **Create a real ₹1 recovery link**. Let the seven nodes fill in — pause for them.
 3. Click **Open the Razorpay link and pay ₹1**.
-5. Card `4111 1111 1111 1111`, any future expiry, any CVV → **Success**.
+5. On the Razorpay page choose **Netbanking**, pick any bank, then **Success** on the simulated
+   bank page. *Not* a card: this test account accepts **domestic cards only**, and the widely-quoted
+   `4111 1111 1111 1111` is an international Visa, which fails with
+   `international_transaction_not_allowed`. It cost a take. Netbanking has no number to mistype.
 6. Alt-tab to the tunnel terminal to show the inbound `POST`, then back to the dashboard and reload.
 
 **SAY**
@@ -259,7 +262,7 @@ the webhook secret**; that was a wrong diagnosis we made once and it wasted an h
 2. Stop on **INC-026**. Then scroll to **INC-032**.
 
 **SAY**
-> Forty-five incidents, each with the part that matters: why no test caught it.
+> Forty-six incidents, each with the part that matters: why no test caught it.
 >
 > The one to read is INC-026. A metrics table with a reader and no writer — the panel showed zero
 > forever, and the test passed *because* the feature was missing.
@@ -348,7 +351,7 @@ right** — say what is on screen.
 | Actual spend | ₹0.00 | Projected at paid rates: ₹1.28 |
 | Audit chain | valid | **Don't quote a block count** — it changes on every batch run. Say "valid", and let the screen show the number. |
 | Tests | 1,282 | ruff, mypy --strict, tsc, eslint all clean |
-| Incidents · decisions | 45 · 46 | `docs/INCIDENTS.md` · `docs/DECISIONS.md` |
+| Incidents · decisions | 46 · 46 | `docs/INCIDENTS.md` · `docs/DECISIONS.md` |
 | Benchmark: naive breaches | 308 | **Measured**, not simulated — `python tasks.py benchmark` |
 | Benchmark: RevPilot breaches | 0 | Measured |
 | Benchmark: firewall removed | 284 breaches | Same recovery as RevPilot — safety costs nothing |

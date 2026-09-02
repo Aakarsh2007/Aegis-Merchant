@@ -10,12 +10,12 @@ number. Documents now cite this snapshot; this snapshot cites the system.
 
 | | |
 |---|---|
-| Snapshot | `20260901-1949-07ead29` |
-| Generated | 2026-09-01 19:49 UTC |
-| Commit | `07ead29` on `main` |
+| Snapshot | `20260902-2253-543b5bd` |
+| Generated | 2026-09-02 22:53 UTC |
+| Commit | `543b5bd` on `main` |
 | Corpus seed | `20260905` |
 | Tests collected | 1,282 |
-| Incidents | 45 |
+| Incidents | 46 |
 | Decisions | 46 |
 
 ## The three numbers, and the question that is open
@@ -25,7 +25,7 @@ number. Documents now cite this snapshot; this snapshot cites the system.
 | Razorpay verified | Rs 2.00 | `RAZORPAY_VERIFIED` |
 | Gross recovered | Rs 2,02,759.95 | `SIMULATED` |
 | Net incremental | Rs 60,216.66 | `SIMULATED` |
-| At risk | Rs 6,64,067.23 | `SIMULATED` |
+| At risk | Rs 6,64,068.23 | `SIMULATED` |
 
 **Did RevPilot cause additional customers to pay?** Not proven, and not provable
 at this sample size. The design that would settle it is pre-registered in
@@ -130,5 +130,5 @@ Full table with breaches by kind, and the limitations, from
 
 ---
 
-*Snapshot `20260901-1949-07ead29`, commit `07ead29`, 2026-09-01 19:49 UTC.*
+*Snapshot `20260902-2253-543b5bd`, commit `543b5bd`, 2026-09-02 22:53 UTC.*
 *Any figure elsewhere in this repository that disagrees with this file is stale.*

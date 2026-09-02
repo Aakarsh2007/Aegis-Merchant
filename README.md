@@ -180,7 +180,10 @@ Make your own: click **Prove it against real Razorpay** on the dashboard, or
 
 ```bash
 python tasks.py testmode-recover     # returns a real Razorpay link
-#   ... pay it: card 4111 1111 1111 1111, any future expiry, any CVV
+#   ... pay it: choose Netbanking -> any bank -> Success.
+#       Not a card: Razorpay test accounts accept DOMESTIC cards only, and the
+#       widely-quoted 4111 1111 1111 1111 is an international Visa that fails
+#       with `international_transaction_not_allowed`.
 python tasks.py reconcile            # asks Razorpay what was actually paid
 ```
 
@@ -258,7 +261,7 @@ policy and attribution machinery but have no production-integrated delivery path
 
 ## What broke
 
-45 incidents in [`docs/INCIDENTS.md`](docs/INCIDENTS.md), each with the part that matters: why no
+46 incidents in [`docs/INCIDENTS.md`](docs/INCIDENTS.md), each with the part that matters: why no
 test caught it. Three worth reading:
 
 - **[INC-026]** A metrics table with a reader and no writer. The panel showed zero forever, and the
@@ -312,7 +315,7 @@ attribution, tamper detection, and the absence of wall-clock reads. `mypy --stri
 |---|---|
 | [`docs/EVIDENCE.md`](docs/EVIDENCE.md) | Every figure, generated from one run |
 | [`docs/PRE-REGISTRATION.md`](docs/PRE-REGISTRATION.md) | The causal experiment, registered before the data |
-| [`docs/INCIDENTS.md`](docs/INCIDENTS.md) | 45 incidents, wrong theories included |
+| [`docs/INCIDENTS.md`](docs/INCIDENTS.md) | 46 incidents, wrong theories included |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | 46 decisions, including what we rejected |
 | [`workflow.md`](workflow.md) | The full design document |
 | [`docs/DEMO-SCRIPT.md`](docs/DEMO-SCRIPT.md) | The five-minute pitch, word for word |

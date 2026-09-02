@@ -1947,3 +1947,74 @@ broken state now reseeds and produces the 210 cases every document quotes.
 
 Sixth instance of the pattern in INC-045's list: something present, something absent, and no link
 asserting the first implies the second.
+
+---
+
+## INC-047 · The card number in our own instructions cannot pay us
+
+**Symptom.** Reported from the middle of a recording session, on take 6: the link generates, the
+Razorpay page loads, details go in, and the page says the payment could not be completed. Reported
+as *"it's generating the payment link but after entering details it is showing payment isn't
+completed"* — which reads exactly like a bug in this project, and is why the diagnosis mattered
+more than the fix.
+
+**It was not our code, and the evidence took two API calls.** Asking Razorpay about the link:
+
+```
+plink_TXKuQfTasL5aO1  status=created  amount_paid=0 of 100  payments=[]
+```
+
+`payments: []` — nothing had reached Razorpay against that link at all. So the failure was upstream
+of every line we own: not the webhook, not the signature check, not reconciliation, not attribution.
+Then the account's payment list:
+
+```
+pay_TXKx6sygOvCCm9  failed  BAD_REQUEST_ERROR / international_transaction_not_allowed
+"this business accepts domestic (Indian) card payments only"
+   last4=1881  network=Visa  international=True
+```
+
+against an earlier success on the same account:
+
+```
+pay_TWSSE7voy4Hb5k  captured   last4=1007  network=Visa  international=False  issuer=DCBL
+```
+
+**The instruction was ours and it was wrong.** Three places told the presenter to type
+`4111 1111 1111 1111`:
+
+* `README.md`, in the reproduction block
+* `docs/DEMO-SCRIPT.md`, step 5 of the Test Mode segment — *the line read on camera*
+* `apps/web/src/components/TestModePanel.tsx`, the caption under the pay button
+
+That number is the most-quoted test card on the internet and it is an **international** Visa.
+Razorpay test accounts accept domestic cards only by default, so it fails — and it fails with a
+message about the *business* not accepting the card, which a presenter reads as "the demo is
+broken". A working payment had been made on this account weeks earlier with a domestic card, which
+is why nothing had ever caught it: the instruction had never been followed.
+
+**Fix.** All three now say **Netbanking → any bank → Success**. Test Mode's netbanking page always
+offers a Success button, it is domestic by construction, and there is no number to mistype. The card
+route is kept as a secondary note *with* the constraint stated, because a reader who wants a card
+should know why theirs was refused rather than discovering it on take 6. UPI is not offered: this
+account has `upi: false` in `/v1/preferences`.
+
+**No regression test, deliberately.** The only assertion available is "the docs mention netbanking",
+which would pass on a document that had gone wrong in some other way, and the real check — does this
+card work against this account — needs a browser and a human. What made this findable was asking
+the provider what it saw, and `python tasks.py reconcile` already does that. The honest guard is the
+one already in place: `/v1/preferences` reports which methods the account actually allows, and the
+diagnosis above is written down here so the next person reads the provider's answer rather than
+their own code.
+
+**Two things worth separating.** The instruction was wrong for months and the system was right the
+whole time — the reconciliation backstop (DEC-037) would have settled the payment the moment one
+succeeded, and did so for `RC-TM88163` after a tunnel died. A demo can fail on an instruction while
+every mechanism behind it works, and the failure looks identical to the presenter either way.
+
+**And an instrument error of mine, during the same session.** Checking whether the approvals panel
+was still live, I called `/api/v1/approvals/pending`, got a 404, parsed the error body as an empty
+list, and reported "0 live approvals" — announcing a second bug that did not exist. The route is
+`/api/v1/approvals`, and there were 19. Sixth time in this project that my own checking tool has
+been wrong before it was right, and again in the direction of confident overstatement: a 404 should
+never have been read as data.

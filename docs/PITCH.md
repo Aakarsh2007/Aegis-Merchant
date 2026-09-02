@@ -17,7 +17,7 @@ Four criteria, in their words:
 | **Problem taste** | did you pick something that actually matters | the gross-vs-incremental split — most recovery tools report the first number |
 | **Build quality** | does it run, is it structured, would you trust it | one command, no Docker, 1,282 tests, `mypy --strict` |
 | **AI judgment** | the right tool in the right place, **and where you chose not to use one** | the rule table answers 158 of 199 diagnoses; the model is consulted on 41 |
-| **Failure recovery** | what broke, and what you did about it | 45 written incidents, each with the reason no test caught it |
+| **Failure recovery** | what broke, and what you did about it | 46 written incidents, each with the reason no test caught it |
 
 And the line that decides the running order: *"The last one is the one we read first."* Answer
 12 is the submission. Everything else supports it.

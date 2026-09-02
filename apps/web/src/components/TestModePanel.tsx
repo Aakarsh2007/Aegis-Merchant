@@ -164,9 +164,24 @@ export function TestModePanel() {
             Open the Razorpay link and pay ₹1 →
           </a>
           <p className="mt-2 text-[10px] leading-relaxed text-paper-500">
-            Card <span className="numeric">4111 1111 1111 1111</span>, any
-            future expiry, any CVV, then choose Success.{" "}
+            Choose <strong className="text-paper-300">Netbanking</strong>, any
+            bank, then <strong className="text-paper-300">Success</strong>.{" "}
             {created.next_step}
+          </p>
+          {/*
+            Not a card, and not `4111 1111 1111 1111`. Razorpay test accounts
+            accept domestic cards only by default, and that number -- the one
+            every tutorial quotes -- is an international Visa. It fails with
+            `international_transaction_not_allowed`, which reads on the checkout
+            page as an ordinary "payment could not be completed" and sends the
+            reader looking for a bug in this project. It cost a recording take.
+            Netbanking has no number to mistype and its test page always offers
+            Success. See INC-047.
+          */}
+          <p className="mt-1 text-[10px] leading-relaxed text-paper-600">
+            Cards work too, but only <em>domestic</em> ones &mdash; this account
+            rejects international test cards, which is what
+            <span className="numeric"> 4111 1111 1111 1111</span> is.
           </p>
         </div>
       )}
