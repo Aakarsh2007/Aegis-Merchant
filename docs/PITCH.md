@@ -63,47 +63,47 @@ Six are facts only you can supply. Six are below, ready to paste.
 
 ### 9 · What it solves
 
-> Razorpay merchants lose revenue in four places — failed payments, abandoned checkouts,
-> overdue invoices and dead subscription mandates — and the tools that chase it back all report
-> the same misleading number: gross money recovered. Some of those customers would have paid
-> anyway. Billing for them is charging for weather.
+> Razorpay merchants leak revenue in four places: failed payments, abandoned checkouts, overdue
+> invoices, and dead subscription mandates. Every tool that chases it back reports the same
+> misleading number — gross money recovered. Some of those customers would have paid anyway, and
+> billing a merchant for them is charging them for the weather.
 >
-> RevPilot AI detects revenue at risk from Razorpay's own failure telemetry, diagnoses the
-> cause, and executes one bounded recovery action inside a deterministic policy firewall. Two
-> things make it different from a retry script.
+> RevPilot reads Razorpay's own failure telemetry, diagnoses the cause, and executes one bounded
+> recovery action per case. Three things make it more than a retry script.
 >
-> **It measures what it actually caused.** A holdout arm of 39 cases is deliberately never
-> contacted. Treated converts at 29.2%, control at 23.1%, so the incremental lift is
-> ₹60,217 against a ₹2,02,760 gross figure — 30% of what a dashboard would claim. Both numbers
-> are on screen, the smaller one is dominant, and it reports the result as not statistically
-> significant at this sample size — z = 0.77, p = 0.44, with the 95% interval on the difference
-> running from −8.7 to +21.0 points.
+> **It holds a control group back on purpose.** 39 of 210 cases are randomly assigned and never
+> contacted. That costs the merchant real recovery, which is exactly the point — it is the only way
+> to know what the agent caused. On the seeded corpus ₹3,41,781 arrived across 59 customers:
+> ₹2,02,760 on a path the agent drove, and ₹1,39,021 that arrived on its own and was credited to us
+> at ₹0.00. Of the part we drove, ₹60,217 is defensible as incremental. The lift is 6.16 percentage
+> points, p = 0.44 — not significant at this sample size, and the dashboard says so before a judge
+> has to ask.
 >
-> **The model cannot touch money.** It diagnoses ambiguity and argues for an action; a
-> deterministic firewall clamps every number and mints an HMAC-signed capability token, and the
-> execution node reads only the clamped action. Asked to charge more than a customer owes, the
-> system returns `UNREPRESENTABLE` — the proposal object has no amount field, so there is no
-> number to raise.
+> **The model cannot touch money.** It diagnoses ambiguity and argues for an action. A deterministic
+> firewall clamps every number and mints an HMAC-signed capability token; the execution node reads
+> only the clamped action. Asked to charge a customer more than they owe, the system returns
+> `UNREPRESENTABLE` — the proposal type has no amount field, so there is no number to raise. Not
+> blocked. Unrepresentable.
 >
-> Compliance is structural, not advisory: twelve named stopping rules (opt-out, TRAI quiet
-> hours, contact caps, consent class, discount budget, kill switch), a SHA-256 hash-chained
-> audit ledger with a public verifier and a tamper endpoint, and a property-based proof that
-> every case terminates.
+> **Compliance is structural, not advisory.** Twelve named stopping rules — opt-out, DND, TRAI quiet
+> hours, contact caps, consent class, discount budget, kill switch — and all twelve are shown on the
+> dashboard including the ten that fired zero times, because a brake that did not fire and a brake
+> that does not exist look identical if you only show the non-zero rows. Every decision is a block in
+> a SHA-256 hash chain with a public verifier and a tamper endpoint you can break yourself.
+> Termination is proved by property test over generated hostile contexts, not asserted.
 >
-> One real Test Mode rupee has been recovered end-to-end and proven by Razorpay's own signed
-> webhook. It sits on its own tile, badged `RAZORPAY VERIFIED`, never averaged with the
-> simulation — because a signed webhook and a seeded corpus are different kinds of evidence.
+> And the part that is not simulated: **₹2.00 has been recovered end to end through real Razorpay
+> Test Mode and proven by Razorpay itself** — one by signed webhook, one by API reconciliation after
+> a webhook was lost to a dead tunnel. It sits on its own tile badged `RAZORPAY VERIFIED` and is
+> never averaged into the simulation, because a signed webhook and a seeded corpus are different
+> kinds of evidence.
 >
-> **And the question it has not answered is on the dashboard too, third from the top.** Whether
-> RevPilot *caused* additional customers to pay is unproven: that needs 1,592 cases at a
-> balanced split and a DLT-registered merchant, and the dashboard reports that we are at 4.9%
-> of the control arm required. The full design — primary endpoint, allocation, stopping rule,
-> and the result that would make us abandon the hypothesis — is pre-registered in
-> `docs/PRE-REGISTRATION.md`, committed before any of the data existed so the ordering is
-> checkable rather than claimed. The randomised holdout itself has been exercised end-to-end
-> against real Razorpay: both arms, real links for treated cases, nothing sent to control, and
-> a control payment recorded as organic rather than credited to us. That is a test of the
-> instrument, labelled as one.
+> What it has **not** proven is on the dashboard too, third from the top: whether the agent *caused*
+> additional customers to pay. That needs 1,592 cases at a balanced split and a DLT-registered
+> merchant. We are at 13.2% overall and 4.9% of the control arm, which is the arm that governs power.
+> The full design — primary endpoint, allocation, stopping rule, and the result that would make me
+> abandon the hypothesis — is pre-registered in `docs/PRE-REGISTRATION.md`, committed before any of
+> the data existed so the ordering is checkable rather than claimed.
 >
 > Runs with one command. No Docker, no Postgres, no Redis, no API key required.
 
@@ -117,61 +117,54 @@ Six are facts only you can supply. Six are below, ready to paste.
 
 ### 12 · What broke, and how you got out
 
-> Twenty-nine incidents are written up in `docs/INCIDENTS.md`, each with the part that matters:
-> why no test caught it. Three of the worst are the same defect wearing different clothes — **a
-> green test that cannot distinguish working from absent** — and I only started finding that
-> class of bug when I stopped trusting the suite.
+> Forty-six incidents are written up in `docs/INCIDENTS.md`, wrong theories left in. The pattern
+> behind most of them is one thing: **a green test that cannot tell working from absent.**
 >
-> **INC-026 — a table with a reader and no writer.** The panel showing how many model calls were
-> made and what fraction came from cache displayed zero inferences. On every clone, since the
-> day it was written. `llm_calls` was declared, registered, migrated, indexed twice and read by
-> the cost report; nothing in the codebase ever inserted a row. The existing test passed
-> *because* the feature was missing — it called the cost report against an empty table and
-> asserted the zeros that came back. It was a test of SQL `COUNT` over no rows, written and
-> reviewed as a test of cost accounting. The graph is pure and the persistence layer is dumb;
-> both halves were well tested and nothing tested the join. I found it by reading a screenshot
-> of my own dashboard.
+> **The one a reviewer found, three days out.** They added up my own README headline — ₹2,02,760
+> gross, ₹60,217 claimable, ₹1,39,021 not claimed — and it came to ₹3,522 short. Every figure was
+> correct. The arrow and the plus sign were wrong: gross and not-claimed are sums over *disjoint*
+> sets of cases, and incremental is a statistical estimate over the treated arm's exposure, not a
+> slice of gross. I had laid an estimate out as a subset of a total, which is the exact overstatement
+> this project exists to refuse, in the most visible place in the repository. Twelve hundred tests
+> were green because no test had an opinion about how the three figures related to each other. Now
+> the identity is computed — `arrived = driven + organic` — the residual is published so a reader can
+> see it is zero rather than take my word, and a test fails if it ever stops balancing.
 >
-> Fixing it exposed **INC-029** in the same hour. The committed response cache — 81 entries,
-> there so the demo runs offline and reproducibly — had a **structurally guaranteed** 0% hit
-> rate. The cache key is a hash of the whole model context; the warming script built a
-> five-key context and the agent built an eight-key one. Not one entry could ever match a
-> lookup. The two bugs had concealed each other: the hit rate was the symptom, and the only
-> instrument that reports it read the table nothing wrote to. The fix removes the second place
-> contexts are built rather than trying to keep two copies in step — warming now *runs the
-> batch itself*, so a recorded key is by construction the key looked up later.
+> **Then I went looking myself and found the worse one.** The measured result is that the
+> deterministic rule table beats the model — 96.4% against 90.4%, over the 83 of 85 golden cases the
+> committed response cache covers. Every document had been quoting both rates a tenth of a point too
+> high, over a denominator that was the size of the golden *file* rather than the number of cases
+> actually scored. Two of those figures were **hardcoded string literals inside the generator**
+> of the file that opens *"Generated, not written. Every figure this submission quotes comes from
+> here."* The entire AI-judgment claim was resting on numbers I had typed by hand, wrong in the
+> flattering direction, in the one place a technical judge would reproduce. The scoring now lives in
+> application code, the test and the snapshot both import it, and a test compares every accuracy
+> figure in every document against it.
 >
-> **INC-022 — twelve tested rules, three that could never fire.** Five fields on the stopping-rule
-> context were never populated by the agent, and every default was the permissive value. So
-> S-10 (promise-to-pay freeze), S-11 (merchant budget) and S-12 (the kill switch) were
-> unreachable. **The kill switch could not kill.** Twelve rules had unit tests and all twelve
-> passed, because the tests constructed the context by hand and filled in the fields the
-> product never filled in.
+> **And the one that would have cost the demo.** On a clean clone, `python tasks.py batch` printed
+> "BATCH COMPLETE — 0 cases" and exited zero. There was no corpus. Worse, it left an empty database
+> behind, and `demo` decided whether to seed by asking whether the *file* existed — so the next
+> `demo` announced "database present" and served a dashboard of zeroes. Judge Mode was one stray
+> command away from silently producing nothing. Found by cloning fresh and running the commands in
+> the order a stranger would, because every test builds its own database and no test had ever *been*
+> a clean clone.
 >
-> **INC-024 — the live webhook path stored events and dropped them.** `_process_event` was still
-> the Phase-2 stub. Signature verification worked, storage worked, attribution worked — and
-> nothing connected them, so a real payment recovered a real rupee and the dashboard showed
-> zero. Two well-tested halves, no test across the join. Same shape as INC-026, three weeks
-> earlier, and I did not recognise the pattern until the third time.
+> Same shape earlier, three times before I recognised it: a webhook handler that verified signatures,
+> stored events, and dropped them. An `llm_calls` table with a reader and no writer, where the
+> existing test passed *because* the feature was missing — it asserted the zeros that came back from
+> counting an empty table. An event bus whose only publisher was in tests. Both ends present, both
+> ends tested, nothing testing the link. And once a pre-existing test that **asserted the bug**: 41
+> of 199 diagnoses were labelled "model reasoning" when a deterministic adapter had answered, and the
+> test locked it in.
 >
-> **INC-023 — a headline number that changed with the time of day.** The batch read the wall
-> clock. The ₹2,02,760 figure was different in the morning and the evening. Every test injected
-> a fake clock, so the suite was structurally incapable of seeing it. The fix was a lint rule
-> that forbids wall-clock reads in application code — which then caught me doing it again two
-> phases later.
->
-> **INC-021 — I was wrong, and it cost the user time.** I told them their webhook secret was
-> wrong and had them re-enter it. It wasn't; a 300-second replay window was rejecting Razorpay's
-> retries, which return 401 the same way a bad signature does. I couldn't support the diagnosis
-> I'd already acted on. Both paths now log distinguishably, and the write-up says plainly that
-> the original secret was almost certainly correct all along.
->
-> **What I actually changed about how I work.** Green tests stopped counting as evidence. Every
-> new test now gets sabotage-verified — I break the thing it covers and confirm the test fails,
-> and that step has caught vacuous tests inside the fixes for vacuous tests. Every real bug in
-> this project was found by touching the real provider or by looking at the running product;
-> none was reachable from local testing at any volume. The suite is at 1,282 tests and I trust it
-> considerably less than I did at 400.
+> **What I actually changed about how I work.** Green stopped counting as evidence. Every new test
+> gets sabotage-verified — I break the thing it covers and confirm the test fails — and that step has
+> caught vacuous tests *inside the fixes for vacuous tests*. Every real bug in this project was found
+> by touching the real provider or by looking at the running product: a screenshot, a hover caption,
+> a scanned PDF of my own dashboard. None was reachable from local testing at any volume. Three of my
+> own checking tools were wrong before they were right, all in the same direction — too confident
+> about what they were measuring. The suite is at 1,282 tests and I trust it considerably less than I
+> did at 400.
 
 ---
 

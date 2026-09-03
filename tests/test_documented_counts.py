@@ -76,6 +76,21 @@ DOCS: list[Path] = [d for d in ALL_DOCS if d.name not in HISTORICAL]
 
 #: Numbers this project spells out because they are read aloud.
 WORDS: dict[str, int] = {
+    # Twenty-somethings included because `docs/PITCH.md` carried "Twenty-nine
+    # incidents" long after there were forty-six, and the first version of this
+    # table started at thirty-five -- so the scan could not see it. A lookup
+    # table that only covers the range you expect is the same defect as a DOCS
+    # list that omits the file that drifted.
+    "twenty-five": 25,
+    "twenty-six": 26,
+    "twenty-seven": 27,
+    "twenty-eight": 28,
+    "twenty-nine": 29,
+    "thirty": 30,
+    "thirty-one": 31,
+    "thirty-two": 32,
+    "thirty-three": 33,
+    "thirty-four": 34,
     "thirty-five": 35,
     "thirty-six": 36,
     "thirty-seven": 37,
